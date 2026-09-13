@@ -23,6 +23,11 @@ Coverage includes:
   tab authorization.
 - Private popup pairing, rejection of page-origin pairing requests, failed pairing
   preserving the existing token, storage isolation, and a public ZIP allowlist.
+- Connection probes detect missing or old content scripts, an unavailable chat,
+  active Muse work, and existing drafts without returning conversation text.
+- Content-script cancellation during a pending claim or reply wait, including
+  rapid reconnects, and cancellation before clicking Send without erasing a
+  manually edited draft.
 
 Tests use synthetic DOM fixtures and temporary databases. They do not require
 accounts, contact live services, or establish real-world encryption compatibility.
@@ -81,3 +86,47 @@ installation. Store artwork uses synthetic popup state and is not live-test
 evidence. Longer background tasks, proactive replies, sleep/resume, and long-term
 reliability remain unverified. The project is experimental. See
 [operations](operations.md) for recovery and encryption troubleshooting.
+
+## Version 0.4 development checks
+
+Synthetic tests cover automatic popup deduplication and active-tab checks,
+close-guard removal on disconnect, recent/all/new-only catch-up, delayed replies,
+message revisions, source-receipt deduplication across database restarts, safe
+retry after an import failure, and rejection of unauthorized imports or browser-
+selected Matrix destinations. Version 0.4 is installed locally for user
+verification. The actual Chrome popup, native confirmation dialog, and a live
+catch-up remain unverified until the updated extension is reloaded and connected.
+
+A labeled synthetic diagnostic posted to the new authenticated import endpoint
+was delivered to the configured Beeper Muse chat by the Muse contact
+(`isSender: false`). The imported job finished `done`. This verifies the new
+import queue and encrypted delivery path; it does not verify Chrome's catch-up
+reader, automatic popup, or native leave-page dialog.
+
+## Version 0.5 native mapping checks
+
+The local development build was checked with 45 JavaScript/TypeScript tests, Go
+tests, and the Go race detector. New coverage includes typed snapshots, absolute
+timestamps, status text exclusion, source revision reversions, structured prompt
+echo binding, HTML sanitization, image bounds, encrypted upload results, native
+self identity, and silent-batch policy.
+
+A clearly labeled synthetic batch in the configured private Beeper chat verified:
+
+- An imported user message appeared with `isSender=true`.
+- Original supplied millisecond timestamps matched the Desktop API exactly.
+- A formatted assistant response retained its HTML and had a native PNG attachment.
+- Both assistant parts reported `isUnread=false`; the chat unread count was zero.
+- Reimporting the same batch queued zero messages.
+- A source revision edited the existing message and preserved its original timestamp.
+- A native reaction was saved in the Matrix mapping database and its removal
+  removed that mapping. An explicit source read update completed through the
+  native read-marker path.
+
+These checks used the authenticated local source endpoint and read-only Beeper
+inspection. They did not send a prompt to Muse or establish that every current
+Muse DOM selector works. Chrome automation was unavailable in the session.
+Actual reaction actors and authoritative read state are not exposed by the DOM
+adapter; those capabilities remain disabled pending verified source evidence.
+Notification suppression was verified through batch flags and read/unread state,
+not through observation of operating-system notification banners.

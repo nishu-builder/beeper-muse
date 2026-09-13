@@ -12,7 +12,8 @@ See its [license](https://github.com/mautrix/go/blob/main/LICENSE).
 
 Other direct Go dependencies are [go-sqlite3](https://github.com/mattn/go-sqlite3)
 (MIT, with SQLite in the public domain) and [go.mau.fi/util](https://github.com/mautrix/util)
-(MPL 2.0). The setup wrapper uses [yaml](https://github.com/eemeli/yaml) (ISC).
+(MPL 2.0), plus [golang.org/x/net](https://go.googlesource.com/net)
+(BSD 3-Clause) for parsing and sanitizing HTML. The setup wrapper uses [yaml](https://github.com/eemeli/yaml) (ISC).
 Transitive and development dependencies retain the notices supplied in their
 module or npm distributions.
 

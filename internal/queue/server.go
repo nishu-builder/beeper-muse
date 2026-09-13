@@ -1,6 +1,7 @@
 package queue
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"io"
@@ -11,7 +12,7 @@ import (
 
 var extensionOrigin = regexp.MustCompile(`^chrome-extension://[a-p]{32}$`)
 
-func Handler(q *Queue, token, host string) http.Handler {
+func Handler(q *Queue, token, host string, importer ...func(context.Context, []Incoming) (int, error)) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.Header().Set("Cache-Control", "no-store")
@@ -27,17 +28,19 @@ func Handler(q *Queue, token, host string) http.Handler {
 				http.Error(w, `{"error":"unavailable"}`, 503)
 				return
 			}
-			reply(s)
+			reply(map[string]any{"phase": s.Phase, "queued": s.Queued, "museSync": len(importer) > 0, "sourceProtocol": 2})
 			return
 		}
 		if r.Method != http.MethodPost || !strings.EqualFold(r.Header.Get("Content-Type"), "application/json") {
 			http.NotFound(w, r)
 			return
 		}
-		r.Body = http.MaxBytesReader(w, r.Body, 262144)
+		r.Body = http.MaxBytesReader(w, r.Body, 8*1024*1024)
 		var input *struct {
-			ID   string `json:"id"`
-			Text string `json:"text"`
+			ID       string     `json:"id"`
+			Text     string     `json:"text"`
+			Sources  []Source   `json:"sources"`
+			Messages []Incoming `json:"messages"`
 		}
 		decoder := json.NewDecoder(r.Body)
 		decoder.DisallowUnknownFields()
@@ -58,8 +61,21 @@ func Handler(q *Queue, token, host string) http.Handler {
 				reply(map[string]any{"job": job})
 				return
 			}
+		case "/v2/result":
+			err = q.ResultMessages(input.ID, input.Messages)
 		case "/v1/result":
-			err = q.Result(input.ID, input.Text)
+			err = q.Result(input.ID, input.Text, input.Sources...)
+		case "/v1/import":
+			if len(importer) == 0 {
+				http.NotFound(w, r)
+				return
+			}
+			var added int
+			added, err = importer[0](r.Context(), input.Messages)
+			if err == nil {
+				reply(map[string]any{"ok": true, "added": added})
+				return
+			}
 		case "/v1/block":
 			err = q.Block(input.ID)
 		default:

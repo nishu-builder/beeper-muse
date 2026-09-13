@@ -71,7 +71,9 @@ func (c *Connector) GetBridgeInfoVersion() (int, int) { return 1, 1 }
 func (c *Connector) GetCapabilities() *bridgev2.NetworkGeneralCapabilities {
 	return &bridgev2.NetworkGeneralCapabilities{}
 }
-func (c *Connector) GetDBMetaTypes() database.MetaTypes { return database.MetaTypes{} }
+func (c *Connector) GetDBMetaTypes() database.MetaTypes {
+	return database.MetaTypes{Message: func() any { return &messageMetadata{} }}
+}
 func (c *Connector) GetConfig() (string, any, configupgrade.Upgrader) {
 	return "owner: '@you:beeper.com'\ndata_dir: .local\nrelay_token: ''\n", &c.Config, configupgrade.SimpleUpgrader(func(helper configupgrade.Helper) {
 		helper.Copy(configupgrade.Str, "owner")
@@ -99,7 +101,7 @@ func (c *Connector) Start(ctx context.Context) error {
 		_ = c.queue.Close()
 		return errors.New("browser relay port 24819 is unavailable; stop the old connector first")
 	}
-	c.server = &http.Server{Handler: queue.Handler(c.queue, c.Config.RelayToken, browserAddress), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 8192}
+	c.server = &http.Server{Handler: queue.Handler(c.queue, c.Config.RelayToken, browserAddress, c.importMessages), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 8192}
 	ctx, c.cancel = context.WithCancel(ctx)
 	c.workers.Add(2)
 	go func() {
@@ -209,6 +211,19 @@ func ValidateMembers(owner, bot, muse id.UserID, members map[id.UserID]*event.Me
 	return nil
 }
 
+func (c *Connector) importMessages(ctx context.Context, messages []queue.Incoming) (int, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	portal, err := c.bridge.GetPortalByKey(ctx, networkid.PortalKey{ID: portalID, Receiver: loginID})
+	if err != nil || portal == nil || portal.MXID == "" {
+		return 0, errors.New("Muse chat is not ready")
+	}
+	if err = c.membersSafe(ctx, portal.MXID); err != nil {
+		return 0, err
+	}
+	return c.queue.Import(string(portal.MXID), messages)
+}
+
 func (c *Connector) tick(ctx context.Context) {
 	login := c.bridge.GetCachedUserLoginByID(loginID)
 	if login == nil {
@@ -228,7 +243,21 @@ func (c *Connector) tick(ctx context.Context) {
 		c.bridge.Log.Error().Msg("Muse reply blocked: the destination could not be validated")
 		return
 	}
+	if job.Payload != "" {
+		deliveryCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
+		defer cancel()
+		if err := c.deliverSource(deliveryCtx, login, portal, job); err != nil {
+			_ = c.queue.Block(job.ID)
+			c.bridge.Log.Error().Msg("Structured Muse delivery blocked; inspect the queue before retrying")
+		}
+		return
+	}
+
 	replyID := networkid.MessageID("muse:" + job.ID)
+	var replyTo *networkid.MessageOptionalPartID
+	if !strings.HasPrefix(job.EventID, "muse-dom:") {
+		replyTo = &networkid.MessageOptionalPartID{MessageID: networkid.MessageID("user:" + job.ID)}
+	}
 	result := login.QueueRemoteEvent(&simplevent.PreConvertedMessage{
 		EventMeta: simplevent.EventMeta{
 			Type: bridgev2.RemoteEventMessage, PortalKey: portal.PortalKey, Sender: bridgev2.EventSender{Sender: museID}, Timestamp: time.Now(),
@@ -245,7 +274,7 @@ func (c *Connector) tick(ctx context.Context) {
 			},
 		},
 		ID: replyID, Data: &bridgev2.ConvertedMessage{
-			ReplyTo: &networkid.MessageOptionalPartID{MessageID: networkid.MessageID("user:" + job.ID)},
+			ReplyTo: replyTo,
 			Parts:   []*bridgev2.ConvertedMessagePart{{Type: event.EventMessage, Content: &event.MessageEventContent{MsgType: event.MsgText, Body: job.Result}}},
 		},
 	})

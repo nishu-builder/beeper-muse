@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
+const sync = await readFile(
+  new URL('../extension/sync.js', import.meta.url),
+  'utf8',
+);
 const adapter = await readFile(
   new URL('../extension/adapter.js', import.meta.url),
   'utf8',
@@ -22,11 +26,15 @@ function fixture() {
     bottom: 40,
     toJSON: () => ({}),
   });
+  dom.window.eval(sync);
   dom.window.eval(adapter);
   return {
     dom,
     document: dom.window.document,
-    adapter: dom.window.BeeperMuseDOM,
+    adapter: {
+      ...dom.window.BeeperMuseDOM,
+      responseAfter: dom.window.BeeperMuseSync.responseAfter,
+    },
   };
 }
 test('browser adapter preserves an existing user draft and never sends it', async () => {
@@ -66,6 +74,33 @@ test('browser adapter uses the textarea input event and clicks Send exactly once
   assert.equal(inputs, 1);
   assert.equal(before.has('old'), true);
   f.dom.window.close();
+});
+
+test('disconnect during composer preparation cancels Send and clears only the inserted draft', async () => {
+  for (const manualEdit of [false, true]) {
+    const f = fixture();
+    let active = true,
+      sends = 0;
+    const field = f.document.querySelector('textarea')!;
+    f.document.querySelector('button')!.onclick = () => {
+      sends++;
+    };
+    await assert.rejects(
+      f.adapter.submit(
+        f.document,
+        'Synthetic prompt',
+        async () => {
+          active = false;
+          if (manualEdit) field.value = 'My edited draft';
+        },
+        () => active,
+      ),
+      /disconnected/,
+    );
+    assert.equal(sends, 0);
+    assert.equal(field.value, manualEdit ? 'My edited draft' : '');
+    f.dom.window.close();
+  }
 });
 test('browser response capture excludes history, buttons, and widgets, and preserves links', () => {
   const f = fixture();
@@ -131,5 +166,57 @@ test('reactions outside user and assistant bubbles cannot change prompt or reply
     ),
     'I am checking the available options.',
   );
+  f.dom.window.close();
+});
+test('a real You: prompt prefix is preserved independently of the accessibility label', () => {
+  const f = fixture();
+  f.document
+    .querySelector('[role="log"]')!
+    .insertAdjacentHTML(
+      'beforeend',
+      '<div data-message-item data-message-id="u" data-message-role="user"><div class="hatch-chat-groupable-bubble"><span class="sr-only">You:</span><p>You: explain this</p></div></div>' +
+        '<div data-message-item data-message-id="r" data-message-role="assistant"><p>Synthetic answer</p></div>',
+    );
+  const snapshot = f.adapter.snapshot(f.document);
+  assert.equal(
+    snapshot.messages.find((m: { id: string }) => m.id === 'u').text,
+    'You: explain this',
+  );
+  assert.equal(
+    f.adapter.responseAfter(new Set(['old']), 'You: explain this', snapshot),
+    'Synthetic answer',
+  );
+  f.dom.window.close();
+});
+
+test('structured snapshots preserve formatting, resolve image URLs, and exclude status UI', () => {
+  const f = fixture();
+  f.document.querySelector('[role="log"]')!.innerHTML =
+    `<div data-message-item data-message-id="a" data-message-role="assistant"><div class="hatch-chat-groupable-bubble"><p>See <strong>this</strong> <a href="https://example.com">item</a></p><img src="/image.png" alt="Sample"><span role="status">Delivered</span><div class="reactions">A reaction</div></div><time datetime="2026-09-01T12:30:00-07:00">12:30 PM</time></div>`;
+  const m = f.adapter.snapshot(f.document).messages[0];
+  assert.match(m.html, /<strong>this<\/strong>/);
+  assert.equal(m.images[0].url, 'https://muse.ai/image.png');
+  assert.equal(m.timestampMs, Date.parse('2026-09-01T19:30:00Z'));
+  assert.doesNotMatch(m.text, /Delivered|reaction|12:30/);
+  assert.equal(m.read, undefined);
+  assert.equal(m.reactions, undefined);
+  f.document.querySelector('time')!.setAttribute('datetime', '12:30 PM');
+  assert.equal(
+    f.adapter.snapshot(f.document).messages[0].timestampMs,
+    undefined,
+  );
+  f.dom.window.close();
+});
+
+test('an image-only answer completes capture and retains the attachment', () => {
+  const f = fixture();
+  f.document.querySelector('[role="log"]')!.innerHTML =
+    '<div data-message-item data-message-id="u" data-message-role="user">Draw a shape</div><div data-message-item data-message-id="a" data-message-role="assistant" data-message-has-presentation="true"><img src="https://example.com/shape.png" alt="Shape"></div>';
+  const view = f.adapter.snapshot(f.document);
+  assert.equal(
+    f.adapter.responseAfter(new Set(), 'Draw a shape', view),
+    '[Image]',
+  );
+  assert.equal(view.messages[1].images[0].url, 'https://example.com/shape.png');
   f.dom.window.close();
 });

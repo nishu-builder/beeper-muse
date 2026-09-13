@@ -49,6 +49,12 @@
           Open and sign in to Muse in Chrome, then connect that tab. Send
           ordinary messages in your <strong>Muse</strong> chat in Beeper.
         </p>
+        <label for="history-mode">Catch up when connecting</label>
+        <select id="history-mode">
+          <option value="recent">Most recent 20 messages</option>
+          <option value="all">All messages loaded in Muse</option>
+          <option value="new">Only new messages</option>
+        </select>
         <button id="connect" class="primary" type="button">
           Connect this Muse tab
         </button>
@@ -56,6 +62,18 @@
         <p class="note">
           Keep the tab open and its composer empty. Review approvals and
           attachments inside Muse.
+        </p>
+        <p class="note">
+          Closing this tab disconnects Muse from Beeper. Chrome asks before you
+          leave once you have clicked in the Muse page. Use
+          <strong>Disconnect tab</strong>
+          first to close it without our warning.
+        </p>
+        <p class="note">
+          New messages and later replies from Muse also appear in Beeper. Your
+          Muse messages appear as you. Catch-up is imported without new-message
+          notifications. Formatting and accessible images are included;
+          interactive controls stay in Muse.
         </p>
         <details>
           <summary>Change bridge</summary>
@@ -76,7 +94,7 @@
           target="_blank"
           rel="noreferrer"
           >Privacy</a
-        ><span>Experimental · text only</span>
+        ><span>Experimental</span>
       </footer>
     </main>
     <script src="popup.js"></script>

@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Beeper Muse",
   "description": "Connect your dedicated Muse chat in Beeper to your signed-in Muse browser tab.",
-  "version": "0.3.0",
+  "version": "0.5.0",
   "permissions": ["storage", "activeTab"],
   "host_permissions": ["http://127.0.0.1:24819/*"],
   "background": {
@@ -18,11 +18,11 @@
   "content_scripts": [
     {
       "matches": ["https://muse.ai/*"],
-      "js": ["adapter.js", "content.js"],
+      "js": ["adapter.js", "sync.js", "content.js"],
       "run_at": "document_idle"
     }
   ],
-  "minimum_chrome_version": "102",
+  "minimum_chrome_version": "127",
   "homepage_url": "https://github.com/nishu-builder/beeper-muse",
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'"

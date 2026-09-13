@@ -33,3 +33,11 @@ limits and current Beeper compatibility findings.
 
 Initial text-only prototype using explicit commands in Beeper Note to self and a
 local Chrome extension. Superseded by the custom bridge in 0.2.
+
+## 0.5.0 — development
+
+- Introduce a strict typed Muse adapter contract and a separate native Matrix translator.
+- Use native self-sending, silent catch-up batches, formatted messages, encrypted image uploads, and edits.
+- Preserve source timestamps when available and distinguish first-observed fallback times.
+- Support native reactions/read markers in the source protocol; the DOM adapter leaves unverified state unknown.
+- Preserve old import receipts and erase completed structured payloads, including image bytes.

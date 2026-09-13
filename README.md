@@ -8,12 +8,17 @@ bridge.
 [Setup guide](docs/setup.md) · [Extension download](https://github.com/nishu-builder/beeper-muse/releases/latest)
 · [Privacy](PRIVACY.md) · [Troubleshooting](docs/operations.md)
 
+The source now includes version 0.5.0 structured message sync. Build
+both the local bridge and extension from this source to use them; the existing
+0.3.0 release ZIP does not include these changes. See [the component design](docs/architecture.md)
+for how a future Muse API can replace the browser adapter.
+
 Version 0.3.0 was submitted to Chrome Web Store on September 13, 2026 and is
 **pending review**. Until Google approves it, use the release ZIP or load the
 source extension as described below. **The extension
 requires the local bridge; installing it alone does not create a Beeper chat.**
 
-**Experimental and text-only.** The Beeper side uses the mautrix `bridgev2`
+**Experimental.** The Beeper side uses the mautrix `bridgev2`
 framework. The Muse side operates the signed-in website through a Chrome
 extension; it is not an official Muse API. Website changes can interrupt it.
 
@@ -32,7 +37,7 @@ Chrome extension ↔ your signed-in Muse conversation
 - Go 1.26 or newer, Node.js 24 or newer, npm, and a C compiler for SQLite.
   On macOS, the Xcode command line tools supply the compiler.
 - macOS or Linux. Native Windows is not supported by bbctl; WSL is untested here.
-- Chrome 102 or newer, and a signed-in [Muse](https://muse.ai/)
+- Chrome 127 or newer, and a signed-in [Muse](https://muse.ai/)
   account. Keep that browser tab and the bridge process running.
 
 The Beeper Desktop local API is **not required** by this bridge. Setup uses
@@ -73,7 +78,9 @@ Leave that terminal running, then:
    **Pair bridge**. Keep this code private; it stays on this computer.
 4. Open Muse's main chat and sign in. Reload the page if it was open before the
    extension was installed.
-5. Click the extension's toolbar button and choose **Connect this Muse tab**.
+5. The popup opens automatically if no Muse tab is connected. Choose how much
+   loaded history to catch up, then click **Connect this Muse tab**. You can also
+   open the popup from the toolbar.
 6. Close the popup and send a message in the **Muse** chat in Beeper.
 
 A separate **Muse** conversation appears in Beeper. Send a short message there,
@@ -100,8 +107,13 @@ extension and `24820` for the Matrix application service, are fixed.
 
 - One owner, one Muse contact, one existing Muse web conversation. This does not
   create a separate Muse agent or copy its memory into Beeper.
-- Only new text messages are forwarded. No history import, edits, deletions,
-  reactions, attachments, or automatic approvals of Muse actions.
+- Connecting imports the most recent 20 loaded messages by default. Choose
+  all loaded messages or only new messages in the popup. Messages written in Muse
+  appear as you through Beeper's existing double-puppet session; assistant replies
+  come from Muse. Catch-up uses silent Matrix batches. Text formatting and
+  accessible PNG/JPEG/GIF/WebP images are included; blocked images remain links.
+  Interactive cards and approvals stay in Muse. No automatic scrolling, whole-message
+  deletion sync, or Beeper-to-Muse attachments are supported.
 - One prompt runs at a time, with up to 20 outstanding prompts. Prompts support
   8,000 Unicode characters. Browser replies are capped at 23,000 JavaScript
   characters, with an explicit truncation notice.
@@ -110,8 +122,15 @@ extension and `24820` for the Matrix application service, are fixed.
   response capture.
 - Reply capture checks for the submitted prompt's echo, then waits for four
   seconds without changes after Muse's Stop button disappears. This is a website
-  heuristic: background work, proactive updates, widgets, and later responses are
-  not fully mirrored. Open Muse to review them.
+  heuristic. A separate observer captures later text messages and revisions after
+  the prompt finishes, without requiring another Beeper message. Revisions use native Matrix edits. Original timestamps are used when the DOM
+  exposes an absolute timestamp; otherwise the first observation time is used
+  and marked as such in event metadata. The browser adapter does not yet expose
+  authoritative reaction actors or read receipts, so it does not fabricate them.
+  The typed protocol and Matrix translator support both for a future adapter.
+- The popup opens once per Muse tab when no healthy tab is connected. Closing,
+  reloading, or leaving a connected tab requests Chrome's standard confirmation,
+  after you have interacted with that webpage. Disconnect first to remove it.
 - Jobs interrupted during a send are blocked for inspection. They are not
   automatically replayed. There is no end-to-end exactly-once guarantee.
 - This is a custom chat network, but Beeper may label its network as `bridgev2`.
