@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.3.0
+
+- Fix dropped replies when Muse adds a reaction beside a message bubble; prompt
+  matching and reply capture now exclude sibling reactions and toolbars.
+- Ship a public Chrome extension with a popup pairing flow, local private token
+  storage, explicit connection feedback, and a Forget this bridge control.
+- Replace generated private extension copies with `.local/pairing-code.txt`.
+- Add a reproducible public ZIP allowlist, release checksums, tag-triggered
+  GitHub releases, and optional protected Chrome Web Store V2 submissions.
+- Add installation, upgrade, privacy, store, and maintainer release instructions.
+- Verify the corrected installed adapter with an automatic encrypted Beeper to
+  Muse to Beeper round trip. Store installation remains separately unverified.
+
 ## 0.2.0
 
 - Replace the Note to self relay with a custom mautrix bridgev2 network.

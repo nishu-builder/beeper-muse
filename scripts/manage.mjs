@@ -3,7 +3,6 @@ import { randomBytes } from 'node:crypto';
 import {
   access,
   chmod,
-  cp,
   mkdir,
   readFile,
   rename,
@@ -136,15 +135,16 @@ async function setup() {
     writers: [{ type: 'stdout', format: 'pretty' }],
   };
   await privateWrite(configPath, stringify(config));
-  const extensionDir = join(dataDir, 'extension');
-  await mkdir(extensionDir, { recursive: true, mode: 0o700 });
-  await cp(join(root, 'extension'), extensionDir, { recursive: true });
-  await privateWrite(
-    join(extensionDir, 'local-config.json'),
-    JSON.stringify({ baseURL: 'http://127.0.0.1:24819', token }) + '\n',
-  );
+  await writePairingCode(token);
+}
+
+async function writePairingCode(token) {
+  if (!/^[a-f0-9]{64}$/.test(token || ''))
+    throw new UserError('Run bridge setup first.');
+  const path = join(dataDir, 'pairing-code.txt');
+  await privateWrite(path, token + '\n');
   console.log(
-    `Bridge configured. Load this private extension folder in Chrome:\n${extensionDir}\nThen run npm start -- start and connect a signed-in Muse tab.`,
+    `Your private pairing code is saved in:\n${path}\nOpen that file and paste the code into the Beeper Muse extension.\nKeep it private. Start the bridge with npm start -- start before pairing.`,
   );
 }
 
@@ -152,6 +152,10 @@ async function main() {
   const command = process.argv[2] || 'help';
   if (process.argv.length > 3) throw new Error('Unexpected arguments.');
   if (command === 'setup') return setup();
+  if (command === 'pairing-code') {
+    const config = parse(await readFile(configPath, 'utf8'));
+    return writePairingCode(config.network?.relay_token);
+  }
   if (command === 'start')
     return run(binary, ['--config', configPath, '--no-update']);
   if (command === 'acknowledge') return run(binary, ['acknowledge', dataDir]);
@@ -170,7 +174,7 @@ async function main() {
   if (!['help', '--help', '-h'].includes(command))
     throw new Error('Unknown command.');
   console.log(
-    'Beeper Muse custom bridge\n\n  npm start -- setup         Register the bridge and prepare the extension\n  npm start -- start         Run the bridge\n  npm start -- status        Inspect the queue without printing messages\n  npm start -- acknowledge   Resolve an interrupted job after checking both apps\n\nSend ordinary messages in the dedicated Muse chat. Keep the connected Muse browser tab open.',
+    'Beeper Muse custom bridge\n\n  npm start -- setup         Register the bridge and save a private pairing code\n  npm start -- pairing-code  Save your private code for extension pairing\n  npm start -- start         Run the bridge\n  npm start -- status        Inspect the queue without printing messages\n  npm start -- acknowledge   Resolve an interrupted job after checking both apps\n\nSend ordinary messages in the dedicated Muse chat. Keep the connected Muse browser tab open.',
   );
 }
 main().catch((error) => {

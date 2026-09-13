@@ -2,7 +2,7 @@
 
 Report vulnerabilities through
 [GitHub private vulnerability reporting](https://github.com/nishu-builder/beeper-muse/security/advisories/new).
-Do not publish tokens, private messages, logs, or pairing codes. Version 0.2.x is
+Do not publish tokens, private messages, logs, or pairing codes. Version 0.3.x is
 the maintained experimental series; there is no guaranteed support SLA.
 
 ## Trust and permissions
@@ -45,11 +45,14 @@ from active rows but retains identifiers for deduplication. SQLite pages, WAL
 files, backups, and filesystem snapshots may retain previous content; this is
 not secure erasure.
 
-`.local/bbctl.json` contains bbctl authentication configuration. The generated
-`.local/extension/local-config.json` contains the browser token. Setup creates
-owner-only configuration files and a private directory on Unix. Protect backups
-and the local account. The source `extension/` directory has no credentials;
-never distribute the generated copy.
+`.local/bbctl.json` contains bbctl authentication configuration.
+`.local/pairing-code.txt` contains the browser token. Setup creates owner-only
+configuration files and a private directory on Unix. The popup verifies the code
+against the running bridge before saving it to trusted-context-only Chrome local
+storage. Protect backups and the local account. Public extension files contain
+no credentials; the release packager uses an explicit file allowlist. Old 0.2
+installations may still have a private `.local/extension/local-config.json`;
+never distribute that generated copy. See [privacy](PRIVACY.md).
 
 ## Failure boundaries
 

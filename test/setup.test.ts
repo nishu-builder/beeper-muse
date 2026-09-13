@@ -50,7 +50,7 @@ async function fixture(t: TestContext) {
   };
 }
 
-test('setup preserves credentials, restricts recipients, and generates a private paired extension', async (t) => {
+test('setup preserves credentials, restricts recipients, and writes a private pairing code', async (t) => {
   const f = await fixture(t);
   await writeFile(
     join(f.dir, 'connection.json'),
@@ -74,11 +74,14 @@ test('setup preserves credentials, restricts recipients, and generates a private
   );
   assert.match(config.encryption.pickle_key, /^[a-f0-9]{64}$/);
   assert.equal(config.network.relay_token, syntheticToken);
-  assert.deepEqual(
-    JSON.parse(
-      await readFile(join(f.dir, 'extension/local-config.json'), 'utf8'),
-    ),
-    { baseURL: 'http://127.0.0.1:24819', token: syntheticToken },
+  assert.equal(
+    (await readFile(join(f.dir, 'pairing-code.txt'), 'utf8')).trim(),
+    syntheticToken,
+  );
+  await assert.rejects(stat(join(f.dir, 'extension')));
+  assert.equal(
+    (await stat(join(f.dir, 'pairing-code.txt'))).mode & 0o777,
+    0o600,
   );
   assert.equal((await stat(join(f.dir, 'bridge.yaml'))).mode & 0o777, 0o600);
   assert.equal((await stat(f.dir)).mode & 0o777, 0o700);

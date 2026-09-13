@@ -1,25 +1,77 @@
 const status = document.getElementById('status');
-async function refresh() {
+const pairing = document.getElementById('pairing');
+const controls = document.getElementById('controls');
+const code = document.getElementById('pair-code');
+const connect = document.getElementById('connect');
+const disconnect = document.getElementById('disconnect');
+async function send(message) {
   try {
-    const result = await chrome.runtime.sendMessage({ type: 'status' });
-    status.textContent = result?.ok
-      ? `${result.connected ? 'Tab connected' : 'No tab connected'} · ${result.phase} · ${result.queued} queued`
-      : 'Start the local connector, then connect a Muse tab.';
+    return await chrome.runtime.sendMessage(message);
   } catch {
-    status.textContent = 'Run setup and start the local connector.';
+    return { ok: false, error: 'Reload the extension and try again.' };
   }
 }
-document.getElementById('connect').onclick = async () => {
-  const result = await chrome.runtime.sendMessage({ type: 'attach' });
+async function refresh() {
+  const result = await send({ type: 'status' });
   if (!result?.ok) {
+    status.textContent = result?.error || 'Cannot check the local bridge.';
+    return;
+  }
+  pairing.hidden = result.paired;
+  controls.hidden = !result.paired;
+  connect.disabled = !result.reachable || result.connected;
+  connect.textContent = result.connected
+    ? 'Muse tab connected'
+    : 'Connect this Muse tab';
+  disconnect.disabled = !result.connected;
+  if (!result.paired)
+    status.textContent = 'First, pair with the bridge on this computer.';
+  else if (!result.reachable)
+    status.textContent = 'Paired. Start the local bridge to continue.';
+  else if (result.phase === 'blocked')
     status.textContent =
-      'Open the main Muse chat and reload it after installing this extension.';
+      'A message needs attention. Follow Recovery in the setup guide.';
+  else if (result.connected)
+    status.textContent = `Connected · ${result.queued} queued. Send a message in Beeper.`;
+  else status.textContent = 'Bridge ready. Open Muse and connect its tab.';
+}
+document.getElementById('pair-form').onsubmit = async (event) => {
+  event.preventDefault();
+  const button = document.getElementById('pair');
+  button.disabled = true;
+  const candidate = code.value;
+  code.value = '';
+  status.textContent = 'Checking your pairing code…';
+  const result = await send({ type: 'pair', token: candidate });
+  button.disabled = false;
+  if (!result?.ok) {
+    status.textContent = result?.error || 'Could not pair with the bridge.';
     return;
   }
   await refresh();
 };
-document.getElementById('disconnect').onclick = async () => {
-  await chrome.runtime.sendMessage({ type: 'detach' });
+connect.onclick = async () => {
+  connect.disabled = true;
+  status.textContent = 'Connecting this Muse tab…';
+  const result = await send({ type: 'attach' });
+  if (!result?.ok) {
+    connect.disabled = false;
+    status.textContent = result?.error || 'Could not connect this Muse tab.';
+    return;
+  }
+  await refresh();
+};
+disconnect.onclick = async () => {
+  await send({ type: 'detach' });
+  await refresh();
+};
+document.getElementById('forget').onclick = async () => {
+  const result = await send({ type: 'forget' });
+  if (!result?.ok) {
+    status.textContent = result?.error || 'Could not remove the pairing.';
+    return;
+  }
+  code.value = '';
   await refresh();
 };
 void refresh();
