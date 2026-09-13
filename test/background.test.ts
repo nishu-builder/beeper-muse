@@ -14,17 +14,33 @@ interface Sender {
   id: string;
   url: string;
   tab?: { id: number };
+  frameId?: number;
 }
 type Reply = Record<string, unknown>;
 function harness(paired = true) {
-  const saved: { tabID?: number } = {};
-  const local: { bridgeToken?: string } = paired ? { bridgeToken: token } : {};
+  const saved: {
+    tabID?: number;
+    offeredTabs?: number[];
+    museSync?: boolean;
+    imported?: number;
+    syncError?: boolean;
+  } = {};
+  const local: { bridgeToken?: string; historyMode?: string } = paired
+    ? { bridgeToken: token }
+    : {};
+  let active: { id: number; windowId: number; url?: string } = {
+    id: 7,
+    windowId: 1,
+    url: 'https://muse.ai/',
+  };
+  let opens = 0;
+  let popupOpen = false;
   const requests: Array<{ url: string; options?: RequestInit }> = [];
   let restricted = false,
     reachable = true,
     receiver = true;
   let health = 'ready';
-  let protocol = 1;
+  let protocol = 2;
   let listener!: (
     message: unknown,
     sender: Sender,
@@ -40,12 +56,20 @@ function harness(paired = true) {
         ok: reachable,
         json: async () =>
           url.endsWith('/v1/status')
-            ? { phase: 'idle', queued: 0 }
-            : { job: { id: 'job', prompt: 'Synthetic prompt' } },
+            ? { phase: 'idle', queued: 0, museSync: true }
+            : url.endsWith('/v1/import')
+              ? { ok: true, added: 1 }
+              : { job: { id: 'job', prompt: 'Synthetic prompt' } },
       };
     },
     chrome: {
+      action: {
+        openPopup: async () => {
+          opens++;
+        },
+      },
       runtime: {
+        getContexts: async () => (popupOpen ? [{ contextType: 'POPUP' }] : []),
         id: extensionID,
         getURL: extensionURL,
         onMessage: {
@@ -81,7 +105,7 @@ function harness(paired = true) {
         },
       },
       tabs: {
-        query: async () => [{ id: 7, url: 'https://muse.ai/' }],
+        query: async () => [active],
         sendMessage: async () => {
           if (!receiver) throw new Error('No content script');
           return { protocol, health };
@@ -102,6 +126,15 @@ function harness(paired = true) {
     requests,
     local,
     saved,
+    get opens() {
+      return opens;
+    },
+    popupOpen: () => {
+      popupOpen = true;
+    },
+    active: (value: typeof active) => {
+      active = value;
+    },
     send,
     offline: () => {
       reachable = false;
@@ -121,9 +154,9 @@ function harness(paired = true) {
         { type, ...extra },
         { id: extensionID, url: extensionURL('popup.html') },
       ),
-    tab: (type: string) =>
+    tab: (type: string, extra = {}) =>
       send(
-        { type },
+        { type, ...extra },
         { id: extensionID, url: 'https://muse.ai/', tab: { id: 7 } },
       ),
   };
@@ -149,6 +182,71 @@ test('a public extension pairs only through its popup after validating the priva
   assert.equal(h.local.bridgeToken, token);
   assert.ok(!JSON.stringify(paired).includes(token));
   assert.equal(h.requests[0]?.url, 'http://127.0.0.1:24819/v1/status');
+});
+
+test('automatic popup is offered once, only for the active main Muse tab', async () => {
+  const h = harness(false);
+  assert.equal((await h.tab('offer-popup')).offered, true);
+  await h.tab('offer-popup');
+  assert.equal(h.opens, 1);
+  assert.equal(h.requests.length, 0);
+  await h.close(7);
+  h.active({ id: 8, windowId: 1, url: 'https://example.com/' });
+  assert.equal((await h.tab('offer-popup')).offered, false);
+  assert.equal(h.opens, 1);
+  assert.equal(
+    (
+      await h.send(
+        { type: 'offer-popup' },
+        {
+          id: extensionID,
+          url: 'https://muse.ai/',
+          tab: { id: 8 },
+          frameId: 1,
+        },
+      )
+    ).ok,
+    false,
+  );
+});
+
+test('another healthy connected Muse tab suppresses automatic popups', async () => {
+  const h = harness();
+  await h.popup('attach');
+  h.active({ id: 8, windowId: 1, url: 'https://muse.ai/' });
+  const result = await h.send(
+    { type: 'offer-popup' },
+    { id: extensionID, url: 'https://muse.ai/', tab: { id: 8 } },
+  );
+  assert.equal(result.offered, false);
+  assert.equal(h.opens, 0);
+});
+test('an already open extension popup is not opened again', async () => {
+  const h = harness();
+  h.popupOpen();
+  assert.equal((await h.tab('offer-popup')).offered, true);
+  assert.equal(h.opens, 0);
+});
+
+test('automatic popup can connect via a Muse content probe without an activeTab URL grant', async () => {
+  const h = harness();
+  h.active({ id: 7, windowId: 1 });
+  assert.equal((await h.popup('attach', { historyMode: 'new' })).ok, true);
+  assert.equal(h.local.historyMode, 'new');
+  assert.equal((await h.tab('connected')).museSync, true);
+});
+
+test('Muse imports require the connected tab and report durable enqueue progress', async () => {
+  const h = harness();
+  const messages = [{ id: 'm1', role: 'assistant', text: 'Synthetic message' }];
+  assert.equal((await h.tab('import', { messages })).ok, false);
+  await h.popup('attach');
+  assert.equal((await h.tab('import', { messages })).ok, true);
+  assert.equal(h.saved.imported, 1);
+  assert.equal(h.requests.at(-1)?.url, 'http://127.0.0.1:24819/v1/import');
+  h.offline();
+  assert.equal((await h.tab('import', { messages })).ok, false);
+  assert.equal(h.saved.syncError, true);
 });
 test('a failed pairing does not replace existing credentials and never echoes a token', async () => {
   const h = harness();

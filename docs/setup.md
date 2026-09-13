@@ -5,13 +5,13 @@ your dedicated Muse chat in Beeper, and the Chrome extension, which connects tha
 chat to your existing signed-in Muse conversation. Both must stay running.
 
 This is an experimental community project, unaffiliated with Beeper or Meta.
-It supports new text messages. It does not import chat history or handle Muse's
-approvals, attachments, product cards, or later background updates.
+It supports text messages in both directions and selected catch-up from the
+loaded Muse chat. Approvals, attachments, and product cards stay in Muse.
 
 ## 1. Prepare your computer
 
 You need macOS or Linux, a Beeper account, access to Muse at <https://muse.ai/>,
-Chrome 102 or newer, Git, Node.js 24 or newer, Go 1.26 or newer, and a C compiler
+Chrome 127 or newer, Git, Node.js 24 or newer, Go 1.26 or newer, and a C compiler
 for SQLite. On macOS, install the Xcode command line tools if needed.
 
 Install [bbctl](https://github.com/beeper/bridge-manager), Beeper's official
@@ -47,6 +47,8 @@ account directly; enabling the Beeper Desktop local API is not necessary.
 
 ## 3. Install the Chrome extension
 
+The current source includes version 0.4.0. Until that version is released, use
+**From source** below and rebuild the bridge for catch-up and automatic popups.
 Version 0.3.0 is pending Chrome Web Store review as of September 13, 2026.
 Until it is approved, choose one of these:
 
@@ -81,7 +83,9 @@ from a second terminal in this repository. That preserves your current pairing.
 2. Refresh the page if it was open before you installed or reloaded the extension.
 3. Leave the main chat open with an empty composer. Wait for active Muse work to
    finish.
-4. Open the extension and click **Connect this Muse tab**. The button changes to
+4. The extension popup opens automatically if no Muse tab is connected. Choose
+   **Most recent 20 messages**, **All messages loaded in Muse**, or **Only new
+   messages**, then click **Connect this Muse tab**. The button changes to
    **Muse tab connected** after checking that Muse's chat is available. The popup
    tells you if a draft or active Muse work is holding up the queue. You only
    need to connect once per browser session.
@@ -89,15 +93,19 @@ from a second terminal in this repository. That preserves your current pairing.
    `Reply with exactly: MUSE_CONNECTED`.
 
 The prompt should appear in Muse, followed by a reply from the Muse contact in
-Beeper. The Connect button itself does not send a test message. `0 queued` means
-there is no outstanding prompt. Messages typed directly in Muse and replies to
-those messages are not imported into Beeper. Check [validation](validation.md)
+Beeper. The Connect button begins the selected catch-up; it does not send a test prompt
+to Muse. New text messages in Muse are also copied to Beeper. Your Muse-side
+messages are labeled **You in Muse**, and later revisions appear as **Updated
+Muse reply** messages. Source IDs and content hashes prevent duplicate imports
+after a reload. Allow time for the queued history to be delivered. Check [validation](validation.md)
 for the current tested scope.
 
 Keep the local bridge and Chrome running and the Muse tab open. Do not compose
 manual messages in the attached tab while a bridge prompt is running. After
-restarting Chrome, reconnect the tab. Use **Disconnect tab** before switching
-to another tab or using Muse directly.
+restarting Chrome, reconnect the tab. Use **Disconnect tab** before connecting a different Muse tab. Closing, refreshing,
+or navigating away from the connected tab requests Chrome's standard leave-page
+confirmation. Chrome only displays it after interaction with the webpage and
+controls its wording. Disconnect first to close without the extension's warning.
 
 ## Recovery
 
@@ -131,3 +139,20 @@ For future updates, store installations update the extension through Chrome.
 For unpacked installations, replace the extracted public files and click
 **Reload** at `chrome://extensions`, then refresh Muse and reconnect. Review
 release notes before updating the local bridge.
+
+## Upgrade for Muse-side sync
+
+Version 0.4 requires an updated local bridge as well as the extension. Wait for
+an idle queue, stop the bridge, back up `.local/`, update the source, run
+`npm ci --ignore-scripts` and `npm run build`, then start the bridge again. Keep
+your existing registration and pairing. Reload the extension, refresh Muse, and
+reconnect. The popup reports an older bridge instead of promising catch-up it
+cannot provide. Earlier messages already forwarded by version 0.3 have no Muse
+source receipts, so the first catch-up can overlap that earlier conversation.
+
+The first catch-up covers only text currently loaded by Muse. The extension
+does not scroll through the entire account or switch conversations for you.
+
+Chrome controls the leave-page dialog and requires prior interaction with the
+webpage. See [Chrome popup support](https://developer.chrome.com/docs/extensions/reference/api/action#method-openPopup)
+and [the browser confirmation requirements](https://developer.mozilla.org/en-US/docs/Web/API/Window/beforeunload_event).

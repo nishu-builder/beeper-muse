@@ -41,3 +41,26 @@ v0.30.0, which can dispatch queued keys while the handler map is still changing.
 The wrapper preserves the original crypto implementation, trust checks, and
 errors. Long-polling mode is unchanged. Reassess this wrapper when upgrading the
 framework; do not register listeners twice.
+
+## Muse-side imports
+
+The sync tracker observes settled text in the connected tab independently of a
+Beeper prompt. A batch contains source ID, role, and text; it cannot choose a
+Matrix destination. The connector resolves the configured private portal and
+validates its membership before accepting imports. Imported jobs enter `ready`
+and use the same authenticated, encrypted Matrix delivery path. User-originated
+Muse text is labeled explicitly and sent by the Muse contact, avoiding owner
+impersonation and preventing imported text from becoming another Muse prompt.
+
+Each source ID and SHA-256 of its role/text is inserted atomically with its
+delivery job. Repeated snapshots and reconnects are idempotent. New text for the
+same ID produces an explicitly labeled update. A normal Beeper reply records its
+source receipts atomically with its result so the observer cannot import it a
+second time. Completed bodies are cleared; deduplication receipts retain only
+identifiers and hashes. Older version 0.3 deliveries have no such receipts.
+
+Automatic popups are restricted to the active main Muse tab, shown once per tab,
+and suppressed while another healthy tab is attached. They do not attach a tab
+or import messages by themselves. Content protocol version 2 rejects stale
+scripts after an update. The browser owns close-confirmation wording and user
+activation requirements. Disconnect removes the extension's beforeunload guard.

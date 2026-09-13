@@ -1,6 +1,6 @@
 {
   "name": "beeper-muse",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Custom Beeper bridge for a dedicated Muse chat, connected directly through your browser.",
   "type": "module",
   "private": true,

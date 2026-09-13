@@ -4,6 +4,19 @@
   let polling = false;
   let stopped = false;
   let generation = 0;
+  let closeGuard = false;
+  let popupOffered = false;
+  let offeringPopup = false;
+  const warnBeforeClosing = (event) => {
+    event.preventDefault();
+    event.returnValue = true;
+  };
+  function guardClosing(connected) {
+    if (connected === closeGuard) return;
+    closeGuard = connected;
+    if (connected) window.addEventListener('beforeunload', warnBeforeClosing);
+    else window.removeEventListener('beforeunload', warnBeforeClosing);
+  }
   function health() {
     if (location.origin !== 'https://muse.ai' || location.pathname !== '/')
       return 'unavailable';
@@ -19,6 +32,27 @@
       if (!result?.ok) throw new Error('Local connector request failed.');
       return result;
     });
+  let tracker = new BeeperMuseSync.Tracker(send);
+  async function offerPopup() {
+    if (
+      popupOffered ||
+      offeringPopup ||
+      stopped ||
+      document.visibilityState !== 'visible' ||
+      location.origin !== 'https://muse.ai' ||
+      location.pathname !== '/'
+    )
+      return;
+    offeringPopup = true;
+    try {
+      const result = await send({ type: 'offer-popup' });
+      popupOffered = result.offered === true;
+    } catch {
+      // The toolbar remains available if Chrome cannot open a popup automatically.
+    } finally {
+      offeringPopup = false;
+    }
+  }
   async function execute(job, current) {
     const active = () => !stopped && generation === current;
     try {
@@ -44,12 +78,19 @@
           continue;
         }
         if (Date.now() - stableSince >= 4000) {
+          const sources = await Promise.all(
+            BeeperMuseSync.messages(view)
+              .filter((message) => !before.has(message.id))
+              .slice(0, 64)
+              .map(BeeperMuseSync.fingerprint),
+          );
           // Retrying a result is safe: the relay accepts it idempotently. Never
           // repeat a claim or a Muse send after an uncertain network result.
           for (let attempt = 0; attempt < 3; attempt++) {
             try {
               if (!active()) throw new Error('Tab disconnected.');
-              await send({ type: 'result', id: job.id, text: answer });
+              await send({ type: 'result', id: job.id, text: answer, sources });
+              tracker.remember(sources);
               return;
             } catch {
               if (attempt === 2) throw new Error('Result delivery failed.');
@@ -75,8 +116,22 @@
     const current = generation;
     try {
       const connected = await send({ type: 'connected' });
-      if (!connected.connected || stopped || generation !== current) return;
+      if (stopped || generation !== current) return;
+      guardClosing(connected.connected);
+      if (!connected.connected) return;
       const view = BeeperMuseDOM.snapshot(document);
+      if (connected.museSync) {
+        try {
+          await tracker.sync(
+            view,
+            connected.historyMode,
+            () => !stopped && current === generation,
+          );
+        } catch {
+          // Import failures must not prevent a queued Beeper prompt from running.
+        }
+      }
+      if (stopped || current !== generation) return;
       if (view.busy || view.draft.trim()) return;
       const result = await send({ type: 'claim' });
       if (result.job) await execute(result.job, current);
@@ -88,19 +143,26 @@
   }
   chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     if (message.type === 'probe') {
-      respond({ protocol: 1, health: health() });
+      respond({ protocol: 2, health: health() });
       return;
     }
     if (message.type === 'stop') {
       stopped = true;
       generation++;
-      respond({ protocol: 1 });
+      guardClosing(false);
+      respond({ protocol: 2 });
     }
     if (message.type === 'start') {
       stopped = false;
-      respond({ protocol: 1, health: health() });
+      tracker = new BeeperMuseSync.Tracker(send);
+      const state = health();
+      guardClosing(state !== 'unavailable');
+      respond({ protocol: 2, health: state });
       void poll();
     }
   });
+  document.addEventListener('visibilitychange', () => void offerPopup());
+  window.addEventListener('focus', () => void offerPopup());
+  void offerPopup();
   setInterval(() => void poll(), 2000);
 })();

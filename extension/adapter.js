@@ -13,11 +13,15 @@
       throw new Error('Muse composer unavailable.');
     return fields[0];
   }
-  function text(element) {
+  function text(element, role) {
     const clone = element.cloneNode(true);
     clone
       .querySelectorAll('button,script,style,svg,[aria-hidden="true"]')
       .forEach((n) => n.remove());
+    if (role === 'user')
+      clone.querySelectorAll('.sr-only').forEach((n) => {
+        if (n.textContent.trim() === 'You:') n.remove();
+      });
     clone.querySelectorAll('a[href]').forEach((a) => {
       const href = a.getAttribute('href');
       if (/^https?:\/\//.test(href) && a.textContent !== href)
@@ -45,26 +49,25 @@
         role: e.getAttribute('data-message-role'),
         // Reactions and toolbars are siblings of the message bubble.
         // Reading the whole item makes a reaction look like a changed prompt.
-        text: text(e.querySelector('.hatch-chat-groupable-bubble') || e),
+        text: text(
+          e.querySelector('.hatch-chat-groupable-bubble') || e,
+          e.getAttribute('data-message-role'),
+        ),
         widget: e.getAttribute('data-message-has-presentation') === 'true',
       })),
     };
   }
-  const normalize = (value) =>
-    value
-      .replace(/^You:\s*/, '')
-      .replace(/\s+/g, ' ')
-      .trim();
+  const normalize = (value) => value.replace(/\s+/g, ' ').trim();
+  const matchesPrompt = (text, prompt) =>
+    normalize(text) === normalize(prompt) ||
+    normalize(text.replace(/^You:\s*/, '')) === normalize(prompt);
   function responseAfter(beforeIDs, prompt, snapshot) {
     const users = snapshot.messages.filter(
       (m) => m.role === 'user' && !beforeIDs.has(m.id),
     );
-    if (
-      users.some((m) => normalize(m.text) !== normalize(prompt)) ||
-      users.length > 1
-    )
+    if (users.some((m) => !matchesPrompt(m.text, prompt)) || users.length > 1)
       throw new Error('Another message was entered in the Muse tab.');
-    const echo = users.find((m) => normalize(m.text) === normalize(prompt));
+    const echo = users.find((m) => matchesPrompt(m.text, prompt));
     if (!echo) return null;
     const after = snapshot.messages.slice(snapshot.messages.indexOf(echo) + 1);
     const responses = after.filter(

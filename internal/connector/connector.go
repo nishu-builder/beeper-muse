@@ -99,7 +99,7 @@ func (c *Connector) Start(ctx context.Context) error {
 		_ = c.queue.Close()
 		return errors.New("browser relay port 24819 is unavailable; stop the old connector first")
 	}
-	c.server = &http.Server{Handler: queue.Handler(c.queue, c.Config.RelayToken, browserAddress), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 8192}
+	c.server = &http.Server{Handler: queue.Handler(c.queue, c.Config.RelayToken, browserAddress, c.importMessages), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 8192}
 	ctx, c.cancel = context.WithCancel(ctx)
 	c.workers.Add(2)
 	go func() {
@@ -209,6 +209,19 @@ func ValidateMembers(owner, bot, muse id.UserID, members map[id.UserID]*event.Me
 	return nil
 }
 
+func (c *Connector) importMessages(ctx context.Context, messages []queue.Incoming) (int, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
+	portal, err := c.bridge.GetPortalByKey(ctx, networkid.PortalKey{ID: portalID, Receiver: loginID})
+	if err != nil || portal == nil || portal.MXID == "" {
+		return 0, errors.New("Muse chat is not ready")
+	}
+	if err = c.membersSafe(ctx, portal.MXID); err != nil {
+		return 0, err
+	}
+	return c.queue.Import(string(portal.MXID), messages)
+}
+
 func (c *Connector) tick(ctx context.Context) {
 	login := c.bridge.GetCachedUserLoginByID(loginID)
 	if login == nil {
@@ -229,6 +242,10 @@ func (c *Connector) tick(ctx context.Context) {
 		return
 	}
 	replyID := networkid.MessageID("muse:" + job.ID)
+	var replyTo *networkid.MessageOptionalPartID
+	if !strings.HasPrefix(job.EventID, "muse-dom:") {
+		replyTo = &networkid.MessageOptionalPartID{MessageID: networkid.MessageID("user:" + job.ID)}
+	}
 	result := login.QueueRemoteEvent(&simplevent.PreConvertedMessage{
 		EventMeta: simplevent.EventMeta{
 			Type: bridgev2.RemoteEventMessage, PortalKey: portal.PortalKey, Sender: bridgev2.EventSender{Sender: museID}, Timestamp: time.Now(),
@@ -245,7 +262,7 @@ func (c *Connector) tick(ctx context.Context) {
 			},
 		},
 		ID: replyID, Data: &bridgev2.ConvertedMessage{
-			ReplyTo: &networkid.MessageOptionalPartID{MessageID: networkid.MessageID("user:" + job.ID)},
+			ReplyTo: replyTo,
 			Parts:   []*bridgev2.ConvertedMessagePart{{Type: event.EventMessage, Content: &event.MessageEventContent{MsgType: event.MsgText, Body: job.Result}}},
 		},
 	})

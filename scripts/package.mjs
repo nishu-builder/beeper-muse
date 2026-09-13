@@ -10,6 +10,7 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 export const extensionFiles = [
   'manifest.json',
   'adapter.js',
+  'sync.js',
   'background.js',
   'content.js',
   'popup.html',

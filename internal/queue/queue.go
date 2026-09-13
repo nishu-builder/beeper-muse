@@ -86,6 +86,10 @@ func Open(dir string) (*Queue, error) {
 	if err != nil {
 		return nil, err
 	}
+	_, err = q.db.Exec(`CREATE TABLE IF NOT EXISTS muse_sources (id TEXT NOT NULL, hash TEXT NOT NULL, PRIMARY KEY(id,hash));`)
+	if err != nil {
+		return nil, err
+	}
 	ok = true
 	return q, nil
 }
@@ -178,7 +182,10 @@ func (q *Queue) Claim() (*Job, error) {
 	return j, nil
 }
 
-func (q *Queue) Result(id, text string) error {
+func (q *Queue) Result(id, text string, sources ...Source) error {
+	if err := validateSources(sources); err != nil {
+		return err
+	}
 	if strings.TrimSpace(text) == "" || !utf8.ValidString(text) || utf8.RuneCountInString(text) > MaxResult {
 		return errors.New("invalid result")
 	}
@@ -188,14 +195,23 @@ func (q *Queue) Result(id, text string) error {
 	if err := q.db.QueryRow("SELECT phase,result FROM jobs WHERE id=?", id).Scan(&phase, &old); err != nil {
 		return ErrConflict
 	}
-	if phase == "done" || ((phase == "ready" || phase == "delivering") && old == text) {
-		return nil
-	}
-	if phase != "claimed" {
+	if phase != "claimed" && phase != "done" && !((phase == "ready" || phase == "delivering") && old == text) {
 		return ErrConflict
 	}
-	_, err := q.db.Exec("UPDATE jobs SET result=?,phase='ready' WHERE id=?", text, id)
-	return err
+	tx, err := q.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if phase == "claimed" {
+		if _, err = tx.Exec("UPDATE jobs SET result=?,phase='ready' WHERE id=?", text, id); err != nil {
+			return err
+		}
+	}
+	if err = recordSources(tx, sources); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 // BeginDelivery persists the uncertain state before handing a reply to Matrix.

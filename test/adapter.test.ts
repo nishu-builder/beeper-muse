@@ -160,3 +160,23 @@ test('reactions outside user and assistant bubbles cannot change prompt or reply
   );
   f.dom.window.close();
 });
+test('a real You: prompt prefix is preserved independently of the accessibility label', () => {
+  const f = fixture();
+  f.document
+    .querySelector('[role="log"]')!
+    .insertAdjacentHTML(
+      'beforeend',
+      '<div data-message-item data-message-id="u" data-message-role="user"><div class="hatch-chat-groupable-bubble"><span class="sr-only">You:</span><p>You: explain this</p></div></div>' +
+        '<div data-message-item data-message-id="r" data-message-role="assistant"><p>Synthetic answer</p></div>',
+    );
+  const snapshot = f.adapter.snapshot(f.document);
+  assert.equal(
+    snapshot.messages.find((m: { id: string }) => m.id === 'u').text,
+    'You: explain this',
+  );
+  assert.equal(
+    f.adapter.responseAfter(new Set(['old']), 'You: explain this', snapshot),
+    'Synthetic answer',
+  );
+  f.dom.window.close();
+});

@@ -2,6 +2,11 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
+import { webcrypto } from 'node:crypto';
+const syncSource = await readFile(
+  new URL('../extension/sync.js', import.meta.url),
+  'utf8',
+);
 
 const source = await readFile(
   new URL('../extension/content.js', import.meta.url),
@@ -23,14 +28,36 @@ function harness(deferred = false) {
   let draft = '';
   let busy = false;
   let unavailable = false;
+  let visibility = 'hidden';
+  const events = new Map<
+    string,
+    (event: { preventDefault: () => void; returnValue?: boolean }) => void
+  >();
   const timers: Array<{ fn: () => void; at: number }> = [];
   const messages: Message[] = [];
   const claim = new Promise((resolve) => {
     resolveClaim = resolve;
   });
   const job = { id: 'job', prompt: 'Synthetic prompt' };
-  runInNewContext(source, {
-    document: {},
+  runInNewContext(syncSource + '\n' + source, {
+    crypto: webcrypto,
+    TextEncoder,
+    document: {
+      get visibilityState() {
+        return visibility;
+      },
+      addEventListener: () => {},
+    },
+    window: {
+      addEventListener: (
+        name: string,
+        fn: (event: {
+          preventDefault: () => void;
+          returnValue?: boolean;
+        }) => void,
+      ) => events.set(name, fn),
+      removeEventListener: (name: string) => events.delete(name),
+    },
     location: { origin: 'https://muse.ai', pathname: '/' },
     Date: { now: () => now },
     setInterval: () => {},
@@ -50,6 +77,8 @@ function harness(deferred = false) {
             return { ok: true, connected: true };
           if (message.type === 'claim')
             return deferred ? claim : { ok: true, job };
+          if (message.type === 'offer-popup')
+            return { ok: true, offered: true };
           return { ok: true };
         },
       },
@@ -68,6 +97,12 @@ function harness(deferred = false) {
   });
   return {
     messages,
+    events,
+    focus: async () => {
+      visibility = 'visible';
+      events.get('focus')?.({ preventDefault() {} });
+      await flush();
+    },
     get submits() {
       return submits;
     },
@@ -109,6 +144,35 @@ test('disconnect during a pending claim cannot submit the returned prompt', asyn
   await flush();
   assert.equal(h.submits, 0);
   assert.equal(h.messages.at(-1)?.type, 'block');
+});
+
+test('closing is guarded only while connected and disconnect removes the guard', async () => {
+  const h = harness(true);
+  assert.equal(h.events.has('beforeunload'), false);
+  h.signal('start');
+  await flush();
+  let prevented = false;
+  const event = {
+    preventDefault: () => {
+      prevented = true;
+    },
+    returnValue: false,
+  };
+  h.events.get('beforeunload')!(event);
+  assert.equal(prevented, true);
+  assert.equal(event.returnValue, true);
+  h.signal('stop');
+  assert.equal(h.events.has('beforeunload'), false);
+  h.claim();
+  await flush();
+});
+
+test('a visible Muse tab offers the popup once, without claiming a prompt', async () => {
+  const h = harness();
+  await h.focus();
+  await h.focus();
+  assert.equal(h.messages.filter((m) => m.type === 'offer-popup').length, 1);
+  assert.equal(h.submits, 0);
 });
 
 test('disconnect followed by reconnect cannot revive an earlier pending claim', async () => {
@@ -154,7 +218,7 @@ test('readiness probes expose no draft or chat text', () => {
     [{ unavailable: true }, 'unavailable'],
   ] as const) {
     h.view(view);
-    assert.deepEqual(h.signal('probe'), { protocol: 1, health });
+    assert.deepEqual(h.signal('probe'), { protocol: 2, health });
   }
   assert.equal(h.messages.length, 0);
 });

@@ -86,3 +86,19 @@ installation. Store artwork uses synthetic popup state and is not live-test
 evidence. Longer background tasks, proactive replies, sleep/resume, and long-term
 reliability remain unverified. The project is experimental. See
 [operations](operations.md) for recovery and encryption troubleshooting.
+
+## Version 0.4 development checks
+
+Synthetic tests cover automatic popup deduplication and active-tab checks,
+close-guard removal on disconnect, recent/all/new-only catch-up, delayed replies,
+message revisions, source-receipt deduplication across database restarts, safe
+retry after an import failure, and rejection of unauthorized imports or browser-
+selected Matrix destinations. Version 0.4 is installed locally for user
+verification. The actual Chrome popup, native confirmation dialog, and a live
+catch-up remain unverified until the updated extension is reloaded and connected.
+
+A labeled synthetic diagnostic posted to the new authenticated import endpoint
+was delivered to the configured Beeper Muse chat by the Muse contact
+(`isSender: false`). The imported job finished `done`. This verifies the new
+import queue and encrypted delivery path; it does not verify Chrome's catch-up
+reader, automatic popup, or native leave-page dialog.

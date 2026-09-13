@@ -8,6 +8,10 @@ bridge.
 [Setup guide](docs/setup.md) · [Extension download](https://github.com/nishu-builder/beeper-muse/releases/latest)
 · [Privacy](PRIVACY.md) · [Troubleshooting](docs/operations.md)
 
+The source now includes version 0.4.0 catch-up and tab-lifecycle changes. Build
+both the local bridge and extension from this source to use them; the existing
+0.3.0 release ZIP does not include these changes.
+
 Version 0.3.0 was submitted to Chrome Web Store on September 13, 2026 and is
 **pending review**. Until Google approves it, use the release ZIP or load the
 source extension as described below. **The extension
@@ -32,7 +36,7 @@ Chrome extension ↔ your signed-in Muse conversation
 - Go 1.26 or newer, Node.js 24 or newer, npm, and a C compiler for SQLite.
   On macOS, the Xcode command line tools supply the compiler.
 - macOS or Linux. Native Windows is not supported by bbctl; WSL is untested here.
-- Chrome 102 or newer, and a signed-in [Muse](https://muse.ai/)
+- Chrome 127 or newer, and a signed-in [Muse](https://muse.ai/)
   account. Keep that browser tab and the bridge process running.
 
 The Beeper Desktop local API is **not required** by this bridge. Setup uses
@@ -73,7 +77,9 @@ Leave that terminal running, then:
    **Pair bridge**. Keep this code private; it stays on this computer.
 4. Open Muse's main chat and sign in. Reload the page if it was open before the
    extension was installed.
-5. Click the extension's toolbar button and choose **Connect this Muse tab**.
+5. The popup opens automatically if no Muse tab is connected. Choose how much
+   loaded history to catch up, then click **Connect this Muse tab**. You can also
+   open the popup from the toolbar.
 6. Close the popup and send a message in the **Muse** chat in Beeper.
 
 A separate **Muse** conversation appears in Beeper. Send a short message there,
@@ -100,8 +106,11 @@ extension and `24820` for the Matrix application service, are fixed.
 
 - One owner, one Muse contact, one existing Muse web conversation. This does not
   create a separate Muse agent or copy its memory into Beeper.
-- Only new text messages are forwarded. No history import, edits, deletions,
-  reactions, attachments, or automatic approvals of Muse actions.
+- Connecting imports the most recent 20 loaded text messages by default. Choose
+  all loaded messages or only new messages in the popup. Messages written in Muse
+  appear as **You in Muse** notices; assistant replies come from the Muse contact.
+  There is no automatic scrolling to fetch older history, deletion sync, attachment
+  transfer, or automatic approval of Muse actions.
 - One prompt runs at a time, with up to 20 outstanding prompts. Prompts support
   8,000 Unicode characters. Browser replies are capped at 23,000 JavaScript
   characters, with an explicit truncation notice.
@@ -110,8 +119,12 @@ extension and `24820` for the Matrix application service, are fixed.
   response capture.
 - Reply capture checks for the submitted prompt's echo, then waits for four
   seconds without changes after Muse's Stop button disappears. This is a website
-  heuristic: background work, proactive updates, widgets, and later responses are
-  not fully mirrored. Open Muse to review them.
+  heuristic. A separate observer captures later text messages and revisions after
+  the prompt finishes, without requiring another Beeper message. Revisions appear
+  as **Updated Muse reply** messages; widgets and action controls stay in Muse.
+- The popup opens once per Muse tab when no healthy tab is connected. Closing,
+  reloading, or leaving a connected tab requests Chrome's standard confirmation,
+  after you have interacted with that webpage. Disconnect first to remove it.
 - Jobs interrupted during a send are blocked for inspection. They are not
   automatically replayed. There is no end-to-end exactly-once guarantee.
 - This is a custom chat network, but Beeper may label its network as `bridgev2`.

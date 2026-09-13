@@ -48,7 +48,7 @@ async function tabHealth(tabID, type = 'probe') {
   try {
     const result = await chrome.tabs.sendMessage(tabID, { type });
     if (
-      result?.protocol === 1 &&
+      result?.protocol === 2 &&
       ['ready', 'busy', 'draft', 'unavailable'].includes(result.health)
     )
       return result.health;
@@ -58,11 +58,53 @@ async function tabHealth(tabID, type = 'probe') {
   return 'reload';
 }
 const tabReady = (health) => ['ready', 'busy', 'draft'].includes(health);
+let openingPopup = false;
+async function offerPopup(sender) {
+  if (!sender.tab?.id || !museURL(sender.url) || (sender.frameId ?? 0) !== 0)
+    throw new Error('Open the main Muse chat.');
+  if (openingPopup) return { ok: true, offered: false };
+  openingPopup = true;
+  try {
+    const [active] = await chrome.tabs.query({
+      active: true,
+      lastFocusedWindow: true,
+    });
+    if (active?.id !== sender.tab.id) return { ok: true, offered: false };
+    const { tabID, offeredTabs = [] } = await chrome.storage.session.get([
+      'tabID',
+      'offeredTabs',
+    ]);
+    if (tabID && tabReady(await tabHealth(tabID)))
+      return { ok: true, offered: false };
+    if (offeredTabs.includes(sender.tab.id)) return { ok: true, offered: true };
+    if (
+      (await chrome.runtime.getContexts({ contextTypes: ['POPUP'] })).length
+    ) {
+      await chrome.storage.session.set({
+        offeredTabs: [...offeredTabs, sender.tab.id],
+      });
+      return { ok: true, offered: true };
+    }
+    const [current] = await chrome.tabs.query({
+      active: true,
+      lastFocusedWindow: true,
+    });
+    if (current?.id !== sender.tab.id) return { ok: true, offered: false };
+    await chrome.action.openPopup({ windowId: current.windowId });
+    await chrome.storage.session.set({
+      offeredTabs: [...offeredTabs, sender.tab.id],
+    });
+    return { ok: true, offered: true };
+  } finally {
+    openingPopup = false;
+  }
+}
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   (async () => {
     if (sender.id !== chrome.runtime.id) throw new Error('Invalid sender.');
     const popup =
       !sender.tab && sender.url === chrome.runtime.getURL('popup.html');
+    if (message.type === 'offer-popup') return offerPopup(sender);
     if (popup && message.type === 'pair') {
       const candidate =
         typeof message.token === 'string'
@@ -105,6 +147,11 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       try {
         const status = await api('/v1/status');
         const health = tabID ? await tabHealth(tabID) : 'disconnected';
+        const sync = await chrome.storage.session.get([
+          'imported',
+          'syncError',
+        ]);
+        const settings = await chrome.storage.local.get('historyMode');
         return {
           ok: true,
           paired: true,
@@ -114,6 +161,10 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
           health,
           phase: status.phase,
           queued: status.queued,
+          museSync: status.museSync === true,
+          historyMode: settings.historyMode || 'recent',
+          imported: sync.imported || 0,
+          syncError: sync.syncError || false,
         };
       } catch {
         return {
@@ -126,12 +177,14 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       }
     }
     if (popup && message.type === 'attach') {
-      await api('/v1/status');
+      const bridge = await api('/v1/status');
       const [tab] = await chrome.tabs.query({
         active: true,
         currentWindow: true,
       });
-      if (!tab?.id || !museURL(tab.url))
+      // Automatic popups don't grant activeTab; a Muse-only content script
+      // can verify the page when Chrome does not expose its URL to the popup.
+      if (!tab?.id || (tab.url && !museURL(tab.url)))
         return {
           ok: false,
           error: 'Open the main Muse chat in this Chrome window first.',
@@ -146,7 +199,16 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
               : 'Sign in to Muse and open its main chat, then click Connect again.',
         };
       await detach();
-      await chrome.storage.session.set({ tabID: tab.id });
+      const historyMode = ['recent', 'all', 'new'].includes(message.historyMode)
+        ? message.historyMode
+        : 'recent';
+      await chrome.storage.local.set({ historyMode });
+      await chrome.storage.session.set({
+        tabID: tab.id,
+        museSync: bridge.museSync === true,
+        imported: 0,
+        syncError: false,
+      });
       if (!tabReady(await tabHealth(tab.id, 'start'))) {
         await chrome.storage.session.remove('tabID');
         return {
@@ -170,7 +232,30 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       if (message.type === 'connected') return { ok: true, connected: false };
       throw new Error('This Muse tab is not connected.');
     }
-    if (message.type === 'connected') return { ok: true, connected: true };
+    if (message.type === 'connected') {
+      const bridge = await api('/v1/status');
+      const { historyMode } = await chrome.storage.local.get('historyMode');
+      return {
+        ok: true,
+        connected: true,
+        museSync: bridge.museSync === true,
+        historyMode: historyMode || 'recent',
+      };
+    }
+    if (message.type === 'import' && Array.isArray(message.messages)) {
+      try {
+        const result = await api('/v1/import', { messages: message.messages });
+        const { imported = 0 } = await chrome.storage.session.get('imported');
+        await chrome.storage.session.set({
+          imported: imported + (result.added || 0),
+          syncError: false,
+        });
+        return { ok: true };
+      } catch {
+        await chrome.storage.session.set({ syncError: true });
+        throw new Error('Muse import unavailable.');
+      }
+    }
     if (message.type === 'claim')
       return { ok: true, ...(await api('/v1/claim', {})) };
     if (
@@ -178,7 +263,12 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       typeof message.id === 'string' &&
       typeof message.text === 'string'
     ) {
-      await api('/v1/result', { id: message.id, text: message.text });
+      const bridge = await api('/v1/status');
+      await api('/v1/result', {
+        id: message.id,
+        text: message.text,
+        ...(bridge.museSync ? { sources: message.sources || [] } : {}),
+      });
       return { ok: true };
     }
     if (message.type === 'block' && typeof message.id === 'string') {
@@ -195,6 +285,10 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   return true;
 });
 chrome.tabs.onRemoved.addListener(async (tabID) => {
-  const saved = await chrome.storage.session.get('tabID');
+  const saved = await chrome.storage.session.get(['tabID', 'offeredTabs']);
   if (saved.tabID === tabID) await chrome.storage.session.remove('tabID');
+  if (saved.offeredTabs?.includes(tabID))
+    await chrome.storage.session.set({
+      offeredTabs: saved.offeredTabs.filter((id) => id !== tabID),
+    });
 });
