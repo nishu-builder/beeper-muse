@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Beeper Muse</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <h1>Beeper Muse</h1>
+      <p id="status" role="status">Checking local connector…</p>
+      <p>
+        Connect one signed-in Muse tab. In Beeper Note to self, write
+        <code>!muse your prompt</code>.
+      </p>
+      <button id="connect">Connect this Muse tab</button
+      ><button id="disconnect">Disconnect</button>
+      <p class="note">
+        Keep this tab open and its composer empty. Review approvals and
+        attachments in Muse.
+      </p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

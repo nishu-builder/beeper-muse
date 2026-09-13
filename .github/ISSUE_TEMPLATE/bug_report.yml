@@ -1,0 +1,26 @@
+name: Bug report
+description: Report a reproducible connector problem.
+body:
+  - type: markdown
+    attributes:
+      value: Do not include tokens, private chat contents, pairing codes, or browser profiles.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe expected and actual behavior using a synthetic prompt.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: OS, Node, Chrome, and Beeper versions.
+    validations:
+      required: true
