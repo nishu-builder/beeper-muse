@@ -27,6 +27,10 @@ type Listener = (
 function harness(deferred = false, structured = false) {
   let listener!: Listener;
   let resolveClaim!: (value: unknown) => void;
+  let resolveExecution!: () => void;
+  const executed = new Promise<void>((resolve) => {
+    resolveExecution = resolve;
+  });
   let now = 0;
   let submits = 0;
   let draft = '';
@@ -77,6 +81,8 @@ function harness(deferred = false, structured = false) {
         },
         sendMessage: async (message: Message) => {
           messages.push(message);
+          if (message.type === 'result' || message.type === 'block')
+            resolveExecution();
           if (message.type === 'connected')
             return {
               ok: true,
@@ -121,6 +127,7 @@ function harness(deferred = false, structured = false) {
   });
   return {
     messages,
+    executed,
     events,
     focus: async () => {
       visibility = 'visible';
@@ -252,6 +259,7 @@ test('structured results preserve the prompt echo and individual answers for nat
   h.signal('start');
   await flush();
   await h.advance(6000);
+  await h.executed;
   const result = h.messages.find((m) => m.type === 'result');
   assert.deepEqual(
     Array.from(result?.messages || [], (m) => m.role),
