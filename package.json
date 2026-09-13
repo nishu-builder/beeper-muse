@@ -1,6 +1,6 @@
 {
   "name": "beeper-muse",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "description": "Custom Beeper bridge for a dedicated Muse chat, connected directly through your browser.",
   "type": "module",
   "private": true,
@@ -9,14 +9,16 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "go build -tags goolm -o bin/beeper-muse ./cmd/beeper-muse",
+    "build": "npm run build:extension && npm run build:native",
     "start": "node scripts/manage.mjs",
-    "test": "tsx --test test/*.test.ts && go test -tags goolm ./...",
-    "typecheck": "tsc --noEmit",
+    "test": "npm run build:extension && tsx --test test/*.test.ts && go test -tags goolm ./...",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.extension.json --noEmit",
     "format": "prettier --write . && gofmt -w cmd internal",
     "format:check": "prettier --check . && node scripts/check-go-format.mjs",
-    "check": "npm run typecheck && npm test && npm run build && npm run format:check",
-    "package": "node scripts/package.mjs"
+    "check": "npm run typecheck && npm test && npm run build:native && npm run format:check",
+    "package": "npm run build:extension && node scripts/package.mjs",
+    "build:extension": "tsc -p tsconfig.extension.json && prettier --write extension/adapter.js extension/sync.js",
+    "build:native": "go build -tags goolm -o bin/beeper-muse ./cmd/beeper-muse"
   },
   "devDependencies": {
     "@types/jsdom": "30.0.0",

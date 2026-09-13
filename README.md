@@ -8,16 +8,17 @@ bridge.
 [Setup guide](docs/setup.md) · [Extension download](https://github.com/nishu-builder/beeper-muse/releases/latest)
 · [Privacy](PRIVACY.md) · [Troubleshooting](docs/operations.md)
 
-The source now includes version 0.4.0 catch-up and tab-lifecycle changes. Build
+The source now includes version 0.5.0 structured message sync. Build
 both the local bridge and extension from this source to use them; the existing
-0.3.0 release ZIP does not include these changes.
+0.3.0 release ZIP does not include these changes. See [the component design](docs/architecture.md)
+for how a future Muse API can replace the browser adapter.
 
 Version 0.3.0 was submitted to Chrome Web Store on September 13, 2026 and is
 **pending review**. Until Google approves it, use the release ZIP or load the
 source extension as described below. **The extension
 requires the local bridge; installing it alone does not create a Beeper chat.**
 
-**Experimental and text-only.** The Beeper side uses the mautrix `bridgev2`
+**Experimental.** The Beeper side uses the mautrix `bridgev2`
 framework. The Muse side operates the signed-in website through a Chrome
 extension; it is not an official Muse API. Website changes can interrupt it.
 
@@ -106,11 +107,13 @@ extension and `24820` for the Matrix application service, are fixed.
 
 - One owner, one Muse contact, one existing Muse web conversation. This does not
   create a separate Muse agent or copy its memory into Beeper.
-- Connecting imports the most recent 20 loaded text messages by default. Choose
+- Connecting imports the most recent 20 loaded messages by default. Choose
   all loaded messages or only new messages in the popup. Messages written in Muse
-  appear as **You in Muse** notices; assistant replies come from the Muse contact.
-  There is no automatic scrolling to fetch older history, deletion sync, attachment
-  transfer, or automatic approval of Muse actions.
+  appear as you through Beeper's existing double-puppet session; assistant replies
+  come from Muse. Catch-up uses silent Matrix batches. Text formatting and
+  accessible PNG/JPEG/GIF/WebP images are included; blocked images remain links.
+  Interactive cards and approvals stay in Muse. No automatic scrolling, whole-message
+  deletion sync, or Beeper-to-Muse attachments are supported.
 - One prompt runs at a time, with up to 20 outstanding prompts. Prompts support
   8,000 Unicode characters. Browser replies are capped at 23,000 JavaScript
   characters, with an explicit truncation notice.
@@ -120,8 +123,11 @@ extension and `24820` for the Matrix application service, are fixed.
 - Reply capture checks for the submitted prompt's echo, then waits for four
   seconds without changes after Muse's Stop button disappears. This is a website
   heuristic. A separate observer captures later text messages and revisions after
-  the prompt finishes, without requiring another Beeper message. Revisions appear
-  as **Updated Muse reply** messages; widgets and action controls stay in Muse.
+  the prompt finishes, without requiring another Beeper message. Revisions use native Matrix edits. Original timestamps are used when the DOM
+  exposes an absolute timestamp; otherwise the first observation time is used
+  and marked as such in event metadata. The browser adapter does not yet expose
+  authoritative reaction actors or read receipts, so it does not fabricate them.
+  The typed protocol and Matrix translator support both for a future adapter.
 - The popup opens once per Muse tab when no healthy tab is connected. Closing,
   reloading, or leaving a connected tab requests Chrome's standard confirmation,
   after you have interacted with that webpage. Disconnect first to remove it.

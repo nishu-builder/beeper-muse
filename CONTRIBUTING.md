@@ -20,3 +20,9 @@ Update documentation for behavior changes. Commit `go.mod`, `go.sum`, and the np
 lockfile when dependencies change. Check dependency licenses before adding them.
 Pull requests should explain the concrete problem, resulting behavior, and
 validation. Keep discussions constructive and respectful.
+
+The source adapter and sync engine are strict TypeScript in `src/`; their
+generated `extension/adapter.js` and `extension/sync.js` files are ignored.
+`npm run build:extension` generates them for Chrome. Update `src/muse.d.ts` and
+`internal/muse` together when changing the source contract. Every received
+payload must be validated by Go; TypeScript types are not a trust boundary.

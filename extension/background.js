@@ -48,7 +48,7 @@ async function tabHealth(tabID, type = 'probe') {
   try {
     const result = await chrome.tabs.sendMessage(tabID, { type });
     if (
-      result?.protocol === 2 &&
+      result?.protocol === 3 &&
       ['ready', 'busy', 'draft', 'unavailable'].includes(result.health)
     )
       return result.health;
@@ -162,6 +162,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
           phase: status.phase,
           queued: status.queued,
           museSync: status.museSync === true,
+          sourceProtocol: status.sourceProtocol,
           historyMode: settings.historyMode || 'recent',
           imported: sync.imported || 0,
           syncError: sync.syncError || false,
@@ -206,6 +207,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       await chrome.storage.session.set({
         tabID: tab.id,
         museSync: bridge.museSync === true,
+        sourceProtocol: bridge.sourceProtocol,
         imported: 0,
         syncError: false,
       });
@@ -239,11 +241,15 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         ok: true,
         connected: true,
         museSync: bridge.museSync === true,
+        sourceProtocol: bridge.sourceProtocol,
         historyMode: historyMode || 'recent',
       };
     }
     if (message.type === 'import' && Array.isArray(message.messages)) {
       try {
+        const bridge = await api('/v1/status');
+        if (bridge.sourceProtocol !== 2)
+          throw new Error('Update the local bridge for structured sync.');
         const result = await api('/v1/import', { messages: message.messages });
         const { imported = 0 } = await chrome.storage.session.get('imported');
         await chrome.storage.session.set({
@@ -264,6 +270,10 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       typeof message.text === 'string'
     ) {
       const bridge = await api('/v1/status');
+      if (bridge.sourceProtocol === 2 && Array.isArray(message.messages)) {
+        await api('/v2/result', { id: message.id, messages: message.messages });
+        return { ok: true };
+      }
       await api('/v1/result', {
         id: message.id,
         text: message.text,

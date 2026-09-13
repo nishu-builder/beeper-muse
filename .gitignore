@@ -12,3 +12,7 @@ bin/
 *.db
 *.db-shm
 *.db-wal
+
+# Generated from strict TypeScript in src/.
+/extension/adapter.js
+/extension/sync.js

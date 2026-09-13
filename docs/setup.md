@@ -6,7 +6,8 @@ chat to your existing signed-in Muse conversation. Both must stay running.
 
 This is an experimental community project, unaffiliated with Beeper or Meta.
 It supports text messages in both directions and selected catch-up from the
-loaded Muse chat. Approvals, attachments, and product cards stay in Muse.
+loaded Muse chat, with formatting and accessible images. Interactive approvals
+and product controls stay in Muse.
 
 ## 1. Prepare your computer
 
@@ -47,7 +48,7 @@ account directly; enabling the Beeper Desktop local API is not necessary.
 
 ## 3. Install the Chrome extension
 
-The current source includes version 0.4.0. Until that version is released, use
+The current source includes version 0.5.0. Until that version is released, use
 **From source** below and rebuild the bridge for catch-up and automatic popups.
 Version 0.3.0 is pending Chrome Web Store review as of September 13, 2026.
 Until it is approved, choose one of these:
@@ -58,7 +59,9 @@ Until it is approved, choose one of these:
   enable **Developer mode**, click **Load unpacked**, and select the extracted
   folder containing `manifest.json`.
 - **From source:** use **Load unpacked** to select the repository's `extension`
-  folder. No extension build step or generated private copy is required.
+  folder after running `npm run build` (or `npm run build:extension`).
+  The TypeScript adapter must be compiled before Chrome can load it. No private
+  generated extension copy is required.
 
 Do not load both copies. Keep the extracted folder in place; Chrome reads from
 it. GitHub ZIP installations need manual updates. Once the store version is
@@ -95,8 +98,9 @@ from a second terminal in this repository. That preserves your current pairing.
 The prompt should appear in Muse, followed by a reply from the Muse contact in
 Beeper. The Connect button begins the selected catch-up; it does not send a test prompt
 to Muse. New text messages in Muse are also copied to Beeper. Your Muse-side
-messages are labeled **You in Muse**, and later revisions appear as **Updated
-Muse reply** messages. Source IDs and content hashes prevent duplicate imports
+messages appear as you, and later revisions update the original Beeper message.
+Catch-up is sent without new-message notifications. Source timestamps are used
+when exposed; otherwise the bridge uses the first observation time. Source IDs and content hashes prevent duplicate imports
 after a reload. Allow time for the queued history to be delivered. Check [validation](validation.md)
 for the current tested scope.
 
@@ -142,7 +146,7 @@ release notes before updating the local bridge.
 
 ## Upgrade for Muse-side sync
 
-Version 0.4 requires an updated local bridge as well as the extension. Wait for
+Version 0.5 requires an updated local bridge as well as the extension. Wait for
 an idle queue, stop the bridge, back up `.local/`, update the source, run
 `npm ci --ignore-scripts` and `npm run build`, then start the bridge again. Keep
 your existing registration and pairing. Reload the extension, refresh Muse, and
@@ -150,9 +154,24 @@ reconnect. The popup reports an older bridge instead of promising catch-up it
 cannot provide. Earlier messages already forwarded by version 0.3 have no Muse
 source receipts, so the first catch-up can overlap that earlier conversation.
 
-The first catch-up covers only text currently loaded by Muse. The extension
+The first catch-up covers only messages currently loaded by Muse. The extension
 does not scroll through the entire account or switch conversations for you.
 
 Chrome controls the leave-page dialog and requires prior interaction with the
 webpage. See [Chrome popup support](https://developer.chrome.com/docs/extensions/reference/api/action#method-openPopup)
 and [the browser confirmation requirements](https://developer.mozilla.org/en-US/docs/Web/API/Window/beforeunload_event).
+
+## Structured sync upgrade
+
+Version 0.5 preserves version 0.4 source receipts so unchanged history is not
+imported again. It does not rewrite already delivered messages with incorrect
+senders or timestamps. Do not delete your registration or reset the chat to upgrade.
+Run `npm run build` to compile both the TypeScript extension adapter and Go bridge.
+Reload the extension **and refresh Muse**, then reconnect. Both components must
+be updated to use structured results.
+
+An absolute `<time datetime>` value is needed for an original timestamp. Without
+one, the bridge cannot recover the original send time from a relative label.
+Reaction actors and read status are not currently exposed by the browser adapter;
+status controls are excluded from message text, and no read receipts are guessed.
+See [architecture](architecture.md) for the supported source contract.

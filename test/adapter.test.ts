@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
+const sync = await readFile(
+  new URL('../extension/sync.js', import.meta.url),
+  'utf8',
+);
 const adapter = await readFile(
   new URL('../extension/adapter.js', import.meta.url),
   'utf8',
@@ -22,11 +26,15 @@ function fixture() {
     bottom: 40,
     toJSON: () => ({}),
   });
+  dom.window.eval(sync);
   dom.window.eval(adapter);
   return {
     dom,
     document: dom.window.document,
-    adapter: dom.window.BeeperMuseDOM,
+    adapter: {
+      ...dom.window.BeeperMuseDOM,
+      responseAfter: dom.window.BeeperMuseSync.responseAfter,
+    },
   };
 }
 test('browser adapter preserves an existing user draft and never sends it', async () => {
@@ -177,6 +185,25 @@ test('a real You: prompt prefix is preserved independently of the accessibility 
   assert.equal(
     f.adapter.responseAfter(new Set(['old']), 'You: explain this', snapshot),
     'Synthetic answer',
+  );
+  f.dom.window.close();
+});
+
+test('structured snapshots preserve formatting, resolve image URLs, and exclude status UI', () => {
+  const f = fixture();
+  f.document.querySelector('[role="log"]')!.innerHTML =
+    `<div data-message-item data-message-id="a" data-message-role="assistant"><div class="hatch-chat-groupable-bubble"><p>See <strong>this</strong> <a href="https://example.com">item</a></p><img src="/image.png" alt="Sample"><span role="status">Delivered</span><div class="reactions">A reaction</div></div><time datetime="2026-09-01T12:30:00-07:00">12:30 PM</time></div>`;
+  const m = f.adapter.snapshot(f.document).messages[0];
+  assert.match(m.html, /<strong>this<\/strong>/);
+  assert.equal(m.images[0].url, 'https://muse.ai/image.png');
+  assert.equal(m.timestampMs, Date.parse('2026-09-01T19:30:00Z'));
+  assert.doesNotMatch(m.text, /Delivered|reaction|12:30/);
+  assert.equal(m.read, undefined);
+  assert.equal(m.reactions, undefined);
+  f.document.querySelector('time')!.setAttribute('datetime', '12:30 PM');
+  assert.equal(
+    f.adapter.snapshot(f.document).messages[0].timestampMs,
+    undefined,
   );
   f.dom.window.close();
 });

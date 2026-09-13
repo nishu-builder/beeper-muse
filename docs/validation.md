@@ -102,3 +102,31 @@ was delivered to the configured Beeper Muse chat by the Muse contact
 (`isSender: false`). The imported job finished `done`. This verifies the new
 import queue and encrypted delivery path; it does not verify Chrome's catch-up
 reader, automatic popup, or native leave-page dialog.
+
+## Version 0.5 native mapping checks
+
+The local development build was checked with 44 JavaScript/TypeScript tests, Go
+tests, and the Go race detector. New coverage includes typed snapshots, absolute
+timestamps, status text exclusion, source revision reversions, structured prompt
+echo binding, HTML sanitization, image bounds, encrypted upload results, native
+self identity, and silent-batch policy.
+
+A clearly labeled synthetic batch in the configured private Beeper chat verified:
+
+- An imported user message appeared with `isSender=true`.
+- Original supplied millisecond timestamps matched the Desktop API exactly.
+- A formatted assistant response retained its HTML and had a native PNG attachment.
+- Both assistant parts reported `isUnread=false`; the chat unread count was zero.
+- Reimporting the same batch queued zero messages.
+- A source revision edited the existing message and preserved its original timestamp.
+- A native reaction was saved in the Matrix mapping database and its removal
+  removed that mapping. An explicit source read update completed through the
+  native read-marker path.
+
+These checks used the authenticated local source endpoint and read-only Beeper
+inspection. They did not send a prompt to Muse or establish that every current
+Muse DOM selector works. Chrome automation was unavailable in the session.
+Actual reaction actors and authoritative read state are not exposed by the DOM
+adapter; those capabilities remain disabled pending verified source evidence.
+Notification suppression was verified through batch flags and read/unread state,
+not through observation of operating-system notification banners.

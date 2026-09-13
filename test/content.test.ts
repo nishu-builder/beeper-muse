@@ -13,14 +13,18 @@ const source = await readFile(
   'utf8',
 );
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
-type Message = { type: string; text?: string };
+type Message = {
+  type: string;
+  text?: string;
+  messages?: Array<{ role: string; text: string }>;
+};
 type Listener = (
   message: Message,
   sender: object,
   respond: (value: unknown) => void,
 ) => void;
 
-function harness(deferred = false) {
+function harness(deferred = false, structured = false) {
   let listener!: Listener;
   let resolveClaim!: (value: unknown) => void;
   let now = 0;
@@ -74,7 +78,11 @@ function harness(deferred = false) {
         sendMessage: async (message: Message) => {
           messages.push(message);
           if (message.type === 'connected')
-            return { ok: true, connected: true };
+            return {
+              ok: true,
+              connected: true,
+              sourceProtocol: structured ? 2 : undefined,
+            };
           if (message.type === 'claim')
             return deferred ? claim : { ok: true, job };
           if (message.type === 'offer-popup')
@@ -84,13 +92,29 @@ function harness(deferred = false) {
       },
     },
     BeeperMuseDOM: {
+      create() {
+        return {
+          snapshot: this.snapshot,
+          submit: this.submit,
+          prepare: async (m: unknown) => m,
+        };
+      },
       submit: async () => {
         submits++;
         return new Set();
       },
       snapshot: () => {
         if (unavailable) throw new Error('Missing composer');
-        return { draft, busy, messages: [] };
+        return {
+          draft,
+          busy,
+          messages: submits
+            ? [
+                { id: 'u', role: 'user', text: 'Synthetic prompt' },
+                { id: 'a', role: 'assistant', text: 'Synthetic answer' },
+              ]
+            : [],
+        };
       },
       responseAfter: () => 'Synthetic answer',
     },
@@ -218,7 +242,20 @@ test('readiness probes expose no draft or chat text', () => {
     [{ unavailable: true }, 'unavailable'],
   ] as const) {
     h.view(view);
-    assert.deepEqual(h.signal('probe'), { protocol: 2, health });
+    assert.deepEqual(h.signal('probe'), { protocol: 3, health });
   }
   assert.equal(h.messages.length, 0);
+});
+
+test('structured results preserve the prompt echo and individual answers for native delivery', async () => {
+  const h = harness(false, true);
+  h.signal('start');
+  await flush();
+  await h.advance(6000);
+  const result = h.messages.find((m) => m.type === 'result');
+  assert.deepEqual(
+    Array.from(result?.messages || [], (m) => m.role),
+    ['user', 'assistant'],
+  );
+  assert.equal(result?.messages?.[1]?.text, 'Synthetic answer');
 });

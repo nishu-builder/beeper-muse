@@ -40,7 +40,7 @@ function harness(paired = true) {
     reachable = true,
     receiver = true;
   let health = 'ready';
-  let protocol = 2;
+  let protocol = 3;
   let listener!: (
     message: unknown,
     sender: Sender,
@@ -56,7 +56,7 @@ function harness(paired = true) {
         ok: reachable,
         json: async () =>
           url.endsWith('/v1/status')
-            ? { phase: 'idle', queued: 0, museSync: true }
+            ? { phase: 'idle', queued: 0, museSync: true, sourceProtocol: 2 }
             : url.endsWith('/v1/import')
               ? { ok: true, added: 1 }
               : { job: { id: 'job', prompt: 'Synthetic prompt' } },

@@ -28,14 +28,14 @@ func Handler(q *Queue, token, host string, importer ...func(context.Context, []I
 				http.Error(w, `{"error":"unavailable"}`, 503)
 				return
 			}
-			reply(map[string]any{"phase": s.Phase, "queued": s.Queued, "museSync": len(importer) > 0})
+			reply(map[string]any{"phase": s.Phase, "queued": s.Queued, "museSync": len(importer) > 0, "sourceProtocol": 2})
 			return
 		}
 		if r.Method != http.MethodPost || !strings.EqualFold(r.Header.Get("Content-Type"), "application/json") {
 			http.NotFound(w, r)
 			return
 		}
-		r.Body = http.MaxBytesReader(w, r.Body, 262144)
+		r.Body = http.MaxBytesReader(w, r.Body, 8*1024*1024)
 		var input *struct {
 			ID       string     `json:"id"`
 			Text     string     `json:"text"`
@@ -61,6 +61,8 @@ func Handler(q *Queue, token, host string, importer ...func(context.Context, []I
 				reply(map[string]any{"job": job})
 				return
 			}
+		case "/v2/result":
+			err = q.ResultMessages(input.ID, input.Messages)
 		case "/v1/result":
 			err = q.Result(input.ID, input.Text, input.Sources...)
 		case "/v1/import":

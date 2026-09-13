@@ -145,3 +145,40 @@ test('a Beeper reply receipt suppresses its echo but not a later assistant messa
     ['later'],
   );
 });
+
+test('catch-up is silent history; later observations keep their first-seen time', async () => {
+  const h = harness();
+  const v = view(message('old'));
+  await h.tracker.sync(v, 'recent', () => true);
+  h.tick();
+  await h.tracker.sync(v, 'recent', () => true);
+  const first = h.sent[0] as Message & {
+    historical: boolean;
+    observedAtMs: number;
+  };
+  assert.equal(first.historical, true);
+  assert.equal(first.observedAtMs, 0);
+  v.messages.push(message('live'));
+  await h.tracker.sync(v, 'recent', () => true);
+  h.tick();
+  await h.tracker.sync(v, 'recent', () => true);
+  const live = h.sent[1] as typeof first;
+  assert.equal(live.historical, false);
+  assert.equal(live.observedAtMs, 4000);
+});
+test('a richer source revision changes identity, but observation time and image bytes do not', async () => {
+  const h = harness();
+  const a = message('a');
+  const b = { ...a, html: '<strong>Synthetic answer</strong>' };
+  assert.notEqual((await h.fingerprint(a)).hash, (await h.fingerprint(b)).hash);
+  assert.equal(
+    (await h.fingerprint(b)).hash,
+    (
+      await h.fingerprint({
+        ...b,
+        observedAtMs: 123,
+        historical: true,
+      } as Message)
+    ).hash,
+  );
+});

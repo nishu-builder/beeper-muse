@@ -46,7 +46,10 @@ async function refresh() {
   else if (result.health === 'unavailable')
     status.textContent =
       'Sign in to Muse and open its main chat, then connect again.';
-  else if (result.connected && !result.museSync)
+  else if (
+    result.connected &&
+    (!result.museSync || result.sourceProtocol !== 2)
+  )
     status.textContent =
       'Update and restart the local bridge to enable catch-up and new Muse messages.';
   else if (result.syncError)

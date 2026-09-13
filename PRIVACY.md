@@ -16,7 +16,7 @@ service for this extension.
   new reply, and returns that reply to the local bridge for delivery to Beeper.
   On connection, the selected catch-up sends the most recent 20 loaded messages
   by default, all loaded messages, or only new messages to the local bridge and
-  Beeper. It also reads later text messages and revisions while connected. No
+  Beeper. It also reads later messages, formatting, accessible images, and revisions while connected. No
   automatic scrolling or account-wide history retrieval is performed.
 - **Pairing code:** the extension stores your bridge's private pairing token in
   Chrome's local extension storage, not Chrome Sync. Access is restricted to
@@ -26,15 +26,20 @@ service for this extension.
   import messages. It also remembers which tabs have already shown an automatic
   popup, so dismissing it does not repeatedly reopen it.
 - **Private bridge state:** the local companion stores Beeper registration and
-  encryption credentials, room/message identifiers, and queued message text on
-  your computer. Completed message bodies are cleared from active queue rows.
+  encryption credentials, room/message identifiers, and queued structured messages and image bytes on
+  your computer. Completed message bodies and image bytes are cleared from active queue rows.
   Source message identifiers and content hashes are retained to prevent duplicate
   imports after restarts. SQLite files, backups, and filesystem snapshots may
   retain previous content.
 
 The extension does not read your Muse password, cookies, or authentication
 tokens. It uses the website through your existing signed-in browser session.
-Messages can contain whatever personal information you choose to send.
+For images already displayed in the connected chat, the extension may make an
+ordinary browser fetch to that image URL, subject to the page's CORS rules. It
+does not add host permissions or bypass browser restrictions. Accessible images
+are uploaded through the bridge's encrypted Matrix media path; inaccessible
+images are represented by links. Messages can contain whatever personal
+information you choose to send.
 
 ## Where information goes
 

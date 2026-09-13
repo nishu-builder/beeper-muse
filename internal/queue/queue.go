@@ -29,6 +29,7 @@ type Job struct {
 	RoomID    string `json:"-"`
 	Phase     string `json:"-"`
 	Result    string `json:"-"`
+	Payload   string `json:"-"`
 	ClaimedAt int64  `json:"-"`
 }
 
@@ -90,6 +91,36 @@ func Open(dir string) (*Queue, error) {
 	if err != nil {
 		return nil, err
 	}
+	// Additive migration: old queues and receipts remain readable.
+	rows, err := q.db.Query("PRAGMA table_info(jobs)")
+	if err != nil {
+		return nil, err
+	}
+	hasPayload := false
+	for rows.Next() {
+		var cid, notnull, pk int
+		var name, typ string
+		var def any
+		if err = rows.Scan(&cid, &name, &typ, &notnull, &def, &pk); err != nil {
+			rows.Close()
+			return nil, err
+		}
+		hasPayload = hasPayload || name == "payload"
+	}
+	err = rows.Err()
+	rows.Close()
+	if err != nil {
+		return nil, err
+	}
+	if !hasPayload {
+		if _, err = q.db.Exec("ALTER TABLE jobs ADD COLUMN payload TEXT NOT NULL DEFAULT ''"); err != nil {
+			return nil, err
+		}
+	}
+	if _, err = q.db.Exec("CREATE TABLE IF NOT EXISTS muse_links(id TEXT PRIMARY KEY,role TEXT NOT NULL,remote_id TEXT NOT NULL,last_hash TEXT NOT NULL DEFAULT '',revision INTEGER NOT NULL DEFAULT 0)"); err != nil {
+		return nil, err
+	}
+
 	ok = true
 	return q, nil
 }
@@ -143,7 +174,7 @@ func (q *Queue) Enqueue(eventID, roomID, prompt string) (string, error) {
 
 func (q *Queue) head() (*Job, error) {
 	var j Job
-	err := q.db.QueryRow("SELECT id,event_id,room_id,prompt,result,phase,claimed_at FROM jobs WHERE phase!='done' ORDER BY seq LIMIT 1").Scan(&j.ID, &j.EventID, &j.RoomID, &j.Prompt, &j.Result, &j.Phase, &j.ClaimedAt)
+	err := q.db.QueryRow("SELECT id,event_id,room_id,prompt,result,phase,claimed_at,payload FROM jobs WHERE phase!='done' ORDER BY seq LIMIT 1").Scan(&j.ID, &j.EventID, &j.RoomID, &j.Prompt, &j.Result, &j.Phase, &j.ClaimedAt, &j.Payload)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
@@ -238,7 +269,7 @@ func (q *Queue) BeginDelivery() (*Job, error) {
 func (q *Queue) Complete(id string) error {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	result, err := q.db.Exec("UPDATE jobs SET phase='done',prompt='',result='' WHERE id=? AND phase='delivering'", id)
+	result, err := q.db.Exec("UPDATE jobs SET phase='done',prompt='',result='',payload='' WHERE id=? AND phase='delivering'", id)
 	if err != nil {
 		return err
 	}
@@ -267,6 +298,6 @@ func (q *Queue) Acknowledge() error {
 	if j == nil || j.Phase != "blocked" {
 		return ErrConflict
 	}
-	_, err = q.db.Exec("UPDATE jobs SET phase='done',prompt='',result='' WHERE id=?", j.ID)
+	_, err = q.db.Exec("UPDATE jobs SET phase='done',prompt='',result='',payload='' WHERE id=?", j.ID)
 	return err
 }

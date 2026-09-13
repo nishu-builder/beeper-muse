@@ -22,8 +22,8 @@ func TestImportPersistsReceiptsAndRevisions(t *testing.T) {
 		t.Fatalf("import: %d %v", n, err)
 	}
 	first, _ := q.BeginDelivery()
-	if first == nil || first.Result != "You in Muse:\nSynthetic question" {
-		t.Fatal("missing user label")
+	if first == nil || first.Result != "Synthetic question" || first.Payload == "" {
+		t.Fatal("missing structured user message")
 	}
 	if err := q.Complete(first.ID); err != nil {
 		t.Fatal(err)
@@ -51,8 +51,8 @@ func TestImportPersistsReceiptsAndRevisions(t *testing.T) {
 		t.Fatalf("revision: %d %v", n, err)
 	}
 	changed, _ := q.BeginDelivery()
-	if changed == nil || changed.Result != "Updated Muse reply:\nA later update" {
-		t.Fatal("missing updated reply label")
+	if changed == nil || changed.Result != "A later update" || changed.Payload == "" {
+		t.Fatal("missing structured update")
 	}
 }
 func TestConcurrentImportsDeduplicate(t *testing.T) {
@@ -181,5 +181,90 @@ func TestImportRouteRequiresAuthenticationAndCannotSelectDestination(t *testing.
 	job, _ := q.BeginDelivery()
 	if job == nil || job.RoomID != "!configured:test" {
 		t.Fatal("incorrect destination")
+	}
+}
+
+func TestStructuredReversionIsAnEditNotLostAsAnOldDuplicate(t *testing.T) {
+	q, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer q.Close()
+	for _, text := range []string{"Original", "Edited", "Original"} {
+		if n, err := q.Import("!test:test", []Incoming{{ID: "same", Role: "assistant", Text: text}}); err != nil || n != 1 {
+			t.Fatalf("revision lost: %d %v", n, err)
+		}
+		job, _ := q.BeginDelivery()
+		if job == nil {
+			t.Fatal("missing job")
+		}
+		if err = q.Complete(job.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if n, err := q.Import("!test:test", []Incoming{{ID: "same", Role: "assistant", Text: "Original"}}); err != nil || n != 0 {
+		t.Fatal("unchanged revision duplicated")
+	}
+}
+func TestStructuredResultBindsEchoAndKeepsIndividualAnswers(t *testing.T) {
+	q, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer q.Close()
+	job, _ := q.Enqueue("$prompt", "!test:test", "Question")
+	_, _ = q.Claim()
+	messages := []Incoming{{ID: "u", Role: "user", Text: "Question"}, {ID: "a", Role: "assistant", Text: "Answer", HTML: "<b>Answer</b>"}, {ID: "b", Role: "assistant", Text: "Followup"}}
+	if err = q.ResultMessages(job, messages); err != nil {
+		t.Fatal(err)
+	}
+	if err = q.ResultMessages(job, messages); err != nil {
+		t.Fatal(err)
+	}
+	if n, err := q.Import("!test:test", messages); err != nil || n != 0 {
+		t.Fatalf("result echoed %d %v", n, err)
+	}
+	status, _ := q.Status()
+	if status.Queued != 2 {
+		t.Fatal("answers not kept separately")
+	}
+	first, _ := q.BeginDelivery()
+	if first == nil || !strings.Contains(first.Payload, "user:"+job) || !strings.Contains(first.Payload, "html") {
+		t.Fatal("native reply mapping or formatting lost")
+	}
+	if err = q.Complete(first.ID); err != nil {
+		t.Fatal(err)
+	}
+	var payload string
+	if err = q.db.QueryRow("SELECT payload FROM jobs WHERE id=?", first.ID).Scan(&payload); err != nil || payload != "" {
+		t.Fatal("completed structured content retained")
+	}
+}
+
+func TestLegacyReceiptSuppressesUpgradeReplayButNotFutureReversions(t *testing.T) {
+	q, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer q.Close()
+	_, err = q.db.Exec("INSERT INTO muse_sources(id,hash) VALUES(?,?)", "legacy", ID("assistant\nOriginal"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	m := Incoming{ID: "legacy", Role: "assistant", Text: "Original"}
+	if n, err := q.Import("!test:test", []Incoming{m}); err != nil || n != 0 {
+		t.Fatal("legacy history replayed")
+	}
+	m.Text = "Revised"
+	if n, err := q.Import("!test:test", []Incoming{m}); err != nil || n != 1 {
+		t.Fatal("new revision lost")
+	}
+	j, _ := q.BeginDelivery()
+	if err = q.Complete(j.ID); err != nil {
+		t.Fatal(err)
+	}
+	m.Text = "Original"
+	if n, err := q.Import("!test:test", []Incoming{m}); err != nil || n != 1 {
+		t.Fatal("legacy hash suppressed real reversion")
 	}
 }

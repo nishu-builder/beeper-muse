@@ -71,7 +71,9 @@ func (c *Connector) GetBridgeInfoVersion() (int, int) { return 1, 1 }
 func (c *Connector) GetCapabilities() *bridgev2.NetworkGeneralCapabilities {
 	return &bridgev2.NetworkGeneralCapabilities{}
 }
-func (c *Connector) GetDBMetaTypes() database.MetaTypes { return database.MetaTypes{} }
+func (c *Connector) GetDBMetaTypes() database.MetaTypes {
+	return database.MetaTypes{Message: func() any { return &messageMetadata{} }}
+}
 func (c *Connector) GetConfig() (string, any, configupgrade.Upgrader) {
 	return "owner: '@you:beeper.com'\ndata_dir: .local\nrelay_token: ''\n", &c.Config, configupgrade.SimpleUpgrader(func(helper configupgrade.Helper) {
 		helper.Copy(configupgrade.Str, "owner")
@@ -241,6 +243,16 @@ func (c *Connector) tick(ctx context.Context) {
 		c.bridge.Log.Error().Msg("Muse reply blocked: the destination could not be validated")
 		return
 	}
+	if job.Payload != "" {
+		deliveryCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
+		defer cancel()
+		if err := c.deliverSource(deliveryCtx, login, portal, job); err != nil {
+			_ = c.queue.Block(job.ID)
+			c.bridge.Log.Error().Msg("Structured Muse delivery blocked; inspect the queue before retrying")
+		}
+		return
+	}
+
 	replyID := networkid.MessageID("muse:" + job.ID)
 	var replyTo *networkid.MessageOptionalPartID
 	if !strings.HasPrefix(job.EventID, "muse-dom:") {

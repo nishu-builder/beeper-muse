@@ -1,5 +1,6 @@
 (() => {
   'use strict';
+  const muse = BeeperMuseDOM.create(document);
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   let polling = false;
   let stopped = false;
@@ -32,7 +33,7 @@
       if (!result?.ok) throw new Error('Local connector request failed.');
       return result;
     });
-  let tracker = new BeeperMuseSync.Tracker(send);
+  let tracker = new BeeperMuseSync.Tracker(send, undefined, muse.prepare);
   async function offerPopup() {
     if (
       popupOffered ||
@@ -53,43 +54,55 @@
       offeringPopup = false;
     }
   }
-  async function execute(job, current) {
+  async function execute(job, current, sourceProtocol) {
     const active = () => !stopped && generation === current;
     try {
       if (!active()) throw new Error('Tab disconnected.');
-      const before = await BeeperMuseDOM.submit(
-        document,
-        job.prompt,
-        wait,
-        active,
-      );
+      const before = await muse.submit(job.prompt, wait, active);
       let stableSince = Date.now();
       let previous = '';
       const deadline = Date.now() + 25 * 60 * 1000;
       while (Date.now() < deadline && active()) {
         await wait(1000);
         if (!active()) throw new Error('Tab disconnected.');
-        const view = BeeperMuseDOM.snapshot(document);
+        const view = await muse.snapshot();
         if (view.draft.trim()) throw new Error('A new draft was entered.');
-        const answer = BeeperMuseDOM.responseAfter(before, job.prompt, view);
+        const answer = BeeperMuseSync.responseAfter(before, job.prompt, view);
         if (view.busy || !answer || answer !== previous) {
           previous = answer || '';
           stableSince = Date.now();
           continue;
         }
         if (Date.now() - stableSince >= 4000) {
+          const observed = BeeperMuseSync.messages(view)
+            .filter((message) => !before.has(message.id))
+            .slice(0, 20);
           const sources = await Promise.all(
-            BeeperMuseSync.messages(view)
-              .filter((message) => !before.has(message.id))
-              .slice(0, 64)
-              .map(BeeperMuseSync.fingerprint),
+            observed.map(BeeperMuseSync.fingerprint),
           );
+          const messages =
+            sourceProtocol === 2
+              ? await BeeperMuseSync.prepareBatch(
+                  observed.map((message) => ({
+                    ...message,
+                    observedAtMs: Date.now(),
+                    historical: false,
+                  })),
+                  muse.prepare,
+                )
+              : undefined;
           // Retrying a result is safe: the relay accepts it idempotently. Never
           // repeat a claim or a Muse send after an uncertain network result.
           for (let attempt = 0; attempt < 3; attempt++) {
             try {
               if (!active()) throw new Error('Tab disconnected.');
-              await send({ type: 'result', id: job.id, text: answer, sources });
+              await send({
+                type: 'result',
+                id: job.id,
+                text: answer,
+                sources,
+                messages,
+              });
               tracker.remember(sources);
               return;
             } catch {
@@ -119,7 +132,7 @@
       if (stopped || generation !== current) return;
       guardClosing(connected.connected);
       if (!connected.connected) return;
-      const view = BeeperMuseDOM.snapshot(document);
+      const view = await muse.snapshot();
       if (connected.museSync) {
         try {
           await tracker.sync(
@@ -134,7 +147,8 @@
       if (stopped || current !== generation) return;
       if (view.busy || view.draft.trim()) return;
       const result = await send({ type: 'claim' });
-      if (result.job) await execute(result.job, current);
+      if (result.job)
+        await execute(result.job, current, connected.sourceProtocol);
     } catch {
       /* Keep private data and server failures out of page logs. */
     } finally {
@@ -143,21 +157,21 @@
   }
   chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     if (message.type === 'probe') {
-      respond({ protocol: 2, health: health() });
+      respond({ protocol: 3, health: health() });
       return;
     }
     if (message.type === 'stop') {
       stopped = true;
       generation++;
       guardClosing(false);
-      respond({ protocol: 2 });
+      respond({ protocol: 3 });
     }
     if (message.type === 'start') {
       stopped = false;
-      tracker = new BeeperMuseSync.Tracker(send);
+      tracker = new BeeperMuseSync.Tracker(send, undefined, muse.prepare);
       const state = health();
       guardClosing(state !== 'unavailable');
-      respond({ protocol: 2, health: state });
+      respond({ protocol: 3, health: state });
       void poll();
     }
   });
