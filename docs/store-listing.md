@@ -7,12 +7,11 @@ Version 0.3.0 was submitted on September 13, 2026. The dashboard confirms
 **Pending review**, with automatic publication after approval enabled.
 This is not yet an available Chrome Web Store installation.
 
-The listing explains the dedicated Muse chat, then prominently states that a
-local companion bridge and the user's own Beeper/Muse accounts are required.
-It links to the public setup guide and issue tracker. It describes text-only
-limits, the need to keep the bridge and Muse tab running, and the lack of official
-affiliation with Beeper or Meta. Do not imply that extension installation alone
-creates the chat or that all Muse widgets and background activity are mirrored.
+## Description
+
+Use Muse from a dedicated chat in Beeper.
+
+Setup instructions: https://github.com/nishu-builder/beeper-muse
 
 ## URLs and artwork
 
