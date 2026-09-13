@@ -8,8 +8,9 @@ bridge.
 [Setup guide](docs/setup.md) · [Extension download](https://github.com/nishu-builder/beeper-muse/releases/latest)
 · [Privacy](PRIVACY.md) · [Troubleshooting](docs/operations.md)
 
-The Chrome Web Store listing is being prepared. Until Google approves it, use
-the release ZIP or load the source extension as described below. **The extension
+Version 0.3.0 was submitted to Chrome Web Store on September 13, 2026 and is
+**pending review**. Until Google approves it, use the release ZIP or load the
+source extension as described below. **The extension
 requires the local bridge; installing it alone does not create a Beeper chat.**
 
 **Experimental and text-only.** The Beeper side uses the mautrix `bridgev2`

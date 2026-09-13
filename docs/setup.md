@@ -47,7 +47,8 @@ account directly; enabling the Beeper Desktop local API is not necessary.
 
 ## 3. Install the Chrome extension
 
-The store listing is being prepared. Until it is approved, choose one of these:
+Version 0.3.0 is pending Chrome Web Store review as of September 13, 2026.
+Until it is approved, choose one of these:
 
 - **Release download:** download `beeper-muse-extension.zip` from
   [GitHub Releases](https://github.com/nishu-builder/beeper-muse/releases/latest)

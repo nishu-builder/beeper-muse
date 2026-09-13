@@ -50,6 +50,11 @@ and assets before retrying. Published releases are not automatically overwritten
 
 ## Optional store automation
 
+The repository's protected `chrome-web-store` environment and item identifiers
+are configured. Google OAuth secrets have not been configured, and `CWS_PUBLISH`
+is currently `false`. The first submission was completed through the dashboard.
+Add the credentials described below before enabling automated submissions.
+
 The first submission uses the dashboard. Later tags can submit the same release
 artifact through the [Chrome Web Store V2 API](https://developer.chrome.com/docs/webstore/using-api).
 This follows the distribution pattern used by

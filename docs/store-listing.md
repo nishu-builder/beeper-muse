@@ -3,6 +3,10 @@
 Item: **Beeper Muse** (`bchjpmhhlhpcokhlmbpbiibehfjdgnme`).
 Category: Productivity / Communication. Language: English. Free, public.
 
+Version 0.3.0 was submitted on September 13, 2026. The dashboard confirms
+**Pending review**, with automatic publication after approval enabled.
+This is not yet an available Chrome Web Store installation.
+
 The listing explains the dedicated Muse chat, then prominently states that a
 local companion bridge and the user's own Beeper/Muse accounts are required.
 It links to the public setup guide and issue tracker. It describes text-only
