@@ -4,3 +4,7 @@ coverage/
 package-lock.json
 .local/
 .env*
+bin/
+*.db
+*.db-shm
+*.db-wal
