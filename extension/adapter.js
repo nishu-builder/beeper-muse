@@ -78,7 +78,8 @@
           '\n\n[Reply shortened. Open Muse for the full response.]'
       : result;
   }
-  async function submit(document, prompt, wait) {
+  async function submit(document, prompt, wait, active = () => true) {
+    if (!active()) throw new Error('Tab disconnected.');
     const initial = snapshot(document);
     if (initial.busy || initial.draft.trim())
       throw new Error('Muse is busy or has an existing draft.');
@@ -93,6 +94,16 @@
       new document.defaultView.Event('input', { bubbles: true }),
     );
     await wait(150);
+    if (!active()) {
+      // Only remove the draft inserted by this submission, never a user's edit.
+      if (field.isConnected && field.value === prompt) {
+        setter.call(field, '');
+        field.dispatchEvent(
+          new document.defaultView.Event('input', { bubbles: true }),
+        );
+      }
+      throw new Error('Tab disconnected.');
+    }
     const buttons = [
       ...document.querySelectorAll('button[aria-label="Send"]'),
     ].filter(visible);

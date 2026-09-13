@@ -23,6 +23,8 @@ function harness(paired = true) {
   let restricted = false,
     reachable = true,
     receiver = true;
+  let health = 'ready';
+  let protocol = 1;
   let listener!: (
     message: unknown,
     sender: Sender,
@@ -82,6 +84,7 @@ function harness(paired = true) {
         query: async () => [{ id: 7, url: 'https://muse.ai/' }],
         sendMessage: async () => {
           if (!receiver) throw new Error('No content script');
+          return { protocol, health };
         },
         onRemoved: {
           addListener: (fn: typeof removed) => {
@@ -105,6 +108,12 @@ function harness(paired = true) {
     },
     withoutContentScript: () => {
       receiver = false;
+    },
+    health: (value: string) => {
+      health = value;
+    },
+    legacyContentScript: () => {
+      protocol = 0;
     },
     close: (id: number) => removed(id),
     popup: (type: string, extra = {}) =>
@@ -188,6 +197,34 @@ test('missing content scripts do not leave a tab falsely connected', async () =>
   h.withoutContentScript();
   assert.equal((await h.popup('attach')).ok, false);
   assert.equal(h.saved.tabID, undefined);
+});
+test('status checks the content script after attachment instead of trusting a saved tab', async () => {
+  const h = harness();
+  await h.popup('attach');
+  assert.equal((await h.popup('status')).connected, true);
+  h.withoutContentScript();
+  const status = await h.popup('status');
+  assert.equal(status.attached, true);
+  assert.equal(status.connected, false);
+  assert.equal(status.health, 'reload');
+});
+test('readiness distinguishes a busy chat, a draft, a missing chat, and an old content script', async () => {
+  const h = harness();
+  for (const health of ['busy', 'draft']) {
+    h.health(health);
+    assert.equal((await h.popup('attach')).ok, true);
+    const status = await h.popup('status');
+    assert.equal(status.connected, true);
+    assert.equal(status.health, health);
+  }
+  h.health('unavailable');
+  assert.equal((await h.popup('status')).connected, false);
+  assert.match(String((await h.popup('attach')).error), /Sign in/);
+  h.legacyContentScript();
+  assert.match(
+    String((await h.popup('attach')).error),
+    /Refresh the Muse webpage/,
+  );
 });
 test('disconnect, tab close, and forgetting revoke access; forgetting removes the saved code', async () => {
   const h = harness();

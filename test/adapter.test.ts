@@ -67,6 +67,33 @@ test('browser adapter uses the textarea input event and clicks Send exactly once
   assert.equal(before.has('old'), true);
   f.dom.window.close();
 });
+
+test('disconnect during composer preparation cancels Send and clears only the inserted draft', async () => {
+  for (const manualEdit of [false, true]) {
+    const f = fixture();
+    let active = true,
+      sends = 0;
+    const field = f.document.querySelector('textarea')!;
+    f.document.querySelector('button')!.onclick = () => {
+      sends++;
+    };
+    await assert.rejects(
+      f.adapter.submit(
+        f.document,
+        'Synthetic prompt',
+        async () => {
+          active = false;
+          if (manualEdit) field.value = 'My edited draft';
+        },
+        () => active,
+      ),
+      /disconnected/,
+    );
+    assert.equal(sends, 0);
+    assert.equal(field.value, manualEdit ? 'My edited draft' : '');
+    f.dom.window.close();
+  }
+});
 test('browser response capture excludes history, buttons, and widgets, and preserves links', () => {
   const f = fixture();
   const log = f.document.querySelector('[role="log"]')!;

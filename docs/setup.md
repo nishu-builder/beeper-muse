@@ -82,14 +82,17 @@ from a second terminal in this repository. That preserves your current pairing.
 3. Leave the main chat open with an empty composer. Wait for active Muse work to
    finish.
 4. Open the extension and click **Connect this Muse tab**. The button changes to
-   **Muse tab connected**. You only need to connect once per browser session.
+   **Muse tab connected** after checking that Muse's chat is available. The popup
+   tells you if a draft or active Muse work is holding up the queue. You only
+   need to connect once per browser session.
 5. Close the popup. In Beeper's **Muse** conversation, send
    `Reply with exactly: MUSE_CONNECTED`.
 
 The prompt should appear in Muse, followed by a reply from the Muse contact in
 Beeper. The Connect button itself does not send a test message. `0 queued` means
-there is no outstanding prompt. Check [validation](validation.md) for the current
-tested scope.
+there is no outstanding prompt. Messages typed directly in Muse and replies to
+those messages are not imported into Beeper. Check [validation](validation.md)
+for the current tested scope.
 
 Keep the local bridge and Chrome running and the Muse tab open. Do not compose
 manual messages in the attached tab while a bridge prompt is running. After
@@ -103,7 +106,7 @@ to another tab or using Muse directly.
 | Pairing fails                                 | Start the bridge, confirm it uses port 24819, and copy the code from this installation.                                                       |
 | Connected, 0 queued                           | Close the popup and send a new message in Beeper's Muse chat. Connecting alone sends nothing.                                                 |
 | Message queued, nothing in Muse               | Leave the Muse main chat open, clear any draft, wait for Muse to finish, and connect the tab.                                                 |
-| Reload message or no response after an update | Reload the extension at `chrome://extensions`, refresh Muse, then reconnect.                                                                  |
+| Reload message or no response after an update | Reload the extension at `chrome://extensions`, then refresh the **Muse webpage**, and reconnect. Both reloads are needed.                     |
 | Message needs attention / blocked             | Follow [interrupted-job recovery](operations.md#interrupted-jobs). Check both apps before discarding a job; it may already have reached Muse. |
 | Muse answered but Beeper did not              | Inspect `npm start -- status` and the bridge terminal. Do not resend blindly; see the operations guide.                                       |
 

@@ -23,6 +23,11 @@ Coverage includes:
   tab authorization.
 - Private popup pairing, rejection of page-origin pairing requests, failed pairing
   preserving the existing token, storage isolation, and a public ZIP allowlist.
+- Connection probes detect missing or old content scripts, an unavailable chat,
+  active Muse work, and existing drafts without returning conversation text.
+- Content-script cancellation during a pending claim or reply wait, including
+  rapid reconnects, and cancellation before clicking Send without erasing a
+  manually edited draft.
 
 Tests use synthetic DOM fixtures and temporary databases. They do not require
 accounts, contact live services, or establish real-world encryption compatibility.

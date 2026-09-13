@@ -44,6 +44,20 @@ async function detach() {
   if (tabID)
     await chrome.tabs.sendMessage(tabID, { type: 'stop' }).catch(() => {});
 }
+async function tabHealth(tabID, type = 'probe') {
+  try {
+    const result = await chrome.tabs.sendMessage(tabID, { type });
+    if (
+      result?.protocol === 1 &&
+      ['ready', 'busy', 'draft', 'unavailable'].includes(result.health)
+    )
+      return result.health;
+  } catch {
+    // A tab opened before extension reload has no usable content script.
+  }
+  return 'reload';
+}
+const tabReady = (health) => ['ready', 'busy', 'draft'].includes(health);
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   (async () => {
     if (sender.id !== chrome.runtime.id) throw new Error('Invalid sender.');
@@ -90,16 +104,25 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       if (!paired) return { ok: true, paired: false, connected: false };
       try {
         const status = await api('/v1/status');
+        const health = tabID ? await tabHealth(tabID) : 'disconnected';
         return {
           ok: true,
           paired: true,
           reachable: true,
-          connected: !!tabID,
+          attached: !!tabID,
+          connected: tabReady(health),
+          health,
           phase: status.phase,
           queued: status.queued,
         };
       } catch {
-        return { ok: true, paired: true, reachable: false, connected: !!tabID };
+        return {
+          ok: true,
+          paired: true,
+          reachable: false,
+          attached: !!tabID,
+          connected: false,
+        };
       }
     }
     if (popup && message.type === 'attach') {
@@ -113,16 +136,22 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
           ok: false,
           error: 'Open the main Muse chat in this Chrome window first.',
         };
-      await detach();
-      await chrome.storage.session.set({ tabID: tab.id });
-      try {
-        await chrome.tabs.sendMessage(tab.id, { type: 'start' });
-      } catch {
-        await chrome.storage.session.remove('tabID');
+      const health = await tabHealth(tab.id);
+      if (!tabReady(health))
         return {
           ok: false,
           error:
-            'Reload your Muse tab after installing the extension, then connect it again.',
+            health === 'reload'
+              ? 'Refresh the Muse webpage, then click Connect again. Reloading the extension alone is not enough.'
+              : 'Sign in to Muse and open its main chat, then click Connect again.',
+        };
+      await detach();
+      await chrome.storage.session.set({ tabID: tab.id });
+      if (!tabReady(await tabHealth(tab.id, 'start'))) {
+        await chrome.storage.session.remove('tabID');
+        return {
+          ok: false,
+          error: 'Refresh the Muse webpage, then click Connect again.',
         };
       }
       return { ok: true };

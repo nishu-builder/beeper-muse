@@ -23,7 +23,7 @@ async function refresh() {
   connect.textContent = result.connected
     ? 'Muse tab connected'
     : 'Connect this Muse tab';
-  disconnect.disabled = !result.connected;
+  disconnect.disabled = !result.attached;
   if (!result.paired)
     status.textContent = 'First, pair with the bridge on this computer.';
   else if (!result.reachable)
@@ -31,6 +31,16 @@ async function refresh() {
   else if (result.phase === 'blocked')
     status.textContent =
       'A message needs attention. Follow Recovery in the setup guide.';
+  else if (result.health === 'reload')
+    status.textContent =
+      'Refresh the Muse webpage, then connect again. Reloading the extension alone is not enough.';
+  else if (result.health === 'unavailable')
+    status.textContent =
+      'Sign in to Muse and open its main chat, then connect again.';
+  else if (result.health === 'draft')
+    status.textContent = `Connected · ${result.queued} queued. Clear the draft in Muse to continue.`;
+  else if (result.health === 'busy')
+    status.textContent = `Connected · ${result.queued} queued. Waiting for Muse to finish.`;
   else if (result.connected)
     status.textContent = `Connected · ${result.queued} queued. Send a message in Beeper.`;
   else status.textContent = 'Bridge ready. Open Muse and connect its tab.';
