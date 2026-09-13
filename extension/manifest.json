@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Beeper Muse Local Connector",
-  "description": "Relay explicit Beeper self-chat prompts to your signed-in Muse tab.",
-  "version": "0.1.0",
+  "name": "Beeper Muse",
+  "description": "Connect your dedicated Muse chat in Beeper to your signed-in Muse browser tab.",
+  "version": "0.2.0",
   "permissions": ["storage", "activeTab"],
   "host_permissions": ["http://127.0.0.1:24819/*"],
   "background": { "service_worker": "background.js" },

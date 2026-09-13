@@ -1,7 +1,7 @@
 {
   "name": "beeper-muse",
-  "version": "0.1.0",
-  "description": "Direct local connector between Beeper and the Muse web app, without WhatsApp.",
+  "version": "0.2.0",
+  "description": "Custom Beeper bridge for a dedicated Muse chat, connected directly through your browser.",
   "type": "module",
   "private": true,
   "license": "MIT",
@@ -9,19 +9,13 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
-    "start": "node --env-file-if-exists=.env dist/cli.js",
-    "dev": "tsx --env-file-if-exists=.env src/cli.ts",
-    "test": "tsx --test test/*.test.ts",
+    "build": "go build -tags goolm -o bin/beeper-muse ./cmd/beeper-muse",
+    "start": "node scripts/manage.mjs",
+    "test": "tsx --test test/*.test.ts && go test -tags goolm ./...",
     "typecheck": "tsc --noEmit",
-    "format": "prettier --write .",
-    "format:check": "prettier --check .",
-    "check": "npm run typecheck && npm run test && npm run build && npm run format:check",
-    "prebuild": "node -e \"require(\\\"node:fs\\\").rmSync(\\\"dist\\\",{recursive:true,force:true})\""
-  },
-  "dependencies": {
-    "@beeper/desktop-api": "5.0.0",
-    "htmlparser2": "12.0.0"
+    "format": "prettier --write . && gofmt -w cmd internal",
+    "format:check": "prettier --check . && node scripts/check-go-format.mjs",
+    "check": "npm run typecheck && npm test && npm run build && npm run format:check"
   },
   "devDependencies": {
     "@types/jsdom": "30.0.0",
@@ -30,5 +24,8 @@
     "prettier": "3.9.6",
     "tsx": "4.23.13",
     "typescript": "7.0.2"
+  },
+  "dependencies": {
+    "yaml": "2.9.1"
   }
 }

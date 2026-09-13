@@ -1,127 +1,131 @@
 # Beeper Muse
 
-Chat with your Meta Muse agent from Beeper through a local relay and a small
-Chrome extension. **No WhatsApp connection and no Muse credential extraction.**
+A custom Beeper bridge that gives your existing Meta Muse conversation its own
+**Muse** chat. Send ordinary messages in that chat; replies are delivered by the
+Muse contact. No WhatsApp connection, Note to self relay, or Muse password in the
+bridge.
 
-**Experimental, text-only, personal-use integration.** This operates the Muse
-website through its visible controls; it is not an official Muse API or a native
-Beeper network bridge. Website changes can break it.
-
-```text
-Beeper Note to self → local relay → Chrome extension → Muse web app
-                   ← text reply  ←                  ←
-```
-
-In Beeper's **Note to self**, send:
+**Experimental and text-only.** The Beeper side uses the mautrix `bridgev2`
+framework. The Muse side operates the signed-in website through a Chrome
+extension; it is not an official Muse API. Website changes can interrupt it.
 
 ```text
-!muse Explain why the sky is blue in two sentences.
+Dedicated Muse chat in Beeper
+            ↕ encrypted Matrix messages
+Local Go bridge + durable queue
+            ↕ authenticated loopback connection
+Chrome extension ↔ your signed-in Muse conversation
 ```
-
-The extension enters that prompt in your selected, signed-in Muse tab. The first
-stable text reply returns to the self-chat with a **Muse** prefix. Beeper shows
-the returned message as sent by your own account.
 
 ## Requirements
 
-- Node.js 24 or newer and npm.
-- Beeper Desktop with its local API enabled under Settings → Integrations.
-- A working Beeper **Note to self** chat.
-- Chrome, a signed-in Muse account, and permission to load an unpacked extension.
+- A Beeper account and [bbctl](https://github.com/beeper/bridge-manager), Beeper's
+  official manager for self-hosted bridges.
+- Go 1.26 or newer, Node.js 24 or newer, npm, and a C compiler for SQLite.
+  On macOS, the Xcode command line tools supply the compiler.
+- macOS or Linux. Native Windows is not supported by bbctl; WSL is untested here.
+- Chrome with unpacked extensions enabled, and a signed-in [Muse](https://muse.ai/)
+  account. Keep that browser tab and the bridge process running.
 
-Both Beeper and the connected Muse tab must remain open while the relay runs.
-The default relay address is `127.0.0.1:24819`; it is never exposed publicly.
+The Beeper Desktop local API is **not required** by this bridge. Setup uses
+bbctl to register a custom application service and can reuse an existing Beeper
+Desktop login. The bridge connects directly to Beeper's server over an outbound
+websocket. No public listener or port forwarding is required.
 
 ## Install
+
+Install bbctl using its official instructions. On macOS:
+
+```sh
+brew install beeper/tap/bbctl
+```
+
+Then:
 
 ```sh
 git clone https://github.com/nishu-builder/beeper-muse.git
 cd beeper-muse
 npm ci --ignore-scripts
 npm run build
-npm start -- login
 npm start -- setup
 ```
 
-Approve the Beeper login in your browser. `setup` selects the unambiguous Beeper
-Note to self chat and prints the absolute path to `.local/extension`. No message
-is sent during setup.
+Setup signs into Beeper with bbctl if needed, registers **sh-muse**, and prepares
+private configuration under `.local/`. Run one installation for this registration.
+Do not reuse the name if you already have an unrelated bridge called sh-muse.
 
 1. Open `chrome://extensions` in Chrome and enable **Developer mode**.
-2. Choose **Load unpacked** and select the generated `.local/extension` directory.
-3. Open the main chat at [muse.ai](https://muse.ai/) and sign in. Reload it if it was
-   already open before the extension was installed.
-4. Click the extension's toolbar button, then **Connect this Muse tab**.
-5. Run the relay:
+2. Choose **Load unpacked** and select the `.local/extension` folder printed by
+   setup. This generated copy contains your private pairing token.
+3. Open Muse's main chat and sign in. Reload the page if it was open before the
+   extension was installed.
+4. Click the extension's toolbar button and choose **Connect this Muse tab**.
+5. Start the bridge:
 
 ```sh
 npm start -- start
 ```
 
-Open your self-chat with `npm start -- open`, then send a new `!muse` prompt.
-Existing chat history is skipped on first launch.
-
-**Keep `.local/` private.** The generated extension contains a local relay token.
-Share this repository's `extension/` source, never your generated extension.
-No extension or background service is installed automatically.
+A separate **Muse** conversation appears in Beeper. Send a short message there,
+for example `Explain why the sky is blue in two sentences.` No command prefix is
+needed. The bridge forwards only messages in this conversation from its owner.
+See [validation](docs/validation.md) for the current live verification status and
+[operations](docs/operations.md) if encryption or delivery fails.
 
 ## Commands
 
-| Command                    | Purpose                                                        |
-| -------------------------- | -------------------------------------------------------------- |
-| `npm start -- login`       | Connect to Beeper with OAuth and PKCE.                         |
-| `npm start -- setup`       | Choose the self-chat and generate the private extension.       |
-| `npm start -- doctor`      | Check local configuration and self-chat access; sends nothing. |
-| `npm start -- start`       | Run the local relay in the foreground.                         |
-| `npm start -- status`      | Show queue state without printing prompts.                     |
-| `npm start -- open`        | Open the configured self-chat in Beeper.                       |
-| `npm start -- acknowledge` | Resolve an interrupted job after inspecting both apps.         |
+| Command                    | Purpose                                                 |
+| -------------------------- | ------------------------------------------------------- |
+| `npm start -- setup`       | Register the bridge and generate the private extension. |
+| `npm start -- start`       | Run the bridge in the foreground.                       |
+| `npm start -- status`      | Show queue state without displaying messages.           |
+| `npm start -- acknowledge` | Discard an interrupted job after checking both apps.    |
 
-Optional environment settings are documented in [.env.example](.env.example).
-They may be placed in a private `.env` file. The extension's local port is fixed
-to keep its host permission narrow.
+Optional exported environment variables are described in [.env.example](.env.example).
+A `.env` file is not loaded automatically. Both loopback ports, `24819` for the
+extension and `24820` for the Matrix application service, are fixed.
 
-## Boundaries
+## Behavior and limits
 
-- Only explicit `!muse` prompts authored by you in the configured self-chat are
-  forwarded. Group chats and chats with anyone else are rejected.
-- One prompt is handled at a time. The queue holds up to 20 prompts.
-- The extension refuses to overwrite an existing draft or send while Muse is busy.
-  Keep the connected tab dedicated to the connector; interleaved manual messages
-  stop response capture.
-- The extension clicks only the main message **Send** button. It never approves
-  purchases, permissions, or other agent actions. Review those inside Muse.
-- Responses use an observed user-message echo and a four-second quiet period
-  after Muse's Stop button disappears. This is a UI heuristic, not an official
-  completion signal. Background work, proactive updates, widgets, and attachments
-  are not fully mirrored. Open Muse for them.
-- This is not a separate Muse contact or network in Beeper. Replies use your own
-  Beeper account in Note to self. There is no standalone AI model or copied agent
-  memory: prompts go to your existing Muse web conversation.
-- Browser reloads, sleep, network failures, and site changes can interrupt a job.
-  Uncertain delivery is blocked for manual inspection rather than retried.
+- One owner, one Muse contact, one existing Muse web conversation. This does not
+  create a separate Muse agent or copy its memory into Beeper.
+- Only new text messages are forwarded. No history import, edits, deletions,
+  reactions, attachments, or automatic approvals of Muse actions.
+- One prompt runs at a time, with up to 20 outstanding prompts. Prompts support
+  8,000 Unicode characters. Browser replies are capped at 23,000 JavaScript
+  characters, with an explicit truncation notice.
+- The extension refuses to overwrite a draft or send while Muse is busy. Keep
+  the connected tab dedicated to this bridge. Interleaved manual messages stop
+  response capture.
+- Reply capture checks for the submitted prompt's echo, then waits for four
+  seconds without changes after Muse's Stop button disappears. This is a website
+  heuristic: background work, proactive updates, widgets, and later responses are
+  not fully mirrored. Open Muse to review them.
+- Jobs interrupted during a send are blocked for inspection. They are not
+  automatically replayed. There is no end-to-end exactly-once guarantee.
+- This is a custom chat network, but Beeper may label its network as `bridgev2`.
+  It is not an officially listed Muse integration in Beeper's network picker.
 
-## Development and verification
+## Development
 
 ```sh
 npm ci --ignore-scripts
 npm run check
+go test -race -tags goolm ./...
 ```
 
-The test suite covers chat restrictions, cursor pagination, queue serialization,
-restart recovery, duplicate results, uncertain sends, OAuth/PKCE, token and origin
-checks, and the browser adapter against synthetic DOM fixtures. Tests never
-require real accounts or access the internet.
+Tests use synthetic DOM fixtures and temporary databases, with no accounts or
+network access. They cover owner and recipient restrictions, durable queue
+transitions, crash recovery, duplicate results, local API authorization, setup,
+and browser response attribution. CI checks Linux and macOS.
 
-The browser selectors were checked against the live Muse interface on September
-13, 2026. See [validation](docs/validation.md) for the exact live checks and their
-limits. CI runs on Linux, macOS, and Windows with Node.js 24.
-
-See [operations](docs/operations.md), [contributing](CONTRIBUTING.md), and
-[security](SECURITY.md). MIT licensed. Unaffiliated with Beeper or Meta.
+See [contributing](CONTRIBUTING.md), [security](SECURITY.md),
+[architecture](docs/architecture.md), and [dependency notices](NOTICES.md).
+Original project code is MIT licensed. Unaffiliated with Beeper or Meta.
 
 ## References
 
-- [Beeper Desktop API](https://developers.beeper.com/desktop-api/)
-- [Beeper OAuth](https://developers.beeper.com/desktop-api/auth/)
-- [Meta Muse](https://ai.meta.com/muse/)
+- [Beeper third-party bridge setup](https://github.com/beeper/bridge-manager#3rd-party-bridgev2-based-bridges)
+- [mautrix bridge framework](https://docs.mau.fi/bridges/)
+- [End-to-bridge encryption](https://docs.mau.fi/bridges/general/end-to-bridge-encryption.html)
+- [Muse](https://muse.ai/)
