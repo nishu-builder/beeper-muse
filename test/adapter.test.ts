@@ -207,3 +207,16 @@ test('structured snapshots preserve formatting, resolve image URLs, and exclude 
   );
   f.dom.window.close();
 });
+
+test('an image-only answer completes capture and retains the attachment', () => {
+  const f = fixture();
+  f.document.querySelector('[role="log"]')!.innerHTML =
+    '<div data-message-item data-message-id="u" data-message-role="user">Draw a shape</div><div data-message-item data-message-id="a" data-message-role="assistant" data-message-has-presentation="true"><img src="https://example.com/shape.png" alt="Shape"></div>';
+  const view = f.adapter.snapshot(f.document);
+  assert.equal(
+    f.adapter.responseAfter(new Set(), 'Draw a shape', view),
+    '[Image]',
+  );
+  assert.equal(view.messages[1].images[0].url, 'https://example.com/shape.png');
+  f.dom.window.close();
+});

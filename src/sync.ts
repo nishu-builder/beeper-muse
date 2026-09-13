@@ -20,10 +20,13 @@
     const after = snapshot.messages.slice(snapshot.messages.indexOf(echo) + 1);
     const responses = after.filter(
       (m) =>
-        m.role === 'assistant' && !beforeIDs.has(m.id) && !m.widget && m.text,
+        m.role === 'assistant' &&
+        !beforeIDs.has(m.id) &&
+        (!m.widget || !!m.images?.length) &&
+        (m.text || !!m.images?.length),
     );
     if (!responses.length) return null;
-    const result = responses.map((m) => m.text).join('\n\n');
+    const result = responses.map((m) => m.text || '[Image]').join('\n\n');
     return result.length > 23000
       ? result.slice(0, 23000) +
           '\n\n[Reply shortened. Open Muse for the full response.]'
@@ -77,9 +80,11 @@
     prepare: (m: Muse.Message) => Promise<Muse.Message>,
   ): Promise<Muse.Message[]> {
     const out: Muse.Message[] = [];
+    const deadline = Date.now() + 60000;
     const size = () => new TextEncoder().encode(JSON.stringify(out)).byteLength;
     for (const item of items) {
-      const prepared = await prepare(item);
+      const prepared =
+        Date.now() < deadline ? await prepare(item) : { ...item };
       out.push(prepared);
       if (size() > 6 * 1024 * 1024) {
         prepared.images = prepared.images?.map(({ url, alt }) => ({

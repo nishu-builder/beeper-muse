@@ -74,9 +74,14 @@
           continue;
         }
         if (Date.now() - stableSince >= 4000) {
-          const observed = BeeperMuseSync.messages(view)
-            .filter((message) => !before.has(message.id))
-            .slice(0, 20);
+          const candidates = BeeperMuseSync.messages(view).filter(
+            (message) => !before.has(message.id),
+          );
+          const echoIndex = candidates.findIndex(
+            (message) => message.role === 'user',
+          );
+          if (echoIndex < 0) throw new Error('Prompt echo unavailable.');
+          const observed = candidates.slice(echoIndex, echoIndex + 20);
           const sources = await Promise.all(
             observed.map(BeeperMuseSync.fingerprint),
           );

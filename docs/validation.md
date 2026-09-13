@@ -105,7 +105,7 @@ reader, automatic popup, or native leave-page dialog.
 
 ## Version 0.5 native mapping checks
 
-The local development build was checked with 44 JavaScript/TypeScript tests, Go
+The local development build was checked with 45 JavaScript/TypeScript tests, Go
 tests, and the Go race detector. New coverage includes typed snapshots, absolute
 timestamps, status text exclusion, source revision reversions, structured prompt
 echo binding, HTML sanitization, image bounds, encrypted upload results, native
