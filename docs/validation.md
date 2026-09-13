@@ -18,8 +18,11 @@ Coverage includes:
 - Host/origin/token validation, strict JSON requests, and private routing data.
 - Setup preserving credentials and crypto keys, refusing owner changes and active
   locks, and never echoing malformed private configuration.
-- Browser input events, one Send click, draft preservation, response extraction,
-  rejection of interleaved manual messages, and extension tab authorization.
+- Browser input events, one Send click, draft preservation, reaction-independent
+  prompt/reply extraction, rejection of interleaved manual messages, and extension
+  tab authorization.
+- Private popup pairing, rejection of page-origin pairing requests, failed pairing
+  preserving the existing token, storage isolation, and a public ZIP allowlist.
 
 Tests use synthetic DOM fixtures and temporary databases. They do not require
 accounts, contact live services, or establish real-world encryption compatibility.
@@ -55,6 +58,26 @@ The browser tests run in jsdom, not an installed Chrome extension.
   capture, sender identity, and reply mapping; it does not validate installation
   or execution of the packaged Chrome extension.
 
-The generated Chrome extension has not been verified running in an installed
-browser. The project is experimental and should not be treated as production
-ready. See [operations](operations.md) for recovery and encryption troubleshooting.
+## Installed extension and version 0.3
+
+The installed 0.2 extension forwarded a real prompt but blocked its reply when
+Muse added a reaction beside the user's message bubble. The adapter was reading
+the whole message item and mistook the reaction for a different prompt. Version
+0.3 reads the message bubble, excluding sibling reactions and toolbars. Synthetic
+fixtures cover reactions on both the prompt and reply. The affected reply was
+recovered from Muse without replaying the prompt.
+
+After reloading the installed extension with the corrected adapter, an automatic
+round trip passed. A diagnostic text sent through Beeper was claimed by the
+extension, submitted to Muse, captured, and returned by the distinct Muse contact
+with exact marker text and `isSender: false`. No controlled browser send or manual
+claim/result call was used for this test. The queue returned to idle and cleared
+completed message bodies.
+
+This establishes the corrected installed adapter's automatic path. The new
+version 0.3 public pairing flow is separately covered by automated service-worker
+tests and popup UI checks; it has not yet been verified as a Chrome Web Store
+installation. Store artwork uses synthetic popup state and is not live-test
+evidence. Longer background tasks, proactive replies, sleep/resume, and long-term
+reliability remain unverified. The project is experimental. See
+[operations](operations.md) for recovery and encryption troubleshooting.

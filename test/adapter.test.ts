@@ -113,3 +113,23 @@ test('a changed page or busy Muse refuses to submit', async () => {
   assert.throws(() => f.adapter.snapshot(f.document), /unavailable/);
   f.dom.window.close();
 });
+
+test('reactions outside user and assistant bubbles cannot change prompt or reply text', () => {
+  const f = fixture();
+  f.document
+    .querySelector('[role="log"]')!
+    .insertAdjacentHTML(
+      'beforeend',
+      '<div data-message-item data-message-id="u" data-message-role="user"><div class="hatch-chat-groupable-bubble"><span class="sr-only">You:</span><p>Find a wooden storage box</p></div><div class="reactions"><span>reaction</span></div></div>' +
+        '<div data-message-item data-message-id="r" data-message-role="assistant"><div class="hatch-chat-groupable-bubble"><p>I am checking the available options.</p></div><div class="reactions"><span>another reaction</span></div></div>',
+    );
+  assert.equal(
+    f.adapter.responseAfter(
+      new Set(['old']),
+      'Find a wooden storage box',
+      f.adapter.snapshot(f.document),
+    ),
+    'I am checking the available options.',
+  );
+  f.dom.window.close();
+});

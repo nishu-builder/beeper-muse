@@ -1,31 +1,33 @@
-let configPromise;
-async function config() {
-  configPromise ||= fetch(chrome.runtime.getURL('local-config.json'))
-    .then((r) => r.json())
-    .then((c) => {
-      if (
-        c.baseURL !== 'http://127.0.0.1:24819' ||
-        !/^[a-f0-9]{64}$/.test(c.token)
-      )
-        throw new Error('Run setup again.');
-      return c;
-    });
-  return configPromise;
+const bridgeURL = 'http://127.0.0.1:24819';
+// Keep the pairing token out of content-script storage and Chrome Sync.
+const storageReady = chrome.storage.local
+  .setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' })
+  .then(
+    () => true,
+    () => false,
+  );
+async function token() {
+  if (!(await storageReady)) throw new Error('Private storage unavailable.');
+  const { bridgeToken } = await chrome.storage.local.get('bridgeToken');
+  return /^[a-f0-9]{64}$/.test(bridgeToken || '') ? bridgeToken : null;
 }
-async function api(path, body) {
-  const c = await config();
-  const response = await fetch(c.baseURL + path, {
+async function request(key, path, body) {
+  if (!key) throw new Error('Pair the extension first.');
+  const response = await fetch(bridgeURL + path, {
     method: body === undefined ? 'GET' : 'POST',
     headers: {
-      Authorization: `Bearer ${c.token}`,
+      Authorization: `Bearer ${key}`,
       'Content-Type': 'application/json',
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
     redirect: 'error',
     signal: AbortSignal.timeout(20000),
   });
-  if (!response.ok) throw new Error('Connector unavailable.');
+  if (!response.ok) throw new Error('Bridge unavailable.');
   return response.json();
+}
+async function api(path, body) {
+  return request(await token(), path, body);
 }
 function museURL(value) {
   try {
@@ -35,42 +37,107 @@ function museURL(value) {
     return false;
   }
 }
+async function detach() {
+  const { tabID } = await chrome.storage.session.get('tabID');
+  // Revoke access before notifying the tab, including when it has navigated away.
+  await chrome.storage.session.remove('tabID');
+  if (tabID)
+    await chrome.tabs.sendMessage(tabID, { type: 'stop' }).catch(() => {});
+}
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   (async () => {
     if (sender.id !== chrome.runtime.id) throw new Error('Invalid sender.');
-    const saved = await chrome.storage.session.get('tabID');
     const popup =
       !sender.tab && sender.url === chrome.runtime.getURL('popup.html');
+    if (popup && message.type === 'pair') {
+      const candidate =
+        typeof message.token === 'string'
+          ? message.token.trim().toLowerCase()
+          : '';
+      if (!/^[a-f0-9]{64}$/.test(candidate) || !(await storageReady))
+        return {
+          ok: false,
+          error: 'Enter the 64-character code from your bridge.',
+        };
+      try {
+        const status = await request(candidate, '/v1/status');
+        if (
+          typeof status.phase !== 'string' ||
+          !Number.isInteger(status.queued)
+        )
+          throw new Error('Invalid bridge response.');
+      } catch {
+        return {
+          ok: false,
+          error:
+            'Start your bridge and check the pairing code, then try again.',
+        };
+      }
+      await detach();
+      await chrome.storage.local.set({ bridgeToken: candidate });
+      return { ok: true };
+    }
+    if (popup && message.type === 'forget') {
+      await detach();
+      if (!(await storageReady))
+        throw new Error('Private storage unavailable.');
+      await chrome.storage.local.remove('bridgeToken');
+      return { ok: true };
+    }
+    if (popup && message.type === 'status') {
+      const paired = !!(await token());
+      const { tabID } = await chrome.storage.session.get('tabID');
+      if (!paired) return { ok: true, paired: false, connected: false };
+      try {
+        const status = await api('/v1/status');
+        return {
+          ok: true,
+          paired: true,
+          reachable: true,
+          connected: !!tabID,
+          phase: status.phase,
+          queued: status.queued,
+        };
+      } catch {
+        return { ok: true, paired: true, reachable: false, connected: !!tabID };
+      }
+    }
     if (popup && message.type === 'attach') {
+      await api('/v1/status');
       const [tab] = await chrome.tabs.query({
         active: true,
         currentWindow: true,
       });
       if (!tab?.id || !museURL(tab.url))
-        throw new Error('Open your main Muse chat first.');
-      if (saved.tabID && saved.tabID !== tab.id)
-        await chrome.tabs
-          .sendMessage(saved.tabID, { type: 'stop' })
-          .catch(() => {});
+        return {
+          ok: false,
+          error: 'Open the main Muse chat in this Chrome window first.',
+        };
+      await detach();
       await chrome.storage.session.set({ tabID: tab.id });
-      await chrome.tabs.sendMessage(tab.id, { type: 'start' });
+      try {
+        await chrome.tabs.sendMessage(tab.id, { type: 'start' });
+      } catch {
+        await chrome.storage.session.remove('tabID');
+        return {
+          ok: false,
+          error:
+            'Reload your Muse tab after installing the extension, then connect it again.',
+        };
+      }
       return { ok: true };
     }
     if (popup && message.type === 'detach') {
-      if (saved.tabID)
-        await chrome.tabs
-          .sendMessage(saved.tabID, { type: 'stop' })
-          .catch(() => {});
-      await chrome.storage.session.remove('tabID');
+      await detach();
       return { ok: true };
     }
-    if (popup && message.type === 'status')
-      return {
-        ok: true,
-        connected: !!saved.tabID,
-        ...(await api('/v1/status')),
-      };
-    if (!sender.tab || !museURL(sender.url) || sender.tab.id !== saved.tabID) {
+    const { tabID } = await chrome.storage.session.get('tabID');
+    if (
+      !sender.tab ||
+      !museURL(sender.url) ||
+      sender.tab.id !== tabID ||
+      !(await token())
+    ) {
       if (message.type === 'connected') return { ok: true, connected: false };
       throw new Error('This Muse tab is not connected.');
     }
@@ -90,7 +157,12 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       return { ok: true };
     }
     throw new Error('Unknown request.');
-  })().then(respond, () => respond({ ok: false }));
+  })().then(respond, () =>
+    respond({
+      ok: false,
+      error: 'Check that your local bridge is running and try again.',
+    }),
+  );
   return true;
 });
 chrome.tabs.onRemoved.addListener(async (tabID) => {

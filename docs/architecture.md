@@ -32,7 +32,7 @@ and returns text through the service worker. A job carries its ID and prompt;
 room IDs and Matrix credentials are never sent to the content script.
 
 `scripts/manage.mjs` runs official bbctl registration, prepares private config,
-copies the extension, and provides start/status/recovery commands. It is a setup
+saves a private pairing code, and provides start/status/recovery commands. It is a setup
 wrapper; the running Matrix bridge is Go and does not use the Desktop API.
 
 `internal/matrixfix` registers application-service crypto listeners before event

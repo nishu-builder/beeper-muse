@@ -72,11 +72,15 @@ Use one process and one private data directory per registration. If either port
 that you own. Do not stop an unrelated service.
 
 To update: stop the bridge, update the source, run `npm ci --ignore-scripts`,
-`npm run build`, and `npm start -- setup`. Reload the generated extension at
+`npm run build`, and `npm start -- setup`. Reload the unpacked extension at
 `chrome://extensions`, reload Muse, reconnect, and restart the bridge. Back up the
 entire private directory while stopped. The configuration and crypto database
 must be restored together. Logs can include Matrix identifiers and errors; redact
 them before sharing.
+
+Version 0.3 uses a public extension paired through its popup instead of a private
+generated copy. Follow the [0.2 upgrade instructions](setup.md#upgrade-from-version-02)
+when migrating. Store extension updates do not update the local bridge.
 
 ## Upgrading from 0.1
 

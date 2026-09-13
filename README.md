@@ -5,6 +5,13 @@ A custom Beeper bridge that gives your existing Meta Muse conversation its own
 Muse contact. No WhatsApp connection, Note to self relay, or Muse password in the
 bridge.
 
+[Setup guide](docs/setup.md) · [Extension download](https://github.com/nishu-builder/beeper-muse/releases/latest)
+· [Privacy](PRIVACY.md) · [Troubleshooting](docs/operations.md)
+
+The Chrome Web Store listing is being prepared. Until Google approves it, use
+the release ZIP or load the source extension as described below. **The extension
+requires the local bridge; installing it alone does not create a Beeper chat.**
+
 **Experimental and text-only.** The Beeper side uses the mautrix `bridgev2`
 framework. The Muse side operates the signed-in website through a Chrome
 extension; it is not an official Muse API. Website changes can interrupt it.
@@ -24,7 +31,7 @@ Chrome extension ↔ your signed-in Muse conversation
 - Go 1.26 or newer, Node.js 24 or newer, npm, and a C compiler for SQLite.
   On macOS, the Xcode command line tools supply the compiler.
 - macOS or Linux. Native Windows is not supported by bbctl; WSL is untested here.
-- Chrome with unpacked extensions enabled, and a signed-in [Muse](https://muse.ai/)
+- Chrome 102 or newer, and a signed-in [Muse](https://muse.ai/)
   account. Keep that browser tab and the bridge process running.
 
 The Beeper Desktop local API is **not required** by this bridge. Setup uses
@@ -48,23 +55,25 @@ cd beeper-muse
 npm ci --ignore-scripts
 npm run build
 npm start -- setup
+npm start -- start
 ```
 
 Setup signs into Beeper with bbctl if needed, registers **sh-muse**, and prepares
 private configuration under `.local/`. Run one installation for this registration.
 Do not reuse the name if you already have an unrelated bridge called sh-muse.
 
-1. Open `chrome://extensions` in Chrome and enable **Developer mode**.
-2. Choose **Load unpacked** and select the `.local/extension` folder printed by
-   setup. This generated copy contains your private pairing token.
-3. Open Muse's main chat and sign in. Reload the page if it was open before the
-   extension was installed.
-4. Click the extension's toolbar button and choose **Connect this Muse tab**.
-5. Start the bridge:
+Leave that terminal running, then:
 
-```sh
-npm start -- start
-```
+1. Open `chrome://extensions` in Chrome and enable **Developer mode**.
+2. Choose **Load unpacked** and select this repository's **extension** folder.
+   Alternatively, extract `beeper-muse-extension.zip` from a GitHub release and
+   load the extracted folder containing `manifest.json`.
+3. Open the extension, paste the code from `.local/pairing-code.txt`, and click
+   **Pair bridge**. Keep this code private; it stays on this computer.
+4. Open Muse's main chat and sign in. Reload the page if it was open before the
+   extension was installed.
+5. Click the extension's toolbar button and choose **Connect this Muse tab**.
+6. Close the popup and send a message in the **Muse** chat in Beeper.
 
 A separate **Muse** conversation appears in Beeper. Send a short message there,
 for example `Explain why the sky is blue in two sentences.` No command prefix is
@@ -74,12 +83,13 @@ See [validation](docs/validation.md) for the current live verification status an
 
 ## Commands
 
-| Command                    | Purpose                                                 |
-| -------------------------- | ------------------------------------------------------- |
-| `npm start -- setup`       | Register the bridge and generate the private extension. |
-| `npm start -- start`       | Run the bridge in the foreground.                       |
-| `npm start -- status`      | Show queue state without displaying messages.           |
-| `npm start -- acknowledge` | Discard an interrupted job after checking both apps.    |
+| Command                     | Purpose                                              |
+| --------------------------- | ---------------------------------------------------- |
+| `npm start -- setup`        | Register the bridge and save a private pairing code. |
+| `npm start -- pairing-code` | Save the existing code again, including during use.  |
+| `npm start -- start`        | Run the bridge in the foreground.                    |
+| `npm start -- status`       | Show queue state without displaying messages.        |
+| `npm start -- acknowledge`  | Discard an interrupted job after checking both apps. |
 
 Optional exported environment variables are described in [.env.example](.env.example).
 A `.env` file is not loaded automatically. Both loopback ports, `24819` for the
@@ -111,6 +121,7 @@ extension and `24820` for the Matrix application service, are fixed.
 ```sh
 npm ci --ignore-scripts
 npm run check
+npm run package
 go test -race -tags goolm ./...
 ```
 
@@ -118,6 +129,10 @@ Tests use synthetic DOM fixtures and temporary databases, with no accounts or
 network access. They cover owner and recipient restrictions, durable queue
 transitions, crash recovery, duplicate results, local API authorization, setup,
 and browser response attribution. CI checks Linux and macOS.
+
+Release ZIPs contain only the extension's explicitly listed public files and a
+SHA-256 checksum is published alongside them. [Releasing](docs/RELEASING.md)
+explains store submission and the tag-triggered GitHub workflow.
 
 See [contributing](CONTRIBUTING.md), [security](SECURITY.md),
 [architecture](docs/architecture.md), and [dependency notices](NOTICES.md).

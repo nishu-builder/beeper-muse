@@ -43,7 +43,9 @@
       ].map((e) => ({
         id: e.getAttribute('data-message-id'),
         role: e.getAttribute('data-message-role'),
-        text: text(e),
+        // Reactions and toolbars are siblings of the message bubble.
+        // Reading the whole item makes a reaction look like a changed prompt.
+        text: text(e.querySelector('.hatch-chat-groupable-bubble') || e),
         widget: e.getAttribute('data-message-has-presentation') === 'true',
       })),
     };
@@ -70,10 +72,11 @@
         m.role === 'assistant' && !beforeIDs.has(m.id) && !m.widget && m.text,
     );
     if (!responses.length) return null;
-    return responses
-      .map((m) => m.text)
-      .join('\n\n')
-      .slice(0, 23000);
+    const result = responses.map((m) => m.text).join('\n\n');
+    return result.length > 23000
+      ? result.slice(0, 23000) +
+          '\n\n[Reply shortened. Open Muse for the full response.]'
+      : result;
   }
   async function submit(document, prompt, wait) {
     const initial = snapshot(document);

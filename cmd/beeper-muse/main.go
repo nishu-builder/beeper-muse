@@ -42,7 +42,7 @@ func main() {
 		return
 	}
 	c := &connector.Connector{}
-	bridge := mxmain.BridgeMain{Name: "beeper-muse", Description: "A direct Beeper-Muse browser bridge", URL: "https://github.com/nishu-builder/beeper-muse", Version: "0.2.0", Connector: c}
+	bridge := mxmain.BridgeMain{Name: "beeper-muse", Description: "A direct Beeper-Muse browser bridge", URL: "https://github.com/nishu-builder/beeper-muse", Version: "0.3.0", Connector: c}
 	bridge.PostInit = func() { matrixfix.RegisterBeforeDispatch(bridge.Matrix) }
 	bridge.PostStart = func() {
 		if _, err := c.EnsureChat(context.Background()); err != nil {
@@ -50,7 +50,7 @@ func main() {
 			bridge.TriggerStop(1)
 		}
 	}
-	bridge.InitVersion("v0.2.0", "", "")
+	bridge.InitVersion("v0.3.0", "", "")
 	bridge.PreInit()
 	if err := c.Prepare(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
