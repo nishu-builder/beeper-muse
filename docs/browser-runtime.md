@@ -1,9 +1,12 @@
 # Browser runtime
 
 Decision: move toward an extension-only bridge. Status: typed source boundaries
-and an isolated Chrome authentication probe are implemented. The probe has
-synthetic protocol tests but still needs a successful live Chrome run. Encrypted
-message transport, durable browser state, and migration are not implemented.
+and an isolated Chrome authentication probe are implemented. Probe 0.1.3 has
+confirmed an authenticated connection in the user's Chrome session: HTTP 101,
+followed by a Beeper protocol ping response, with no companion process. A typed
+IndexedDB transaction inbox is implemented and tested, but is not connected to
+the probe. Encrypted message processing, runtime integration, and migration
+remain unfinished.
 The released runtime still needs the companion.
 
 ## Components
@@ -38,8 +41,8 @@ Go crypto database.
    Beeper's pinned [WebSocket implementation](https://github.com/mautrix/go/blob/v0.30.0/appservice/websocket.go)
    sends Authorization, process ID, and protocol-version headers. Browser
    WebSocket constructors cannot set those headers. Verify an authenticated
-   Chrome handshake before committing to this path. A narrowly scoped extension
-   request-header rule is a candidate; never put credentials in a URL or broadly
+   Chrome handshake before committing to this path (confirmed with probe 0.1.3).
+   The probe uses a narrowly scoped extension request-header rule; never put credentials in a URL or broadly
    attach them to requests. Do not introduce a proxy daemon to solve this step.
 2. **Crypto and native events.** Verify appservice transactions, to-device key
    events, double-puppet encryption, encrypted attachments, edits, reactions, and
@@ -148,5 +151,39 @@ Probe 0.1.3 removes `Origin` from this narrowly scoped appservice handshake.
 A native API control using the same isolated registration returned HTTP 101 and
 a protocol ping response without Origin, but HTTP 403 with a Chrome extension
 Origin. The diagnostic now reports whether the outgoing Origin header is absent.
-This identifies a server rejection independently of Chrome; a successful live
-Chrome run is still required to confirm the complete fix.
+The user confirmed a successful live Chrome run with 0.1.3: Origin absent, all
+three authentication headers verified, HTTP 101, and a Beeper protocol reply.
+This closes the document-based handshake investigation. Background lifecycle
+and message delivery are separate remaining work.
+
+## Durable transaction inbox
+
+`browser-runtime/inbox.ts` implements the first browser persistence boundary.
+It retains complete transaction payloads, including encrypted room events,
+to-device events, device/key updates, receipts, and unknown future fields.
+Received timestamps are not substituted for source timestamps.
+
+Writes request strict IndexedDB durability and wait for transaction completion
+before generating the Beeper acknowledgement. A failed write, full queue, or
+conflicting reuse of a transaction ID produces no acknowledgement. Resent
+transactions use the current WebSocket request ID but do not duplicate stored
+work. Namespaces separate registrations and homeservers without storing tokens.
+
+Pending records survive database reopen and are read in insertion order. A single
+runtime consumer must receive transactions serially, persist crypto and event
+processing results, then mark each transaction complete. Completed records retain
+a compact ID/digest receipt and discard the payload. Remote side effects still
+need deterministic event IDs and their own durable receipts: this inbox alone
+does not guarantee exactly-once message delivery.
+
+The pending queue is bounded to 128 transactions, each at most 1 MiB of encoded
+payload. Capacity exhaustion stops intake without dropping existing records.
+Processed receipts are retained until a safe server replay window is established.
+Tests cover restart, concurrent duplicate delivery, registration isolation,
+changed-payload conflicts, abort after a successful write request, lost network
+acknowledgements, and queue exhaustion using the IndexedDB test implementation.
+These are automated storage tests, not a live Chrome storage/restart test.
+
+The diagnostic does not import this module and still acknowledges no transactions.
+Do not enable intake on a live registration until a durable crypto/event consumer
+is connected and recovery is verified.

@@ -25,6 +25,7 @@
   "devDependencies": {
     "@types/jsdom": "30.0.0",
     "@types/node": "24.13.4",
+    "fake-indexeddb": "6.2.5",
     "jsdom": "30.0.1",
     "prettier": "3.9.6",
     "tsx": "4.23.13",
