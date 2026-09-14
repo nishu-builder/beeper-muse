@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.8.15
+
+- Log image preparation success, download failures, unsupported formats and size
+  limits using fixed codes without message content or image URLs.
+- Record the passed live photo-followed-by-text checks, including native delivery.
+
 ## 0.8.14
 
 - Read all top-level bubbles in each Muse message. Photo and caption surfaces now

@@ -908,3 +908,44 @@ test('photo media and caption bubbles are read together exactly once in source o
   );
   f.dom.window.close();
 });
+
+test('image preparation reports fixed failure codes without URLs or content', async () => {
+  const f = fixture();
+  const events: string[] = [];
+  const adapter = f.adapter.create(f.document, (code: string) =>
+    events.push(code),
+  );
+  const message = {
+    id: 'test',
+    role: 'assistant',
+    text: '',
+    images: [{ url: 'https://muse.ai/private-image' }],
+  };
+  f.dom.window.fetch = async () => {
+    throw Error('PRIVATE');
+  };
+  await adapter.prepare(message);
+  f.dom.window.fetch = async () =>
+    new Response('PRIVATE', {
+      headers: { 'content-type': 'text/html' },
+    }) as any;
+  await adapter.prepare(message);
+  f.dom.window.fetch = async () =>
+    new Response(new Uint8Array(2 * 1024 * 1024 + 1), {
+      headers: { 'content-type': 'image/png' },
+    }) as any;
+  await adapter.prepare(message);
+  f.dom.window.fetch = async () =>
+    new Response(new Uint8Array(colorPNG('RED')), {
+      headers: { 'content-type': 'image/png' },
+    }) as any;
+  const result = await adapter.prepare(message);
+  assert.ok(result.images[0].data);
+  assert.deepEqual(events, [
+    'image-fetch-failed',
+    'image-format-unsupported',
+    'image-too-large',
+    'image-prepared',
+  ]);
+  f.dom.window.close();
+});

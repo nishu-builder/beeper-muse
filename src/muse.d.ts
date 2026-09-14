@@ -3,6 +3,12 @@
  * A future API adapter implements Adapter; sync and Matrix delivery stay intact.
  */
 declare namespace Muse {
+  type PreparationEvent =
+    | 'image-prepared'
+    | 'image-fetch-failed'
+    | 'image-format-unsupported'
+    | 'image-too-large';
+  type PreparationReporter = (event: PreparationEvent) => void;
   type Activity = 'idle' | 'working';
   type Role = 'user' | 'assistant';
   interface Image {
@@ -115,7 +121,7 @@ declare namespace Muse {
     ): Promise<void>;
   }
   interface DOMAdapter {
-    create(document: Document): Adapter;
+    create(document: Document, report?: PreparationReporter): Adapter;
     snapshot(document: Document): Snapshot;
     submit(
       document: Document,
