@@ -27,7 +27,7 @@ async function refresh() {
             ? 'Paused'
             : s.phase === 'conflict'
               ? 'Connection conflict'
-              : s.failure
+              : s.failure || s.phase === 'error'
                 ? 'Needs attention'
                 : 'Connecting…',
       beeperReady,
@@ -55,7 +55,20 @@ async function refresh() {
           ? 'Another Beeper Muse instance is connected. Disable older copies or the connection test, then reconnect here.'
           : s.phase === 'paused'
             ? 'Paused. Open Connection settings below to reconnect.'
-            : s.failure || 'Connecting to Beeper…';
+            : s.failure ||
+              (s.phase === 'error' || s.phase === 'disconnected'
+                ? 'Beeper is disconnected. Retrying automatically.'
+                : (s.startup?.stage || 'Connecting to Beeper') + '…');
+    el('startup-progress').textContent =
+      !beeperReady && s.configured && s.phase !== 'paused'
+        ? (s.retrySeconds && !s.starting
+            ? `Retrying in ${s.retrySeconds}s. `
+            : '') +
+          (s.startup?.stage
+            ? `${s.startup.stage} · ${s.startup.stageSeconds}s`
+            : '')
+        : '';
+    el('startup-steps').textContent = (s.startup?.steps || []).join(' → ');
     if (document.activeElement !== history)
       history.value = s.historyMode || 'recent';
     el('progress').textContent =
@@ -72,7 +85,7 @@ async function refresh() {
     (el('rescan') as HTMLButtonElement).disabled = !s.connected || !beeperReady;
     (el('pause') as HTMLButtonElement).disabled = s.phase === 'paused';
     (el('resume') as HTMLButtonElement).disabled =
-      beeperReady || s.phase === 'connecting';
+      beeperReady || s.phase === 'connecting' || s.starting;
     (el('connect') as HTMLButtonElement).disabled =
       s.connected || s.phase !== 'connected';
     if (s.health === 'reload')

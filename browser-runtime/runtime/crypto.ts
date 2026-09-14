@@ -26,14 +26,18 @@ export class MatrixCrypto {
     state: StateStore,
     wasmURL?: string,
     memoryOnly = false,
+    report: (stage: string) => void = () => {},
   ) {
+    report('Loading the encryption module');
     await Rust.initAsync(wasmURL);
+    report('Reading the saved Beeper device');
     let device = await state.get<Device>('device');
     if (!device) {
       const id = 'MUSE_' + crypto.randomUUID().replace(/-/g, '');
       // Save device identity before login so a crash cannot create another device.
       const pending = (await state.get<string>('device-id')) || id;
       await state.put('device-id', pending);
+      report('Signing in the Beeper device');
       const login = await api.request<{
         device_id: string;
         access_token: string;
@@ -57,6 +61,7 @@ export class MatrixCrypto {
       };
       await state.put('device', device);
     }
+    report('Opening the encrypted key store');
     const machine = await Rust.OlmMachine.initialize(
       new Rust.UserId(api.config.bot),
       new Rust.DeviceId(device.id),
@@ -68,6 +73,7 @@ export class MatrixCrypto {
     );
     try {
       machine.roomKeyRequestsEnabled = true;
+      report('Checking the Beeper device keys');
       const keys = await api.request<{
         device_keys?: Record<
           string,
@@ -94,6 +100,7 @@ export class MatrixCrypto {
         new Rust.UserId(api.config.owner),
         new Rust.UserId(api.config.bot),
       ]);
+      report('Publishing encryption keys');
       await instance.flush();
       return instance;
     } catch (error) {

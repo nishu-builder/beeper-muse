@@ -87,7 +87,7 @@ export class BrowserBridge {
         { displayname: 'Muse' },
       );
       report('Opening encryption keys');
-      crypto = await MatrixCrypto.open(api, state, wasmURL, memoryOnly);
+      crypto = await MatrixCrypto.open(api, state, wasmURL, memoryOnly, report);
       report('Preparing the Muse chat');
       let room = await state.get<string>('room');
       if (!room) {

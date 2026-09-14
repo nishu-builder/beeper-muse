@@ -137,3 +137,12 @@ test('transactions reach the durable consumer and no handshake means timeout', a
   assert.equal(h.network.closed, true);
   assert.ok(h.states.includes('error'));
 });
+
+test('a failed handshake keeps its error after the socket closes', async (t) => {
+  const h = await harness(t);
+  h.network.onerror?.();
+  assert.equal(h.network.closed, true);
+  assert.equal(h.states.at(-1), 'error');
+  t.mock.timers.tick(60000);
+  assert.equal(h.states.at(-1), 'error');
+});

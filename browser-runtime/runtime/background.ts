@@ -2,12 +2,18 @@ import { BrowserBridge } from './bridge.js';
 import { configuration, type Configuration } from './matrix.js';
 import { startupFailure } from './diagnostics.js';
 import { BeeperSocket } from './socket.js';
+import { StartupProgress } from './startup.js';
 let bridge: BrowserBridge | undefined;
 let socket: BeeperSocket | undefined;
 let starting: Promise<void> | undefined;
 let phase = 'disconnected';
 let failure = '';
-let stage = '';
+const startup = new StartupProgress((stage) => {
+  phase = 'error';
+  failure =
+    stage +
+    ' has not finished after 60 seconds. Reload the extension to retry. Saved data has not been cleared.';
+});
 let retryAt = 0;
 let failures = 0;
 const secure = Promise.all([
@@ -42,6 +48,7 @@ async function start() {
     const config = configuration(saved.configuration);
     phase = 'connecting';
     failure = '';
+    startup.begin();
     try {
       if (socket) await socket.stop();
       if (!bridge)
@@ -51,10 +58,11 @@ async function start() {
           indexedDB,
           false,
           (value) => {
-            stage = value;
+            startup.step(value);
           },
         );
       if ((await chrome.storage.local.get('enabled')).enabled === false) {
+        startup.stop();
         bridge.pause();
         phase = 'paused';
         return;
@@ -63,9 +71,12 @@ async function start() {
       socket = new BeeperSocket(
         config,
         (frame, send) => bridge!.receive(frame, send),
-        (state) => {
+        (state, reason) => {
+          startup.stop();
+          if (reason) failure = reason;
           phase = state;
           if (state === 'connected') {
+            failure = '';
             failures = 0;
             retryAt = 0;
           }
@@ -77,13 +88,15 @@ async function start() {
           if (state === 'conflict')
             void chrome.storage.local.set({ conflict: true });
         },
+        (value) => startup.step(value),
       );
       await socket.start();
     } catch (error) {
+      startup.stop();
       phase = 'error';
       failure =
         'Beeper could not start at ' +
-        stage +
+        startup.snapshot().stage +
         '. ' +
         startupFailure(error) +
         ' Saved data has not been cleared.';
@@ -148,6 +161,9 @@ async function report() {
     configured: !!config,
     phase: conflict ? 'conflict' : enabled === false ? 'paused' : phase,
     failure,
+    startup: startup.snapshot(),
+    starting: !!starting,
+    retrySeconds: Math.max(0, Math.ceil((retryAt - Date.now()) / 1000)),
     connected:
       !!tabID && ['ready', 'busy', 'draft'].includes(String(tab.health)),
     health: tab.health,

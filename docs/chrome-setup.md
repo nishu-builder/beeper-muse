@@ -1,6 +1,6 @@
 # Chrome-only setup
 
-Beeper Muse 0.6.2 is a preview that runs in Chrome. A service worker connects
+Beeper Muse 0.6.3 is a preview that runs in Chrome. A service worker connects
 to Beeper; the selected Muse tab supplies the conversation. No companion,
 localhost server, native messaging host, or background terminal is needed while
 it runs. Registration is a one-time setup using Beeper's `bbctl` tool.
@@ -58,7 +58,7 @@ If it is missing, use **Load unpacked** and select `.local/chrome-extension`,
 not `.local/extension` or `.local/chrome-probe`.
 
 Refresh the Muse webpage, then open **Beeper Muse — Chrome-only** from Chrome's
-extensions menu. The new panel says **Chrome-only v0.6.2** under its title and
+extensions menu. The new panel says **Chrome-only v0.6.3** under its title and
 shows separate **Beeper** and **Muse tab** connection states. Reloading the old
 extension does not switch it to the new folder. You do not need to restart the
 retired companion.
@@ -85,6 +85,12 @@ and typing are not implemented; source read status is only propagated when the
 adapter actually provides it.
 
 ## Recovery
+
+The popup shows the current startup step and time spent there. A step that takes
+more than 60 seconds is reported as stalled. It does not start a second encryption
+writer while the first operation is pending; reload the same extension to retry.
+Connection settings lists the recent startup steps without credentials or message
+contents. Socket failures remain visible during the automatic retry delay.
 
 Incoming transactions and outgoing encrypted batches are saved in IndexedDB.
 A lost send response retries the same ciphertext and event IDs. Crypto keys and
