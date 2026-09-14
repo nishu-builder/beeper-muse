@@ -15,11 +15,13 @@ The product remains Chrome-only. Maintainer test tools are optional.
    the 0.8.10 status fix, that same test also reports native delivery. Automatic
    reload, diagnostic-file retention and selected-tab recovery were verified
    during the 0.8.10 → 0.8.11 update; the held photo job stayed held.
-2. Verify incoming photo delivery. A fresh 0.8.10 photo test staged an attachment
-   but stopped at image-input-changed before Send; native failure was verified.
-   After user dismissal, a new 0.8.11 test timed out before Send and is held.
-   Live DOM inspection now works in a new Muse tab. Version 0.8.12 corrects the
-   composer boundary; live photo and subsequent text verification remain open.
+2. Finish photo confirmation. A fresh 0.8.12 image was submitted and Muse returned
+   the correct undisclosed test color, verified through live browser inspection.
+   The bridge incorrectly rejected its caption because the image was a sibling
+   outside that text bubble. Version 0.8.13 parses that media control and waits
+   for delayed image evidence. The correct reply returned to Beeper through sync.
+   Native success and post-photo text remain open;
+   the already submitted test is held and must not be replayed.
 3. Verify the new Babar avatar synchronization and diagnose missing typing indicators.
 4. Verify both-direction photos and native delivery status end to end.
 5. Work through the rendering/type inventory below; inspect actual source support
@@ -351,3 +353,35 @@ corrected region now reports two image elements and one Send control where the
 old region reported zero of each. These counts do not identify the images, but
 they confirm the boundary changed actual observation. Inspect and remove only
 leftover synthetic test attachments before dismissing that test and trying again.
+
+## September 14 follow-up: photo reached Muse; echo parsing (0.8.13)
+
+Fresh diagnostics confirmed dismissal and an empty queue. One new 0.8.12 photo
+was sent: upload-start, image-submitted and typing-accepted were observed, then
+reply-attribution and native failure. Live read-only browser inspection found the
+exact uniquely marked prompt with its image and Muse's correct RED answer. The
+caption did not disclose that color. This verifies Beeper-to-Muse image delivery
+and interpretation for that attempt. Subsequent read-only dev:observe confirmed
+the correct reply in Beeper (roundTrip=true) but nativeFailure=true and
+nativeDelivery=false. No resend or subsequent text was attempted.
+
+The source message owns a chat_media_click media button beside its caption
+bubble. The parser only read images within the bubble. Version 0.8.13 includes
+these owned user-media siblings, keeps captions unchanged and excludes unrelated
+sibling decoration or assistant cards. A matching caption without image evidence
+now waits rather than throwing an unrelated-message error. Different or multiple
+new user messages still fail attribution. Regression coverage uses a synthetic
+version of this observed layout. The submitted test remains held and its journal
+is retained; parser changes must not resubmit it.
+
+The 0.8.13 local update automatically reconnected and retained fresh diagnostic
+logging and the held submitted job. No replay occurred. The fix's new-attempt
+native SUCCESS and post-photo text checks await dismissal of that test.
+
+Read-only inspection also explained ID-01: the named Babar avatar is an autoplaying
+video, not an img element. Its aria-labelled data-hatch-avatar-interaction wrapper
+owns a video marked data-hatch-media-owner=avatar-layer and slot=current. The
+image-only avatar selector therefore cannot find it. Next: support a bounded,
+cached still frame from the uniquely identified current avatar, preserve original
+image support, and verify the resulting native chat avatar. Do not infer typing
+from avatar animation. No avatar implementation is claimed by this entry.

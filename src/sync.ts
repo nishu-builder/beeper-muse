@@ -15,15 +15,16 @@
       (m) => m.role === 'user' && !beforeIDs.has(m.id),
     );
     const matches = (m: Muse.Message) =>
-      (matchesPrompt(m.text, prompt) ||
-        (!prompt &&
-          imageName !== undefined &&
-          normalize(m.text) === normalize(imageName))) &&
-      (imageName === undefined || !!m.images?.length);
+      matchesPrompt(m.text, prompt) ||
+      (!prompt &&
+        imageName !== undefined &&
+        normalize(m.text) === normalize(imageName));
     if (users.some((m) => !matches(m)) || users.length > 1)
       throw new Error('Another message was entered in the Muse tab.');
     const echo = users.find(matches);
-    return echo;
+    // Caption and media can mount separately. Missing media is incomplete
+    // evidence, not proof that another user sent a different prompt.
+    return imageName !== undefined && !echo?.images?.length ? undefined : echo;
   }
   function responseAfter(
     beforeIDs: Set<string>,
