@@ -257,7 +257,7 @@ async function handle(
       if (
         !(
           await chrome.runtime.getContexts({
-            contextTypes: [chrome.runtime.ContextType.POPUP],
+            contextTypes: ['POPUP' as chrome.runtime.ContextType],
           })
         ).length
       )
