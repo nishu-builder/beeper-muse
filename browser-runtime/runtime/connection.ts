@@ -40,16 +40,22 @@ function connect() {
   port = current;
   let configured = false;
   const waiting = setTimeout(() => {
-    if (!configured) current.disconnect();
+    if (!configured) disconnect();
   }, 10000);
-  current.onDisconnect.addListener(() => {
+  function lost() {
     clearTimeout(waiting);
     if (port !== current) return;
     port = undefined;
     status.textContent = 'Waiting for Beeper Muse to reconnect…';
     serialized(closeSocket);
     if (!leaving) reconnect = setTimeout(connect, 3000);
-  });
+  }
+  function disconnect() {
+    current.disconnect();
+    // Chrome notifies the other endpoint, not the caller of disconnect().
+    lost();
+  }
+  current.onDisconnect.addListener(lost);
   current.onMessage.addListener((value: unknown) => {
     if (port !== current || !value || typeof value !== 'object') return;
     const m = value as Record<string, unknown>;
@@ -58,7 +64,7 @@ function connect() {
         socket?.pulse();
         current.postMessage({ type: 'alive' });
       } catch {
-        current.disconnect();
+        disconnect();
       }
     } else if (m.type === 'configure') {
       if (configured) return;
@@ -112,7 +118,7 @@ function connect() {
       try {
         sendToBeeper?.(m.data);
       } catch {
-        current.disconnect();
+        disconnect();
       }
     } else if (
       (m.type === 'processed' || m.type === 'failed') &&

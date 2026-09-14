@@ -10,6 +10,8 @@ import {
 } from '../browser-runtime/runtime/document-socket.ts';
 
 test('bundled connection page uses tab-scoped socket headers and relays only worker ACKs', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout', 'setInterval'] });
+  let connectionAttempts = 0;
   const bundle = await build({
     entryPoints: ['browser-runtime/runtime/connection.ts'],
     bundle: true,
@@ -61,7 +63,6 @@ test('bundled connection page uses tab-scoped socket headers and relays only wor
     disconnect() {
       if (this.closed) return;
       this.closed = this.peer.closed = true;
-      this.disconnectListeners.forEach((fn) => fn());
       this.peer.disconnectListeners.forEach((fn) => fn());
     }
   }
@@ -95,9 +96,10 @@ test('bundled connection page uses tab-scoped socket headers and relays only wor
           server = new Port();
         client.peer = server;
         server.peer = client;
-        queueMicrotask(() =>
-          adapter.accept(server as unknown as chrome.runtime.Port),
-        );
+        if (++connectionAttempts > 1)
+          queueMicrotask(() =>
+            adapter.accept(server as unknown as chrome.runtime.Port),
+          );
         return client;
       },
     },
@@ -146,6 +148,11 @@ test('bundled connection page uses tab-scoped socket headers and relays only wor
     clearInterval,
   });
   await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(Boolean(network), false);
+  t.mock.timers.tick(10000);
+  t.mock.timers.tick(3000);
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(connectionAttempts, 2);
   assert(network);
   assert.deepEqual(Array.from(rules[0].addRules[0].condition.tabIds), [3]);
   assert(
