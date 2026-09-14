@@ -48,7 +48,7 @@ account directly; enabling the Beeper Desktop local API is not necessary.
 
 ## 3. Install the Chrome extension
 
-The current source includes version 0.5.1. Until that version is released, use
+The current source includes version 0.5.2. Until that version is released, use
 **From source** below and rebuild the bridge for catch-up and automatic popups.
 Version 0.3.0 is pending Chrome Web Store review as of September 13, 2026.
 Until it is approved, choose one of these:
@@ -192,6 +192,22 @@ exposes an absolute machine-readable time; otherwise the capture time is used.
 Already imported messages keep their existing position in the Beeper timeline.
 
 After updating an unpacked extension, reload it in `chrome://extensions` **and
-refresh the Muse webpage**, then reconnect. Version 0.5.1 still requires the
+refresh the Muse webpage**, then reconnect. Version 0.5.2 still requires the
 local bridge. The extension-only runtime is described in
 [browser-runtime.md](browser-runtime.md); it is not shipped yet.
+
+## Reactions and typing
+
+Muse's visible working state is sent to Beeper as a native typing indicator.
+It renews during a task and clears when Muse stops. If the tab, extension, or
+bridge disappears, the last indicator expires after 12 seconds. This requires
+both the 0.5.2 extension and the updated bridge; update and restart the bridge
+as well as reloading the extension and Muse page. Your draft text is never sent
+as typing activity.
+
+Reactions are **not captured from the Muse page yet**. The bridge can map an
+explicit source reaction to a native Matrix reaction, but the browser adapter
+still cannot identify the actor reliably. It does not turn acknowledgment text
+into reactions or read receipts. Outgoing reactions from Beeper are also not
+supported. These limits are independent of whether the bridge runs natively or
+inside Chrome.

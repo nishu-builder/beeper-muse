@@ -14,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/nishu-builder/beeper-muse/internal/muse"
 	"github.com/nishu-builder/beeper-muse/internal/queue"
 	"go.mau.fi/util/configupgrade"
 	"go.mau.fi/util/ptr"
@@ -52,12 +53,15 @@ func (c Config) Validate() error {
 }
 
 type Connector struct {
-	Config  Config
-	bridge  *bridgev2.Bridge
-	queue   *queue.Queue
-	server  *http.Server
-	cancel  context.CancelFunc
-	workers sync.WaitGroup
+	Config        Config
+	bridge        *bridgev2.Bridge
+	queue         *queue.Queue
+	server        *http.Server
+	cancel        context.CancelFunc
+	workers       sync.WaitGroup
+	activityMu    sync.Mutex
+	activityState muse.Activity
+	activityAt    time.Time
 }
 
 var _ bridgev2.NetworkConnector = (*Connector)(nil)
@@ -101,7 +105,7 @@ func (c *Connector) Start(ctx context.Context) error {
 		_ = c.queue.Close()
 		return errors.New("browser relay port 24819 is unavailable; stop the old connector first")
 	}
-	c.server = &http.Server{Handler: queue.Handler(c.queue, c.Config.RelayToken, browserAddress, c.importMessages), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 8192}
+	c.server = &http.Server{Handler: queue.Handler(c.queue, c.Config.RelayToken, browserAddress, queue.Callbacks{Import: c.importMessages, Activity: c.setActivity}), ReadHeaderTimeout: 5 * time.Second, ReadTimeout: 10 * time.Second, WriteTimeout: 10 * time.Second, IdleTimeout: 30 * time.Second, MaxHeaderBytes: 8192}
 	ctx, c.cancel = context.WithCancel(ctx)
 	c.workers.Add(2)
 	go func() {

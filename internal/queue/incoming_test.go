@@ -154,10 +154,10 @@ func TestImportRouteRequiresAuthenticationAndCannotSelectDestination(t *testing.
 	defer q.Close()
 	token := strings.Repeat("a", 64)
 	calls := 0
-	handler := Handler(q, token, "127.0.0.1:24819", func(_ context.Context, messages []Incoming) (int, error) {
+	handler := Handler(q, token, "127.0.0.1:24819", Callbacks{Import: func(_ context.Context, messages []Incoming) (int, error) {
 		calls++
 		return q.Import("!configured:test", messages)
-	})
+	}})
 	for _, tc := range []struct {
 		body, auth string
 		status     int

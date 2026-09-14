@@ -15,6 +15,14 @@ import (
 	"unicode/utf8"
 )
 
+// Activity is transient. It is never stored or replayed with message history.
+type Activity string
+
+const (
+	Idle    Activity = "idle"
+	Working Activity = "working"
+)
+
 type Role string
 
 const (

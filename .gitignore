@@ -17,3 +17,4 @@ bin/
 /extension/adapter.js
 /extension/sync.js
 /extension/bridge.js
+/extension/activity.js

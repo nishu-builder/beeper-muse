@@ -72,6 +72,25 @@ read receipts. **The DOM adapter currently reports these capabilities as absent:
 we have not verified markup exposing the reaction actor or authoritative read
 state. It does not synthesize receipts from acknowledgments.
 
+## Transient activity
+
+`Muse.Activity` reports `idle` or `working` independently of stored messages.
+The DOM adapter derives this from Muse's visible Stop control. The content script
+uses a separate heartbeat during message capture and catch-up. It renews at most
+once per five seconds and clears on idle, page exit, and disconnect. No draft
+text, source message, read state, or catch-up record is sent with activity.
+
+`MuseBridge.Transport.activity` forwards the state through authenticated
+`POST /v1/activity`; the Go connector fixes the destination and Muse sender and
+uses mautrix's `MarkTyping` with a 12-second timeout (zero to stop). Publishing
+working state requires the normal private membership checks. There is no durable
+activity queue: restart cannot replay stale typing. The service worker serializes
+activity and disconnect cleanup. The native bridge also throttles renewals.
+Status advertises `activitySync` so older companions do not break message capture.
+
+This is incoming Muse activity only; the room does not advertise outgoing typing
+or reaction support that the source adapter cannot provide.
+
 ## Native Matrix mapping
 
 `internal/connector/delivery.go` is the Matrix translator. It uses mautrix

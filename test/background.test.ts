@@ -44,7 +44,7 @@ function harness(paired = true) {
     reachable = true,
     receiver = true;
   let health = 'ready';
-  let protocol = 4;
+  let protocol = 5;
   let listener!: (
     message: unknown,
     sender: Sender,
@@ -364,4 +364,36 @@ test('only the popup can rescan an attached tab and change the history selection
   );
   assert.equal(result.ok, false);
   assert.equal(h.local.historyMode, 'all');
+});
+
+test('activity is restricted to the connected Muse tab and disconnect clears it', async () => {
+  const h = harness();
+  await h.popup('attach');
+  const sender = { id: extensionID, url: 'https://muse.ai/', tab: { id: 7 } };
+  assert.equal(
+    (
+      await h.send(
+        { type: 'activity', activity: 'working' },
+        { ...sender, tab: { id: 8 } },
+      )
+    ).ok,
+    false,
+  );
+  assert.equal(
+    (await h.send({ type: 'activity', activity: 'read' }, sender)).ok,
+    false,
+  );
+  assert.equal(
+    (await h.send({ type: 'activity', activity: 'working' }, sender)).ok,
+    true,
+  );
+  await h.popup('detach');
+  assert.equal(
+    (await h.send({ type: 'activity', activity: 'working' }, sender)).ok,
+    false,
+  );
+  const updates = h.requests
+    .filter((r) => r.url.endsWith('/v1/activity'))
+    .map((r) => JSON.parse(String(r.options?.body)));
+  assert.deepEqual(updates, [{ activity: 'working' }, { activity: 'idle' }]);
 });

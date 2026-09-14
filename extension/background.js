@@ -12,6 +12,19 @@ async function token() {
   return /^[a-f0-9]{64}$/.test(bridgeToken || '') ? bridgeToken : null;
 }
 const bridgeTransport = new BeeperMuseBridge.LocalBridge(token);
+let activityRequests = Promise.resolve();
+function publishActivity(activity, selectedTab) {
+  activityRequests = activityRequests
+    .catch(() => {})
+    .then(async () => {
+      if (selectedTab) {
+        const { tabID } = await chrome.storage.session.get('tabID');
+        if (tabID !== selectedTab) return;
+      }
+      await bridgeTransport.activity(activity);
+    });
+  return activityRequests;
+}
 function museURL(value) {
   try {
     const url = new URL(value);
@@ -24,6 +37,7 @@ async function detach() {
   const { tabID } = await chrome.storage.session.get('tabID');
   // Revoke access before notifying the tab, including when it has navigated away.
   await chrome.storage.session.remove('tabID');
+  if (tabID) await publishActivity('idle').catch(() => {});
   if (tabID)
     await chrome.tabs.sendMessage(tabID, { type: 'stop' }).catch(() => {});
 }
@@ -31,7 +45,7 @@ async function tabReport(tabID, type = 'probe') {
   try {
     const result = await chrome.tabs.sendMessage(tabID, { type });
     if (
-      result?.protocol === 4 &&
+      result?.protocol === 5 &&
       ['ready', 'busy', 'draft', 'unavailable'].includes(result.health)
     )
       return {
@@ -160,6 +174,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
           queued: status.queued,
           museSync: status.museSync === true,
           sourceProtocol: status.sourceProtocol,
+          activitySync: status.activitySync,
           historyMode: settings.historyMode || 'recent',
           imported: sync.imported || 0,
           syncError: sync.syncError || false,
@@ -249,6 +264,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         connected: true,
         museSync: bridge.museSync === true,
         sourceProtocol: bridge.sourceProtocol,
+        activitySync: bridge.activitySync,
         historyMode: historyMode || 'recent',
       };
     }
@@ -265,6 +281,13 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         await chrome.storage.session.set({ syncError: true });
         throw new Error('Muse import unavailable.');
       }
+    }
+    if (
+      message.type === 'activity' &&
+      ['idle', 'working'].includes(message.activity)
+    ) {
+      await publishActivity(message.activity, sender.tab.id);
+      return { ok: true };
     }
     if (message.type === 'claim')
       return { ok: true, ...(await bridgeTransport.claim()) };
@@ -291,7 +314,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
 });
 chrome.tabs.onRemoved.addListener(async (tabID) => {
   const saved = await chrome.storage.session.get(['tabID', 'offeredTabs']);
-  if (saved.tabID === tabID) await chrome.storage.session.remove('tabID');
+  if (saved.tabID === tabID) await detach();
   if (saved.offeredTabs?.includes(tabID))
     await chrome.storage.session.set({
       offeredTabs: saved.offeredTabs.filter((id) => id !== tabID),

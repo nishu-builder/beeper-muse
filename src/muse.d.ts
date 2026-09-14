@@ -3,6 +3,7 @@
  * A future API adapter implements Adapter; sync and Matrix delivery stay intact.
  */
 declare namespace Muse {
+  type Activity = 'idle' | 'working';
   type Role = 'user' | 'assistant';
   interface Image {
     url: string;
@@ -30,11 +31,13 @@ declare namespace Muse {
     widget?: boolean;
   }
   interface Snapshot {
+    activity: Activity;
     busy: boolean;
     draft: string;
     messages: Observation[];
   }
   interface Capabilities {
+    activity: boolean;
     images: boolean;
     formatting: boolean;
     timestamps: boolean;
