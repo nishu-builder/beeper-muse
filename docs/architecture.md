@@ -77,10 +77,33 @@ checkmarks, tab focus, or reaction icons.
 Typing uses a lightweight activity observation, independent of transcript reads
 and composer availability. Every four seconds the connected worker asks the
 selected Muse tab for a fresh observation, so renewal does not rely on the page's
-background timers. The source reports a visible Stop control as working. Working
+background timers. The source recognizes visible Stop/Stop generating controls
+outside the transcript and explicit busy state scoped to the composer or named
+assistant header. Historical tool cards and whole-page loading are excluded. Working
 state renews at most once every five seconds with a twelve-second Matrix expiry;
 idle clears it. The worker does not replay cached activity when the source tab
 stops responding. Chrome suspension and page freezing can still interrupt updates.
+
+Source-readiness counts and accepted/failed typing requests are recorded separately
+in the optional diagnostic log. An accepted request is not proof that either
+client rendered an indicator. `com.beeper.room_features` is not yet advertised;
+its effect on this custom bridge's client controls remains under investigation.
+
+## Assistant profile
+
+The optional typed adapter `profile()` supplies avatar bytes independently of
+message snapshots. The DOM implementation requires one visible image matching the
+assistant named in the chat title, outside navigation and transcript content.
+An absent or ambiguous match does not erase an existing avatar. Reads are bounded,
+cached briefly, and cannot block the message queue.
+
+`AvatarSync` validates image type, signature and size, verifies room membership,
+uploads ordinary Matrix avatar media, and updates the bot profile, joined member,
+room avatar, and channel avatar in both bridge-info state events. Other state
+fields are preserved. A durable hash/media record avoids uploading the same
+picture on each scan or retrying an upload after a partial metadata failure.
+These profile/state images are not encrypted message attachments. No image data,
+assistant name or media address is added to diagnostics.
 
 Catch-up covers loaded messages only and does not reposition older events among
 messages already in Beeper. Virtualized text-only observations are marked

@@ -5,6 +5,9 @@
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   let polling = false;
   let activityEnabled = false;
+  let profiling = false;
+  let profileCheckedAt = -Infinity;
+  let activityCheckedAt = -Infinity;
   let rescanPending = false;
   let stopped = false;
   let generation = 0;
@@ -78,6 +81,22 @@
     try {
       diagnostic('image-readiness', muse.imageReadiness?.());
     } catch {}
+  }
+  async function syncProfile(current) {
+    if (profiling || !muse.profile || Date.now() - profileCheckedAt < 30000)
+      return;
+    profiling = true;
+    profileCheckedAt = Date.now();
+    try {
+      const profile = await muse.profile();
+      if (stopped || current !== generation || !closeGuard) return;
+      if (profile) await send({ type: 'profile', avatar: profile.avatar });
+      else diagnostic('avatar-source-missing');
+    } catch {
+      diagnostic('avatar-failed');
+    } finally {
+      profiling = false;
+    }
   }
   async function execute(job, current, sourceProtocol, deliveryStatus) {
     const active = () => !stopped && generation === current;
@@ -206,6 +225,7 @@
       activityEnabled = connected.activitySync === true;
       guardClosing(connected.connected);
       if (!connected.connected) return;
+      if (connected.profileSync === true) void syncProfile(current);
       if (rescanPending) {
         tracker = new BeeperMuseSync.Tracker(send, undefined, muse.prepare);
         rescanPending = false;
@@ -249,6 +269,7 @@
         ready =
           !polling &&
           !pulsing &&
+          !profiling &&
           health() !== 'busy' &&
           health() !== 'unavailable';
       } catch {}
@@ -272,7 +293,7 @@
     }
     if (message.type === 'probe') {
       respond({
-        protocol: 9,
+        protocol: 10,
         health: health(),
         progress: tracker.progress,
         rescanning: rescanPending,
@@ -290,14 +311,14 @@
       generation++;
       void reportActivity(null);
       guardClosing(false);
-      respond({ protocol: 9 });
+      respond({ protocol: 10 });
     }
     if (message.type === 'start') {
       stopped = false;
       tracker = new BeeperMuseSync.Tracker(send, undefined, muse.prepare);
       const state = health();
       guardClosing(state !== 'unavailable');
-      respond({ protocol: 9, health: state });
+      respond({ protocol: 10, health: state });
       checkUpload();
       void poll();
     }
@@ -309,6 +330,12 @@
     pulsing = true;
     const current = generation;
     try {
+      if (Date.now() - activityCheckedAt >= 30000 && muse.activityReadiness) {
+        try {
+          diagnostic('activity-readiness', muse.activityReadiness());
+        } catch {}
+        activityCheckedAt = Date.now();
+      }
       const value = muse.activity
         ? await muse.activity()
         : ((view) => view.activity || (view.busy ? 'working' : 'idle'))(
@@ -317,7 +344,9 @@
       if (stopped || current !== generation || !closeGuard) return;
       await reportActivity({ activity: value });
     } catch {
-      await reportActivity(null);
+      // An unreadable source is unknown, not evidence that Muse stopped working.
+      // The server's short typing lease expires if observations cannot resume.
+      diagnostic('activity-unavailable');
     } finally {
       pulsing = false;
     }

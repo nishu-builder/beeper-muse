@@ -35,6 +35,7 @@ function harness(
   activityEnabled = false,
   photo = false,
   uploadSupported = true,
+  profile?: () => Promise<unknown>,
 ) {
   let listener!: Listener;
   let resolveClaim!: (value: unknown) => void;
@@ -48,6 +49,7 @@ function harness(
   let busy = false;
   let reply = true;
   let unavailable = false;
+  let activityUnavailable = false;
   let visibility = 'hidden';
   const events = new Map<
     string,
@@ -116,6 +118,7 @@ function harness(
               ok: true,
               connected: true,
               activitySync: activityEnabled,
+              profileSync: !!profile,
               deliveryStatus: true,
               sourceProtocol: structured ? 2 : undefined,
             };
@@ -130,7 +133,12 @@ function harness(
     BeeperMuseDOM: {
       create() {
         return {
-          activity: () => (busy ? 'working' : 'idle'),
+          profile,
+          activity: () => {
+            if (activityUnavailable)
+              throw Error('Synthetic unreadable activity');
+            return busy ? 'working' : 'idle';
+          },
           snapshot: this.snapshot,
           submit: this.submit,
           submitImage: uploadSupported
@@ -210,12 +218,14 @@ function harness(
       busy?: boolean;
       draft?: string;
       unavailable?: boolean;
+      activityUnavailable?: boolean;
       reply?: boolean;
     }) {
       reply = value.reply ?? true;
       busy = value.busy ?? false;
       draft = value.draft ?? '';
       unavailable = value.unavailable ?? false;
+      activityUnavailable = value.activityUnavailable ?? false;
     },
     async advance(ms: number) {
       const target = now + ms;
@@ -231,6 +241,29 @@ function harness(
     },
   };
 }
+test('slow or failed avatar reads do not block message delivery and stale results are discarded', async () => {
+  let resolveProfile!: (value: unknown) => void;
+  const pending = new Promise((resolve) => {
+    resolveProfile = resolve;
+  });
+  const h = harness(false, true, false, false, true, () => pending);
+  h.signal('start');
+  await flush();
+  assert.equal(h.submits, 1);
+  h.signal('stop');
+  resolveProfile({ avatar: { mime: 'image/png', data: 'synthetic' } });
+  await flush();
+  assert.equal(
+    h.messages.some((m) => m.type === 'profile'),
+    false,
+  );
+  const failed = harness(false, true, false, false, true, async () => {
+    throw Error('Synthetic source failure');
+  });
+  failed.signal('start');
+  await flush();
+  assert.equal(failed.submits, 1);
+});
 
 test('disconnect during a pending claim cannot submit the returned prompt', async () => {
   const h = harness(true);
@@ -321,7 +354,7 @@ test('readiness probes expose no draft or chat text', () => {
   ] as const) {
     h.view(view);
     const probe = h.signal('probe');
-    assert.equal(probe.protocol, 9);
+    assert.equal(probe.protocol, 10);
     assert.equal(probe.health, health);
     assert.deepEqual(Object.keys(probe).sort(), [
       'health',
@@ -372,6 +405,26 @@ test('Muse working activity renews independently and clears when the tab disconn
   assert.deepEqual(
     h.messages.filter((m) => m.type === 'activity').map((m) => m.activity),
     ['working', 'working', 'idle'],
+  );
+});
+
+test('an activity read failure does not invent an idle transition', async () => {
+  const h = harness(false, false, true);
+  h.view({ busy: true });
+  h.signal('start');
+  await flush();
+  h.view({ busy: true, activityUnavailable: true });
+  await h.advance(6000);
+  await h.pulse();
+  assert.deepEqual(
+    h.messages.filter((m) => m.type === 'activity').map((m) => m.activity),
+    ['working'],
+  );
+  h.signal('stop');
+  await flush();
+  assert.deepEqual(
+    h.messages.filter((m) => m.type === 'activity').map((m) => m.activity),
+    ['working', 'idle'],
   );
 });
 

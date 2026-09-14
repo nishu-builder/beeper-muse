@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
+import { colorPNG } from '../scripts/dev/fixture.ts';
 const sync = await readFile(
   new URL('../extension/sync.js', import.meta.url),
   'utf8',
@@ -37,6 +38,116 @@ function fixture() {
     },
   };
 }
+test('avatar discovery selects the named assistant outside navigation/history and refuses ambiguity', async () => {
+  const f = fixture();
+  try {
+    f.document.title = 'Chat – Babar';
+    f.document.body.insertAdjacentHTML(
+      'afterbegin',
+      '<header><img alt="Babar" src="https://muse.ai/avatar.png"></header><nav><img alt="Babar" src="/other.png"></nav>',
+    );
+    f.document
+      .querySelector('[role="log"]')!
+      .insertAdjacentHTML('beforeend', '<img alt="Babar" src="/history.png">');
+    let fetches = 0;
+    f.dom.window.fetch = async (input: unknown) => {
+      fetches++;
+      assert.equal(input, 'https://muse.ai/avatar.png');
+      return new Response(new Uint8Array(colorPNG('RED')), {
+        headers: { 'content-type': 'image/png' },
+      }) as any;
+    };
+    const adapter = f.adapter.create(f.document);
+    assert.equal(
+      (await adapter.profile()).avatar.data,
+      colorPNG('RED').toString('base64'),
+    );
+    await adapter.profile();
+    assert.equal(fetches, 1, 'unchanged image is cached briefly');
+    f.document.body.insertAdjacentHTML(
+      'beforeend',
+      '<img alt="Babar" src="/ambiguous.png">',
+    );
+    assert.equal(await adapter.profile(), undefined);
+    f.document.title = 'Different page';
+    assert.equal(await adapter.profile(), undefined);
+    assert.equal(fetches, 1);
+  } finally {
+    f.dom.window.close();
+  }
+});
+test('avatar capture enforces its smaller byte budget without affecting chat image preparation', async () => {
+  const f = fixture();
+  try {
+    f.document.title = 'Chat – Babar';
+    f.document.body.insertAdjacentHTML(
+      'afterbegin',
+      '<header><img alt="Babar" src="/avatar.png"></header>',
+    );
+    f.dom.window.fetch = async () =>
+      new Response(new Uint8Array(512 * 1024 + 1), {
+        headers: { 'content-type': 'image/png' },
+      }) as any;
+    const adapter = f.adapter.create(f.document);
+    assert.equal(await adapter.profile(), undefined);
+    const message = await adapter.prepare({
+      id: 'image',
+      role: 'assistant',
+      text: '',
+      images: [{ url: 'https://muse.ai/image.png' }],
+    });
+    assert.ok(message.images[0].data);
+  } finally {
+    f.dom.window.close();
+  }
+});
+test('typing recognizes current Stop variants and scoped busy regions, excluding historical controls', async () => {
+  const f = fixture();
+  try {
+    const adapter = f.adapter.create(f.document);
+    f.document
+      .querySelector('[role="log"]')!
+      .insertAdjacentHTML(
+        'beforeend',
+        '<button aria-label="Stop generating">Old tool</button><span aria-busy="true">Old activity</span>',
+      );
+    assert.equal(await adapter.activity(), 'idle');
+    for (const label of [
+      'Stop',
+      'Stop generating',
+      'Stop generating response',
+      'Stop response',
+    ]) {
+      f.document
+        .querySelector('body > button')!
+        .setAttribute('aria-label', label);
+      assert.equal(await adapter.activity(), 'working');
+    }
+    f.document
+      .querySelector('body > button')!
+      .setAttribute('aria-label', 'Send');
+    f.document.body.setAttribute('aria-busy', 'true');
+    assert.equal(
+      await adapter.activity(),
+      'idle',
+      'whole-page loading is not assistant typing',
+    );
+    f.document.body.removeAttribute('aria-busy');
+    f.document.querySelector('textarea')!.setAttribute('aria-busy', 'true');
+    assert.equal(await adapter.activity(), 'working');
+    f.document.querySelector('textarea')!.removeAttribute('aria-busy');
+    f.document.title = 'Chat – Babar';
+    f.document.body.insertAdjacentHTML(
+      'afterbegin',
+      '<header aria-busy="true"><img alt="Babar" src="/avatar.png"></header>',
+    );
+    assert.equal(await adapter.activity(), 'working');
+    f.document.querySelector('header')!.removeAttribute('aria-busy');
+    assert.equal(await adapter.activity(), 'idle');
+  } finally {
+    f.dom.window.close();
+  }
+});
 test('browser adapter preserves an existing user draft and never sends it', async () => {
   const f = fixture();
   f.document.querySelector('textarea')!.value = 'My unfinished message';

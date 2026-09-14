@@ -1,6 +1,9 @@
 # Contributing
 
 Start with [architecture](docs/architecture.md) and [runtime protocol](docs/browser-runtime.md).
+Read the [parity ledger](docs/parity.md) before choosing work. Keep reported bugs,
+implemented changes and live verification separate, and update it when findings
+or priorities change. An interrupted investigation stays open across handoffs.
 The current product is the Chrome-only extension. Legacy Go code is retained
 for existing installations and protocol reference, not bundled into releases.
 

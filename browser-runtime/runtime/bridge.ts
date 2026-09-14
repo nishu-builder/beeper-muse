@@ -1,4 +1,5 @@
 /// <reference path="../../src/muse.d.ts" />
+import { AvatarSync } from './avatar.js';
 import { explanations, failureCode } from './diagnostic-log.js';
 import { incomingImage, type IncomingImage } from './media.js';
 import { IndexedDBInbox, receiveTransaction } from '../inbox.js';
@@ -49,6 +50,11 @@ export class BrowserBridge {
   private chain: Promise<unknown> = Promise.resolve();
   private intake: Promise<unknown> = Promise.resolve();
   private paused = false;
+  private avatarSync?: AvatarSync;
+  profile(avatar: unknown) {
+    this.avatarSync ??= new AvatarSync(this.api, this.state, this.room);
+    return this.avatarSync.update(avatar);
+  }
   pause() {
     this.paused = true;
   }

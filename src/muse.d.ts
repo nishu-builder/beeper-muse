@@ -11,6 +11,14 @@ declare namespace Muse {
     data?: string;
     mime?: string;
   }
+  interface Profile {
+    avatar: Image;
+  }
+  interface ActivityReadiness {
+    stopButtons: number;
+    composerBusy: boolean;
+    assistantBusy: boolean;
+  }
   interface UploadReadiness {
     composers: number;
     hasForm: boolean;
@@ -68,6 +76,8 @@ declare namespace Muse {
     snapshot(): Snapshot | Promise<Snapshot>;
     /** Lightweight observation that does not require a usable composer or transcript. */
     activity?(): Activity | Promise<Activity>;
+    activityReadiness?(): ActivityReadiness;
+    profile?(): Promise<Profile | undefined>;
     submit(
       prompt: string,
       wait: (ms: number) => Promise<void>,

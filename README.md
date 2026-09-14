@@ -5,7 +5,7 @@ Chrome, with no companion app or background terminal.
 
 [Get started](docs/chrome-setup.md) · [Download](https://github.com/nishu-builder/beeper-muse/releases/latest)
 · [Architecture](docs/architecture.md) · [Troubleshooting](docs/operations.md)
-· [Privacy](PRIVACY.md)
+· [Privacy](PRIVACY.md) · [Parity and known issues](docs/parity.md)
 
 **Experimental community integration.** The Beeper connection uses its
 application-service protocol; the Muse connection reads and operates your
@@ -44,13 +44,13 @@ errors or resending tests manually.
 
 ## What syncs
 
-| Direction      | Supported                                                            |
-| -------------- | -------------------------------------------------------------------- |
-| Beeper to Muse | Text prompts; photo uploads in preview (see below)                   |
-| Muse to Beeper | User and assistant messages with native sender identities            |
-| Rich content   | Allowed formatting, links, accessible encrypted images, and edits    |
-| Activity       | Observed Muse reactions and a typing indicator while Muse works      |
-| Catch-up       | Latest 20 loaded messages, all loaded messages, or only new messages |
+| Direction      | Supported                                                                                 |
+| -------------- | ----------------------------------------------------------------------------------------- |
+| Beeper to Muse | Text prompts; photo uploads in preview (see below)                                        |
+| Muse to Beeper | User and assistant messages with native sender identities                                 |
+| Rich content   | Allowed formatting, links, accessible encrypted images, and edits                         |
+| Activity       | Observed Muse reactions; typing translation implemented, live display under investigation |
+| Catch-up       | Latest 20 loaded messages, all loaded messages, or only new messages                      |
 
 History is sent with notification suppression and marked read. Repeat scans use
 saved source IDs to avoid duplicate imports. Source timestamps are preserved when
@@ -63,6 +63,16 @@ Muse. Beeper-to-Muse edits, reactions, typing, video, and general files are not 
 Muse read receipts are not inferred from acknowledgments or reaction icons.
 Images blocked by browser access rules remain links when possible. Keep the Muse message box
 empty while the bridge is handling a prompt.
+
+The extension can copy the selected assistant's recognizable avatar to the
+Beeper chat. This is implemented but not yet verified against the live Babar
+header. Ambiguous or inaccessible pictures leave the existing avatar unchanged.
+
+Beeper may identify this custom account as a generic self-hosted `bridgev2`
+account rather than a named Muse network. A dedicated chat and a connected
+registration do not guarantee a separate branded entry in every client. The
+[parity ledger](docs/parity.md) tracks the Account display investigation and
+distinguishes implementation from verification in Desktop and mobile.
 
 ## Photos
 

@@ -1,4 +1,4 @@
-import { boundedBytes, mediaPath } from './media.js';
+import { boundedBytes, mediaPath, imageTypes } from './media.js';
 import { endpoint, type Registration } from '../transport.js';
 export interface Configuration extends Registration {
   owner: string;
@@ -50,6 +50,7 @@ export class MatrixAPI {
     body?: unknown,
     user = this.config.bot,
     token = this.config.appserviceToken,
+    binaryMime = 'application/octet-stream',
   ): Promise<T> {
     if (
       !path.startsWith('/_matrix/') ||
@@ -63,15 +64,19 @@ export class MatrixAPI {
     if (token === this.config.appserviceToken)
       url.searchParams.set('user_id', user);
     const binary = body instanceof Uint8Array;
+    if (
+      binary &&
+      binaryMime !== 'application/octet-stream' &&
+      !imageTypes.has(binaryMime)
+    )
+      throw Error('Invalid media type.');
     const response = await this.fetcher(url, {
       method,
       headers: {
         Authorization: 'Bearer ' + token,
         ...(body !== undefined
           ? {
-              'Content-Type': binary
-                ? 'application/octet-stream'
-                : 'application/json',
+              'Content-Type': binary ? binaryMime : 'application/json',
             }
           : {}),
       },

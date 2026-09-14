@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.4
+
+- Add a persistent parity ledger covering reported reliability issues, native
+  state, identity and Muse message/rendering types. Keep live verification open
+  separately from implementation and synthetic regression coverage.
+- Add typed assistant-avatar synchronization to native profile, room and bridge
+  metadata, with bounded retrieval, ambiguity checks and resumable updates.
+- Recognize additional explicit Muse activity signals and log source readiness
+  separately from accepted or failed Matrix typing requests. Unknown source
+  failures let the typing lease expire instead of claiming Muse became idle.
+- Refresh older content scripts when reconnecting. Avatar and typing display
+  remain unverified in the installed apps; the earlier interrupted photo is not
+  retried or dismissed by this update.
+
 ## 0.8.3
 
 - Support a bounded message composer container without requiring a native HTML

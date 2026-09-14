@@ -53,6 +53,7 @@ const log = new DiagnosticLog(
   chrome.runtime.getManifest().version,
 );
 const museURL = isMuseURL;
+let lastTyping: { activity: Muse.Activity; at: number } | undefined;
 async function start() {
   await secure;
   if (applyingUpdate) return;
@@ -384,6 +385,7 @@ async function handle(
       sourceProtocol: 2,
       deliveryStatus: true,
       activitySync: true,
+      profileSync: true,
       partialSync: true,
       historyMode: historyMode || 'recent',
     };
@@ -397,7 +399,31 @@ async function handle(
     message.type === 'activity' &&
     (message.activity === 'idle' || message.activity === 'working')
   ) {
-    await bridge.activity(message.activity);
+    try {
+      await bridge.activity(message.activity);
+      if (
+        lastTyping?.activity !== message.activity ||
+        Date.now() - lastTyping.at >= 30000
+      ) {
+        await log.record(
+          message.activity === 'working' ? 'typing-accepted' : 'typing-cleared',
+        );
+        lastTyping = { activity: message.activity, at: Date.now() };
+      }
+    } catch (error) {
+      await log.record('typing-failed');
+      throw error;
+    }
+    return { ok: true };
+  }
+  if (message.type === 'profile') {
+    try {
+      if (await bridge.profile(message.avatar))
+        await log.record('avatar-updated');
+    } catch (error) {
+      await log.record('avatar-failed');
+      throw error;
+    }
     return { ok: true };
   }
   if (message.type === 'claim')

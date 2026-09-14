@@ -185,3 +185,26 @@ while preserving existing drafts and requiring a loaded preview. Additional
 content-free counts distinguish a missing region from a missing page file input.
 The older interrupted attempt remains held because current readiness cannot
 prove whether that historical attempt reached Muse.
+
+## Avatar, activity and persistent parity tracking (0.8.4)
+
+All 175 JavaScript/TypeScript tests pass, together with the TypeScript checks,
+Go tests, builds and formatting checks. New synthetic cases cover avatar
+selection outside history/navigation, ambiguous names, byte limits, concurrent
+refreshes, native state preservation, retry after partial failure and nonblocking
+source reads. Activity cases distinguish current controls from historical
+widgets and leave unknown source activity to expire instead of inventing idle.
+
+Live read-only Matrix checks found no avatar on either the selected room or the
+Muse bot. A short typing request and its explicit clearing request were accepted;
+no conversation message was sent, and this does not verify visible client typing.
+The corresponding Desktop account exists, connected, under self-hosted `bridgev2`
+without a friendly network name. Its Account-screen rendering remains unverified.
+
+Supported browser inspection still returns `Debugger unattached`. The selected
+diagnostic file is stale; its last runtime is 0.8.2 with one held photo and one
+queued text. The development driver correctly refuses to send a test in this
+state. The new source selectors are synthetic hypotheses until inspected against
+the live header and upload controls. Track all remaining work in the
+[parity ledger](parity.md); neither avatar display nor full message parity is
+claimed from passing tests.

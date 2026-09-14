@@ -14,6 +14,13 @@ links, formatting, accessible images, explicit reactions and visible activity
 so it can send the corresponding Matrix events to Beeper. Selected catch-up
 can include earlier messages already loaded in that conversation.
 
+When recognizable, the selected assistant's avatar is copied to the Muse bot's
+Matrix profile, room avatar and bridge metadata. Unlike encrypted message
+attachments, these are ordinary, unencrypted Matrix profile/state media. Avatar
+retrieval follows the same browser access rules, with a 512 KiB limit. The saved
+avatar record contains a content hash, Matrix media address and completion flag;
+the diagnostic file contains neither the image nor its address.
+
 The Muse website uses your existing signed-in session to communicate with Muse.
 The extension connects directly to `matrix.beeper.com` over HTTPS and WebSocket.
 Beeper photo downloads can redirect to its Cloudflare R2 storage service. The

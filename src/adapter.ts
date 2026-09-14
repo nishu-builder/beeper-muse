@@ -72,7 +72,10 @@
     });
     return clone;
   }
-  async function prepare(message: Muse.Message): Promise<Muse.Message> {
+  async function prepare(
+    message: Muse.Message,
+    imageLimit = 2 * 1024 * 1024,
+  ): Promise<Muse.Message> {
     const images: Muse.Image[] = [];
     let remaining = 4 * 1024 * 1024;
     for (const image of message.images || []) {
@@ -103,7 +106,7 @@
             const chunk = await reader.read();
             if (chunk.done) break;
             size += chunk.value.length;
-            if (size > Math.min(remaining, 2 * 1024 * 1024))
+            if (size > Math.min(remaining, imageLimit))
               throw Error('Image too large');
             chunks.push(chunk.value);
           }
@@ -129,6 +132,7 @@
     return { ...message, images };
   }
   function create(document: Document): Muse.Adapter {
+    let cached: { url: string; at: number; profile: Muse.Profile } | undefined;
     return {
       capabilities: {
         activity: true,
@@ -140,6 +144,24 @@
       },
       snapshot: () => snapshot(document),
       activity: () => activity(document),
+      activityReadiness: () => activityReadiness(document),
+      profile: async () => {
+        const image = assistantAvatar(document);
+        if (!image) return;
+        const url = image.currentSrc || image.src;
+        if (!safeImageURL(url)) return;
+        if (cached?.url === url && Date.now() - cached.at < 300000)
+          return cached.profile;
+        const prepared = await prepare(
+          { id: 'avatar', role: 'assistant', text: '', images: [{ url }] },
+          512 * 1024,
+        );
+        const avatar = prepared.images?.[0];
+        if (!avatar?.data || !avatar.mime) return;
+        const profile = { avatar };
+        cached = { url, at: Date.now(), profile };
+        return profile;
+      },
       imageReadiness: () => imageReadiness(document),
       submitImage: (prompt, image, wait, active) =>
         submitImage(document, prompt, image, wait, active),
@@ -187,10 +209,55 @@
       (a.actor + a.key).localeCompare(b.actor + b.key),
     );
   }
+  function assistantAvatar(document: Document): HTMLImageElement | undefined {
+    const name = /^Chat\s+[–—-]\s+(.+)$/.exec(document.title)?.[1]?.trim();
+    if (!name || name.length > 100) return;
+    const labels = new Set(
+      [name, `${name}'s avatar`, `${name} avatar`, `Avatar of ${name}`].map(
+        (s) => s.toLowerCase(),
+      ),
+    );
+    const images = [
+      ...document.querySelectorAll<HTMLImageElement>('img[alt]'),
+    ].filter(
+      (image) =>
+        visible(image) &&
+        !image.closest(
+          '[role="log"],[data-message-item],nav,[role="navigation"]',
+        ) &&
+        labels.has(image.alt.trim().toLowerCase()),
+    );
+    return images.length === 1 ? images[0] : undefined;
+  }
+  function activityReadiness(document: Document): Muse.ActivityReadiness {
+    const stopButtons = [
+      ...document.querySelectorAll('button[aria-label]'),
+    ].filter(
+      (button) =>
+        visible(button) &&
+        !button.closest('[role="log"],[data-message-item]') &&
+        /^stop(?: generating(?: response)?| response)?$/i.test(
+          button.getAttribute('aria-label')!.trim(),
+        ),
+    ).length;
+    const field = [
+      ...document.querySelectorAll('textarea[aria-label="Message"]'),
+    ].find(visible);
+    const busy = field?.closest('[aria-busy="true"]');
+    const header = assistantAvatar(document)?.closest('header,[role="banner"]');
+    return {
+      stopButtons: Math.min(stopButtons, 100),
+      composerBusy:
+        !!busy && !busy.querySelector('[role="log"],[data-message-item]'),
+      assistantBusy:
+        !!header &&
+        (header.getAttribute('aria-busy') === 'true' ||
+          [...header.querySelectorAll('[aria-busy="true"]')].some(visible)),
+    };
+  }
   function activity(document: Document): Muse.Activity {
-    return [...document.querySelectorAll('button[aria-label="Stop"]')].some(
-      visible,
-    )
+    const signals = activityReadiness(document);
+    return signals.stopButtons || signals.composerBusy || signals.assistantBusy
       ? 'working'
       : 'idle';
   }
