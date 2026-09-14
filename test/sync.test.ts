@@ -182,3 +182,77 @@ test('a richer source revision changes identity, but observation time and image 
     ).hash,
   );
 });
+
+test('an empty log during page hydration does not consume the history selection', async () => {
+  const h = harness();
+  await h.tracker.sync(view(), 'new', () => true);
+  h.tick();
+  await h.tracker.sync(view(message('history')), 'new', () => true);
+  h.tick();
+  await h.tracker.sync(view(message('history')), 'new', () => true);
+  assert.equal(h.sent.length, 0);
+});
+
+test('recent selection waits for history hydration to settle before choosing twenty', async () => {
+  const h = harness();
+  const v = view(message('first'));
+  await h.tracker.sync(v, 'recent', () => true);
+  h.tick(2000);
+  v.messages.push(...Array.from({ length: 24 }, (_, i) => message(String(i))));
+  await h.tracker.sync(v, 'recent', () => true);
+  h.tick(2000);
+  await h.tracker.sync(v, 'recent', () => true);
+  assert.equal(h.sent.length, 0);
+  h.tick(2000);
+  await h.tracker.sync(v, 'recent', () => true);
+  assert.deepEqual(
+    h.sent.map((m) => m.id),
+    Array.from({ length: 20 }, (_, i) => String(i + 4)),
+  );
+  assert.ok(
+    h.sent.every((m) => (m as Message & { historical: boolean }).historical),
+  );
+});
+
+test('a long Muse task does not block settled history or user messages', async () => {
+  const h = harness();
+  const v = view(
+    message('history'),
+    { id: 'user', role: 'user', text: 'A new task' },
+    message('stream', 'Working'),
+  );
+  v.busy = true;
+  await h.tracker.sync(v, 'all', () => true);
+  h.tick();
+  await h.tracker.sync(v, 'all', () => true);
+  assert.deepEqual(
+    h.sent.map((m) => m.id),
+    ['history', 'user'],
+  );
+  v.messages[2]!.text = 'Still working';
+  h.tick();
+  await h.tracker.sync(v, 'all', () => true);
+  assert.equal(h.sent.length, 2);
+  v.busy = false;
+  h.tick();
+  await h.tracker.sync(v, 'all', () => true);
+  assert.equal(h.sent[2]?.id, 'stream');
+});
+
+test('older messages loaded by scrolling remain silent history; new-only ignores them', async () => {
+  for (const mode of ['all', 'new']) {
+    const h = harness();
+    const v = view(message('anchor'));
+    await h.tracker.sync(v, mode, () => true);
+    h.tick();
+    await h.tracker.sync(v, mode, () => true);
+    v.messages.unshift(message('older'));
+    await h.tracker.sync(v, mode, () => true);
+    h.tick();
+    await h.tracker.sync(v, mode, () => true);
+    const imported = h.sent.find((m) => m.id === 'older') as
+      (Message & { historical: boolean }) | undefined;
+    if (mode === 'new') assert.equal(imported, undefined);
+    else assert.equal(imported?.historical, true);
+  }
+});

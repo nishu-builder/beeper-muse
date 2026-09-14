@@ -51,13 +51,15 @@
         </p>
         <label for="history-mode">Catch up when connecting</label>
         <select id="history-mode">
-          <option value="recent">Most recent 20 messages</option>
+          <option value="recent">Latest 20 loaded messages</option>
           <option value="all">All messages loaded in Muse</option>
           <option value="new">Only new messages</option>
         </select>
         <button id="connect" class="primary" type="button">
           Connect this Muse tab
         </button>
+        <button id="rescan" type="button">Catch up now</button>
+        <p id="sync-progress" class="note" role="status"></p>
         <button id="disconnect" type="button">Disconnect tab</button>
         <p class="note">
           Keep the tab open and its composer empty. Review approvals and

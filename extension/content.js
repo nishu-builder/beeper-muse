@@ -3,6 +3,7 @@
   const muse = BeeperMuseDOM.create(document);
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   let polling = false;
+  let rescanPending = false;
   let stopped = false;
   let generation = 0;
   let closeGuard = false;
@@ -137,6 +138,10 @@
       if (stopped || generation !== current) return;
       guardClosing(connected.connected);
       if (!connected.connected) return;
+      if (rescanPending) {
+        tracker = new BeeperMuseSync.Tracker(send, undefined, muse.prepare);
+        rescanPending = false;
+      }
       const view = await muse.snapshot();
       if (connected.museSync) {
         try {
@@ -162,21 +167,32 @@
   }
   chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     if (message.type === 'probe') {
-      respond({ protocol: 3, health: health() });
+      respond({
+        protocol: 4,
+        health: health(),
+        progress: tracker.progress,
+        rescanning: rescanPending,
+      });
+      return;
+    }
+    if (message.type === 'rescan') {
+      rescanPending = true;
+      respond({ ok: true });
+      void poll();
       return;
     }
     if (message.type === 'stop') {
       stopped = true;
       generation++;
       guardClosing(false);
-      respond({ protocol: 3 });
+      respond({ protocol: 4 });
     }
     if (message.type === 'start') {
       stopped = false;
       tracker = new BeeperMuseSync.Tracker(send, undefined, muse.prepare);
       const state = health();
       guardClosing(state !== 'unavailable');
-      respond({ protocol: 3, health: state });
+      respond({ protocol: 4, health: state });
       void poll();
     }
   });
