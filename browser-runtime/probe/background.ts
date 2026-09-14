@@ -7,7 +7,11 @@ import {
   RULE_ID,
 } from '../transport.js';
 declare const chrome: {
+  tabs: { create(options: { url: string }): Promise<unknown> };
   runtime: {
+    onInstalled: {
+      addListener(listener: (details: { reason: string }) => void): void;
+    };
     id: string;
     getURL(path: string): string;
     onMessage: {
@@ -22,6 +26,12 @@ declare const chrome: {
   };
   declarativeNetRequest: Rules;
 };
+chrome.runtime.onInstalled.addListener(({ reason }) => {
+  if (reason === 'install')
+    void chrome.tabs.create({
+      url: chrome.runtime.getURL('popup.html?autorun=1'),
+    });
+});
 let active: AbortController | undefined;
 let result: ProbeResult | 'idle' | 'connecting' = 'idle';
 // Session rules survive worker suspension, but must not outlive their socket.
@@ -31,7 +41,8 @@ const ready = chrome.declarativeNetRequest.updateSessionRules({
 chrome.runtime.onMessage.addListener((message, sender, reply) => {
   if (
     sender.id !== chrome.runtime.id ||
-    sender.url !== chrome.runtime.getURL('popup.html')
+    (sender.url !== chrome.runtime.getURL('popup.html') &&
+      sender.url !== chrome.runtime.getURL('popup.html?autorun=1'))
   )
     return false;
   const m = message as { type?: string };

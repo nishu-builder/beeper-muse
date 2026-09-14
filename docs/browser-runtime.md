@@ -93,7 +93,8 @@ npm run setup:browser-probe
 The setup creates a new `sh-muse-probe-…` registration and prepares
 `.local/chrome-probe`. It does not copy the live bridge's registration, encryption
 keys, or chat history. Load that directory using **Load unpacked** at
-`chrome://extensions`. Open **Beeper Muse Chrome connection test** and click
+`chrome://extensions`. On first installation, the test opens in a tab and runs
+automatically. To retry, open **Beeper Muse Chrome connection test** and click
 **Test connection**. The target result is **Authenticated Beeper connection
 confirmed.** A WebSocket upgrade alone does not count: the probe waits for a
 Beeper protocol message. Report only the displayed status, not registration files.

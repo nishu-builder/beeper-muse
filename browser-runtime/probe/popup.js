@@ -11,7 +11,7 @@ const labels = {
 const show = (result) => {
   status.textContent = labels[result] || 'Could not read test status.';
 };
-document.getElementById('connect').onclick = async () => {
+const run = async () => {
   show('connecting');
   try {
     show((await chrome.runtime.sendMessage({ type: 'probe' })).result);
@@ -19,6 +19,17 @@ document.getElementById('connect').onclick = async () => {
     show('failed');
   }
 };
+document.getElementById('connect').onclick = run;
 document.getElementById('stop').onclick = () =>
   chrome.runtime.sendMessage({ type: 'stop' });
-chrome.runtime.sendMessage({ type: 'status' }).then((r) => show(r.result));
+chrome.runtime
+  .sendMessage({ type: 'status' })
+  .then((r) => {
+    if (
+      new URLSearchParams(location.search).get('autorun') === '1' &&
+      r.result === 'idle'
+    )
+      void run();
+    else show(r.result);
+  })
+  .catch(() => show('failed'));
