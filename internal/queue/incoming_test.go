@@ -268,3 +268,42 @@ func TestLegacyReceiptSuppressesUpgradeReplayButNotFutureReversions(t *testing.T
 		t.Fatal("legacy hash suppressed real reversion")
 	}
 }
+
+func TestPartialHistoryNeverDowngradesKnownContentAfterRestart(t *testing.T) {
+	dir := t.TempDir()
+	q, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	partial := Incoming{ID: "history", Role: "assistant", Text: "Summary", Partial: true}
+	full := Incoming{ID: "history", Role: "assistant", Text: "Full answer", HTML: "<strong>Full answer</strong>"}
+	for _, m := range []Incoming{partial, full} {
+		if n, err := q.Import("!private:test", []Incoming{m}); err != nil || n != 1 {
+			t.Fatalf("upgrade: %d %v", n, err)
+		}
+		job, err := q.BeginDelivery()
+		if err != nil || job == nil {
+			t.Fatalf("delivery: %v", err)
+		}
+		if err := q.Complete(job.ID); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := q.Close(); err != nil {
+		t.Fatal(err)
+	}
+	q, err = Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer q.Close()
+	for _, m := range []Incoming{partial, full} {
+		if n, err := q.Import("!private:test", []Incoming{m}); err != nil || n != 0 {
+			t.Fatalf("downgrade or duplicate: %d %v", n, err)
+		}
+	}
+	full.Text = "Later edit"
+	if n, err := q.Import("!private:test", []Incoming{full}); err != nil || n != 1 {
+		t.Fatalf("edit: %d %v", n, err)
+	}
+}

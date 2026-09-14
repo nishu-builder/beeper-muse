@@ -8,7 +8,7 @@ bridge.
 [Setup guide](docs/setup.md) · [Extension download](https://github.com/nishu-builder/beeper-muse/releases/latest)
 · [Privacy](PRIVACY.md) · [Troubleshooting](docs/operations.md)
 
-The source now includes version 0.5.2 structured message sync. Build
+The source now includes version 0.5.3 structured message sync. Build
 both the local bridge and extension from this source to use them; the existing
 0.3.0 release ZIP does not include these changes. See [the component design](docs/architecture.md)
 for how a future Muse API can replace the browser adapter.
@@ -125,9 +125,10 @@ extension and `24820` for the Matrix application service, are fixed.
   heuristic. A separate observer captures later text messages and revisions after
   the prompt finishes, without requiring another Beeper message. Revisions use native Matrix edits. Original timestamps are used when the DOM
   exposes an absolute timestamp; otherwise the first observation time is used
-  and marked as such in event metadata. The browser adapter does not yet expose
-  authoritative reaction actors or read receipts, so it does not fabricate them.
-  The typed protocol and Matrix translator support both for a future adapter.
+  and marked as such in event metadata. Verified Muse reaction labels map to native reactions from you or Muse, including
+  removals. Read receipts remain unavailable; acknowledgments are not treated as
+  read receipts. Virtualized messages provide text-only catch-up until rendered;
+  those placeholders never overwrite already imported content.
 - The popup opens once per Muse tab when no healthy tab is connected. Closing,
   reloading, or leaving a connected tab requests Chrome's standard confirmation,
   after you have interacted with that webpage. Disconnect first to remove it.

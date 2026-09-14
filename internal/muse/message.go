@@ -51,6 +51,7 @@ type Message struct {
 	TimestampMS  int64 `json:"timestampMs,omitempty"`
 	ObservedAtMS int64 `json:"observedAtMs,omitempty"`
 	Historical   bool  `json:"historical,omitempty"`
+	Partial      bool  `json:"partial,omitempty"`
 	// Read is an explicit source receipt, never inferred from an acknowledgment.
 	Read bool `json:"read,omitempty"`
 	// nil means unknown; an empty list means the source reports no reactions.

@@ -6,6 +6,7 @@ declare namespace MuseBridge {
     museSync: boolean;
     sourceProtocol?: number;
     activitySync: boolean;
+    partialSync: boolean;
   }
   interface Job {
     id: string;
@@ -76,6 +77,7 @@ declare namespace MuseBridge {
         queued: Number(s.queued),
         museSync: s.museSync === true,
         activitySync: s.activitySync === true,
+        partialSync: s.partialSync === true,
         sourceProtocol:
           typeof s.sourceProtocol === 'number' ? s.sourceProtocol : undefined,
       };
@@ -84,7 +86,10 @@ declare namespace MuseBridge {
       await this.request('/v1/activity', { activity }, 3000);
     }
     async importMessages(messages: Muse.Message[]) {
-      if ((await this.status()).sourceProtocol !== 2)
+      const status = await this.status();
+      if (messages.some((m) => m.partial) && !status.partialSync)
+        throw Error('Update the bridge for virtualized history.');
+      if (status.sourceProtocol !== 2)
         throw Error('Update the local bridge for structured sync.');
       const result = await this.request('/v1/import', { messages });
       if (

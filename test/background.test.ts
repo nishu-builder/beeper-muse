@@ -44,7 +44,7 @@ function harness(paired = true) {
     reachable = true,
     receiver = true;
   let health = 'ready';
-  let protocol = 5;
+  let protocol = 6;
   let listener!: (
     message: unknown,
     sender: Sender,

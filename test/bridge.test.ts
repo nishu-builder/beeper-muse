@@ -19,6 +19,14 @@ function harness() {
       LocalBridge: new (token: () => Promise<string | null>) => {
         status(): Promise<unknown>;
         claim(): Promise<unknown>;
+        importMessages(
+          messages: Array<{
+            id: string;
+            role: string;
+            text: string;
+            partial?: boolean;
+          }>,
+        ): Promise<unknown>;
       };
     },
   };
@@ -50,6 +58,7 @@ test('local delivery transport validates status instead of reporting malformed s
     queued: 0,
     museSync: false,
     activitySync: false,
+    partialSync: false,
     sourceProtocol: 2,
   });
   for (const { url, options } of h.requests) {
@@ -76,4 +85,21 @@ test('invalid claims cannot reach the Muse composer', async () => {
   assert.deepEqual(JSON.parse(JSON.stringify(await h.bridge.claim())), {
     job: null,
   });
+});
+
+test('partial history refuses an older bridge before posting source messages', async () => {
+  const h = harness();
+  const m = { id: 'a', role: 'assistant', text: 'History', partial: true };
+  await assert.rejects(h.bridge.importMessages([m]), /Update the bridge/);
+  assert.equal(h.requests.length, 1);
+  assert.match(h.requests[0]!.url, /status$/);
+  h.reply({
+    phase: 'idle',
+    queued: 0,
+    sourceProtocol: 2,
+    partialSync: true,
+    added: 1,
+  });
+  await h.bridge.importMessages([m]);
+  assert.match(h.requests.at(-1)!.url, /import$/);
 });

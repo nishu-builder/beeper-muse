@@ -56,6 +56,11 @@ func (q *Queue) importTx(tx *sql.Tx, roomID string, messages []Incoming, replyTo
 		if err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return 0, err
 		}
+		if m.Partial && role != "" {
+			// Virtualized text lacks formatting, media, and reaction state. It
+			// may fill missing history, but must never downgrade an existing ID.
+			continue
+		}
 		if known > 0 && role == "" {
 			continue
 		}

@@ -126,7 +126,21 @@ A clearly labeled synthetic batch in the configured private Beeper chat verified
 These checks used the authenticated local source endpoint and read-only Beeper
 inspection. They did not send a prompt to Muse or establish that every current
 Muse DOM selector works. Chrome automation was unavailable in the session.
-Actual reaction actors and authoritative read state are not exposed by the DOM
-adapter; those capabilities remain disabled pending verified source evidence.
+At that stage, reaction actors and authoritative read state remained unverified.
 Notification suppression was verified through batch flags and read/unread state,
 not through observation of operating-system notification banners.
+
+## Verified Muse markup in 0.5.3
+
+Chrome inspection confirmed distinct assistant reaction labels and owner reaction
+removal controls. Synthetic regression fixtures cover actor attribution, removal,
+unknown markup, virtualized transcript prefixes, mixed cards, and images wrapped
+in buttons. Tracker and durable queue tests ensure text-only placeholders cannot
+downgrade an existing message, including after a restart. Private account markup
+is kept outside the repository and release archive.
+
+Actual DOM-derived assistant and owner reaction snapshots were imported through
+the authenticated local bridge. Both created native reaction mappings; clearing
+the temporary owner reaction in Muse and importing its resulting snapshot removed
+the native mapping. This verifies parsing and Matrix delivery separately from the
+extension's automatic observer, which still requires reloading the installed build.

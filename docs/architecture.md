@@ -67,10 +67,18 @@ state. **Catch up now** scans the selected loaded history again; durable source
 receipts suppress duplicates. It does not fetch a hidden archive or move already
 posted Matrix events. Scroll in Muse to load older messages before rescanning.
 
-The source contract and Matrix translator support reaction snapshots and owner
-read receipts. **The DOM adapter currently reports these capabilities as absent:**
-we have not verified markup exposing the reaction actor or authoritative read
-state. It does not synthesize receipts from acknowledgments.
+The DOM adapter reads assistant reactions from explicitly labeled image roles and
+owner reactions from pressed removal controls. It reports an empty list only for
+fully rendered messages with no unrecognized reaction markup. Unknown state is
+omitted so the translator does not remove existing reactions. Read receipts are
+still unavailable; the adapter does not synthesize them from acknowledgments.
+
+Virtualized accessibility transcripts are marked `partial`. Their generated role
+prefix is removed only on the transcript element. They may create missing text
+history, but both the tab tracker and durable queue refuse partial updates to
+known source IDs. A rendered observation can upgrade a partial import. This
+prevents scrolling or reconnecting from erasing media, formatting, and reactions.
+The transport requires `partialSync` support before importing these observations.
 
 ## Transient activity
 
