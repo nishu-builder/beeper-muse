@@ -209,7 +209,7 @@ test('log controls save a chosen handle, flush automatically and stop writing on
       else Reflect.deleteProperty(globalThis, key);
     }
   });
-  const flush = startLogControls()!;
+  const flush = startLogControls('0.8.8', 'a'.repeat(64))!;
   await flush();
   assert.equal(writes, 0, 'no file access before selection');
   elements.get('choose-log')!.onclick();

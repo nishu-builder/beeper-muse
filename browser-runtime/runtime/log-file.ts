@@ -11,8 +11,12 @@ export class LogFileWriter {
   private chain = Promise.resolve();
   private previous = '';
   constructor(private handle: LogHandle) {}
-  write(entries: unknown, health?: unknown): Promise<void> {
-    const text = logFile(entries, health);
+  write(
+    entries: unknown,
+    health?: unknown,
+    collection?: unknown,
+  ): Promise<void> {
+    const text = logFile(entries, health, collection);
     const next = this.chain.then(async () => {
       if (text === this.previous) return;
       if (

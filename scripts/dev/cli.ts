@@ -90,6 +90,8 @@ try {
         d = diagnostics(raw);
       checks.health = d.health;
       checks.logFresh = d.fresh;
+      checks.collection = d.collection;
+      checks.collectionFresh = d.collectionFresh;
       checks.recentEvents = d.events.slice(-12);
       ready(raw, version, build);
       checks.readyToTest = true;

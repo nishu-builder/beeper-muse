@@ -1,3 +1,5 @@
+import { LogCollector } from './log-collector.js';
+declare const __BEEPER_MUSE_BUILD_ID__: string;
 import { StateStore } from './state.js';
 import { LogFileWriter, type LogHandle } from './log-file.js';
 interface SavedHandle extends LogHandle {
@@ -8,7 +10,7 @@ interface PickerWindow {
 }
 // The user selects one normal file. Never inspect profiles or choose a path
 // programmatically. Only the sanitized diagnostic ring is written to that file.
-export function startLogControls() {
+export function startLogControls(version?: string, build?: string) {
   const choose = document.getElementById(
     'choose-log',
   ) as HTMLButtonElement | null;
@@ -30,20 +32,27 @@ export function startLogControls() {
     .catch(() => {
       status.textContent = 'Chrome could not open the saved log settings.';
     });
+  const collector = new LogCollector(
+    version ?? chrome.runtime.getManifest().version,
+    build ?? __BEEPER_MUSE_BUILD_ID__,
+    async () =>
+      (await chrome.storage.local.get('diagnosticEvents')).diagnosticEvents,
+    () => chrome.runtime.sendMessage({ type: 'diagnostic-health' }),
+    () => chrome.runtime.sendMessage({ type: 'diagnostic-progress' }),
+  );
   async function flush() {
     if (busy || disposed) return;
     busy = true;
     try {
       await ready;
       if (!writer) return;
-      const { diagnosticEvents } =
-        await chrome.storage.local.get('diagnosticEvents');
-      const health = await chrome.runtime
-        .sendMessage({ type: 'diagnostic-health' })
-        .catch(() => undefined);
-      await writer.write(diagnosticEvents, health);
+      const sample = await collector.collect();
+      await writer.write(sample.events, sample.health, sample.collection);
       status!.textContent =
-        'Diagnostic file is updating. You can return to Muse.';
+        sample.collection.health === 'available' &&
+        sample.collection.events === 'available'
+          ? 'Diagnostic file is updating. You can return to Muse.'
+          : 'Diagnostic file is updating, but runtime diagnostics are incomplete. The file records what is unavailable.';
     } catch {
       status!.textContent =
         'Log file needs attention. Choose Allow file updates or select the file again.';

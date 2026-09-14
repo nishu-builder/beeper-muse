@@ -246,3 +246,46 @@ test('synthetic PNG color matches the private expectation and is absent from the
   const run = newRun(target, 'image');
   assert.ok(!run.prompt.includes(run.color));
 });
+
+test('writer heartbeat alone, inconsistent collection and in-progress updates cannot authorize a live send', () => {
+  const collection = {
+    at: Date.now(),
+    version: '0.8.2',
+    build: 'a'.repeat(64),
+    events: 'available',
+    health: 'available',
+  };
+  const file = { ...exported(), collection };
+  assert.ok(ready(file, '0.8.2', 'a'.repeat(64)));
+  for (const c of [
+    { ...collection, health: 'unavailable' },
+    { ...collection, at: Date.now() - 60000 },
+    { ...collection, build: 'b'.repeat(64) },
+    {
+      ...collection,
+      update: { stage: 'waiting-source', pending: true, elapsedMs: 1000 },
+    },
+  ]) {
+    assert.throws(() =>
+      ready({ ...file, collection: c }, '0.8.2', 'a'.repeat(64)),
+    );
+  }
+  assert.throws(
+    () => ready({ ...file, health: undefined }, '0.8.2', 'a'.repeat(64)),
+    /runtime health/,
+  );
+  for (const update of [
+    { stage: 'applying', pending: true, elapsedMs: 0 },
+    { stage: 'failed', pending: true, elapsedMs: 0 },
+  ]) {
+    assert.throws(
+      () =>
+        ready(
+          { ...file, health: { ...health(), update } },
+          '0.8.2',
+          'a'.repeat(64),
+        ),
+      /update/,
+    );
+  }
+});

@@ -1,6 +1,7 @@
 import { randomUUID, randomInt } from 'node:crypto';
 import {
   cleanEntries,
+  cleanCollection,
   cleanHealth,
 } from '../../browser-runtime/runtime/diagnostic-log.ts';
 import {
@@ -77,10 +78,24 @@ export function diagnostics(value: unknown, now = Date.now()) {
   const health = cleanHealth(file.health);
   const events = cleanEntries(file.events);
   const fresh = !!health && now - health.at >= -5000 && now - health.at < 30000;
-  return { health, fresh, events };
+  const collection = cleanCollection(file.collection);
+  const collectionFresh =
+    !!collection && now - collection.at >= -5000 && now - collection.at < 30000;
+  return { health, fresh, events, collection, collectionFresh };
 }
 export function ready(value: unknown, version: string, build: string) {
   const d = diagnostics(value);
+  if (
+    d.collection &&
+    (!d.collectionFresh || d.collection.health !== 'available')
+  )
+    throw new DevError(
+      'Diagnostic collection is stale or runtime health is unavailable. No test was sent.',
+    );
+  if (!d.fresh && d.collectionFresh)
+    throw new DevError(
+      'Diagnostic file is updating, but runtime health is unavailable or stale. No test was sent.',
+    );
   if (!d.fresh)
     throw new DevError(
       'Diagnostic file is missing a fresh heartbeat. Enable file logging in the connection tab.',
@@ -89,6 +104,23 @@ export function ready(value: unknown, version: string, build: string) {
   if (h.version !== version || h.build !== build)
     throw new DevError(
       'The installed extension has not loaded the current build.',
+    );
+  if (
+    d.collection &&
+    (d.collection.build !== build || d.collection.version !== version)
+  )
+    throw new DevError(
+      'The connection tab has not loaded the current diagnostic build.',
+    );
+  if (
+    [h.update, d.collection?.update].some(
+      (update) =>
+        update &&
+        (update.pending || !['idle', 'failed'].includes(update.stage)),
+    )
+  )
+    throw new DevError(
+      'An extension update is pending or in progress. No test was sent.',
     );
   if (!h.beeperConnected || !h.museConnected || !h.ready)
     throw new DevError(

@@ -182,3 +182,28 @@ Browser inspection again returned `Debugger unattached`; the selected diagnostic
 export is still stale. The actual Muse type inventory is not exhaustive. Image
 upload, avatar, typing, native offline banners, historical ordering, connector-card
 decoration and installed-client formatting remain open. No user job was touched.
+
+## September 14 follow-up: disconnected account and diagnostics
+
+The user's Desktop screenshot shows a disconnected account with a legacy probe
+name. A read-only check confirmed that it is the current extension registration,
+not an obsolete test account. The Desktop API currently reports `disconnected`
+with the source-specific message "Muse is disconnected. Open Chrome and connect
+your Muse tab." This verifies a native Desktop warning, but not its precise cause,
+server expiry, mobile behavior or recovery. Do not remove the active registration
+to clean up its name. ID-03 also tracks replacing technical account naming with
+supported friendly metadata.
+
+0.8.8 bounds diagnostic observation without restarting pending reads. The selected
+file has a separate collection heartbeat and update stage; unavailable health is
+not replaced with empty queue counts. Only authenticated top-level connection-page
+diagnostic requests bypass the update work guard. Real message operations and
+source preparation remain guarded. Tests cover stalled reads, late completion,
+privacy, update progress and refusal to send from incomplete/inconsistent state.
+These paths could explain stale diagnostics or deferred updates; they have not
+been established as the cause of this installation's failure.
+
+The selected live log still ends at 0.8.2. Newer files on disk do not establish the
+running build. No uncertain image was retried, no held job dismissed and no live
+conversation test sent. Fresh runtime evidence, source inspection and the rest of
+the parity inventory remain required.
