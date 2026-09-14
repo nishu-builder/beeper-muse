@@ -27,6 +27,8 @@ export interface Job {
   statusFingerprint?: string;
 }
 interface SourceRecord {
+  revision?: number;
+  lastEventTime?: number;
   eventID: string;
   fingerprint: string;
   contentFingerprint?: string;
@@ -40,6 +42,11 @@ interface SourceRecord {
 }
 interface Delivery {
   events: Event[];
+  redactions?: Array<{
+    eventID: string;
+    actor: Muse.Role;
+    transactionID: string;
+  }>;
   historical: boolean;
   read: boolean;
   record: SourceRecord;
@@ -595,16 +602,32 @@ export class BrowserBridge {
       throw Error('Invalid Muse message.');
     const key = 'source:' + message.id;
     const saved = await this.state.get<SourceRecord>(key);
-    if (saved && message.partial) return false;
     if (saved && saved.role !== message.role)
       throw Error('Muse message identity changed.');
+    const observedReactions = sourceReactionKeys(message.reactions);
+    const pending = await this.state.get<Delivery>('delivery:' + message.id);
+    if (pending) {
+      // Finish every journaled mutation before comparing with newer content.
+      // Otherwise a source reverting to saved content can hide a lost response.
+      await this.deliver(pending);
+      await this.state.put(key, pending.record);
+      await this.state.put('delivery:' + message.id, null);
+      await this.importOne(message);
+      return true;
+    }
+    if (saved && message.partial) return false;
+    const reactionKeys =
+      observedReactions ?? Object.keys(saved?.reactions || {}).sort();
+    // Reverting to earlier content is a new event, even when its content hash
+    // appeared before. The persisted delivery retains this revision on retries.
+    const revision = (saved?.revision || 0) + 1;
     const contentFingerprint = await eventID(
       this.room,
       JSON.stringify([message.text, message.html, message.images]),
     );
     const fingerprint = await eventID(
       this.room,
-      JSON.stringify([contentFingerprint, message.reactions]),
+      JSON.stringify([contentFingerprint, reactionKeys]),
     );
     if (message.read === true && saved && !saved.read) {
       await this.api.request(
@@ -617,16 +640,6 @@ export class BrowserBridge {
       await this.state.put(key, saved);
     }
     if (saved?.fingerprint === fingerprint) return false;
-    let delivery = await this.state.get<Delivery>('delivery:' + message.id);
-    // Persist the exact encrypted batch before sending. On uncertain outcomes,
-    // retry these same event IDs and ciphertext, then accept newer revisions.
-    if (delivery) {
-      await this.deliver(delivery);
-      await this.state.put(key, delivery.record);
-      await this.state.put('delivery:' + message.id, null);
-      if (delivery.record.fingerprint === fingerprint) return true;
-      return this.importOne(message);
-    }
     const timestamp =
       saved?.timestamp ||
       (Number.isSafeInteger(message.timestampMs) && message.timestampMs! > 0
@@ -634,6 +647,13 @@ export class BrowserBridge {
         : message.observedAtMs || Date.now());
     const baseID =
       saved?.eventID || (await eventID(this.room, 'source:' + message.id));
+    const updateTime = saved
+      ? Math.max(
+          Date.now(),
+          timestamp,
+          (saved.lastEventTime || saved.timestamp) + 1,
+        )
+      : timestamp;
     const sender =
       message.role === 'user' ? this.api.config.owner : this.api.config.bot;
     const missingImages = (message.images || [])
@@ -686,9 +706,12 @@ export class BrowserBridge {
         room_id: this.room,
         sender,
         event_id: saved
-          ? await eventID(this.room, 'edit:' + message.id + ':' + fingerprint)
+          ? await eventID(
+              this.room,
+              'edit:' + message.id + ':' + revision + ':' + fingerprint,
+            )
           : baseID,
-        origin_server_ts: timestamp,
+        origin_server_ts: updateTime,
         content: encrypted,
       });
     }
@@ -741,28 +764,35 @@ export class BrowserBridge {
         event_id: previousImage
           ? await eventID(
               this.room,
-              'image-edit:' + message.id + ':' + index + ':' + imageFingerprint,
+              'image-edit:' +
+                message.id +
+                ':' +
+                index +
+                ':' +
+                revision +
+                ':' +
+                imageFingerprint,
             )
           : imageID,
-        origin_server_ts: timestamp,
+        origin_server_ts: updateTime,
         content: imageContent,
       });
     }
     const reactions: Record<string, string> = {};
-    for (const reaction of (message.reactions || []).slice(0, 32)) {
-      if (
-        !['user', 'assistant'].includes(reaction.actor) ||
-        typeof reaction.key !== 'string' ||
-        reaction.key.length > 64 ||
-        !reaction.key
-      )
-        continue;
-      const rk = JSON.stringify([reaction.actor, reaction.key]);
+    for (const rk of reactionKeys) {
+      const [actor, key] = JSON.parse(rk) as [Muse.Role, string];
       const id =
         saved?.reactions[rk] ||
         (await eventID(
           this.room,
-          'reaction:' + message.id + ':' + rk + ':' + fingerprint,
+          'reaction:' +
+            message.id +
+            ':' +
+            rk +
+            ':' +
+            revision +
+            ':' +
+            fingerprint,
         ));
       reactions[rk] = id;
       if (!saved?.reactions[rk])
@@ -770,40 +800,35 @@ export class BrowserBridge {
           type: 'm.reaction',
           room_id: this.room,
           sender:
-            reaction.actor === 'user'
-              ? this.api.config.owner
-              : this.api.config.bot,
+            actor === 'user' ? this.api.config.owner : this.api.config.bot,
           event_id: id,
-          origin_server_ts: timestamp,
+          origin_server_ts: updateTime,
           content: {
             'm.relates_to': {
               rel_type: 'm.annotation',
               event_id: baseID,
-              key: reaction.key,
+              key,
             },
           },
         });
     }
+    const redactions: NonNullable<Delivery['redactions']> = [];
     for (const [rk, id] of Object.entries(saved?.reactions || {}))
       if (!reactions[rk]) {
-        const actor = JSON.parse(rk)[0];
-        await this.api.request(
-          'PUT',
-          '/_matrix/client/v3/rooms/' +
-            enc(this.room) +
-            '/redact/' +
-            enc(id) +
-            '/' +
-            enc(await eventID(this.room, 'remove:' + id)),
-          {},
-          actor === 'user' ? this.api.config.owner : this.api.config.bot,
-        );
+        redactions.push({
+          eventID: id,
+          actor: JSON.parse(rk)[0] as Muse.Role,
+          transactionID: await eventID(this.room, 'remove:' + id),
+        });
       }
-    delivery = {
+    const delivery: Delivery = {
       events,
+      redactions,
       historical: message.historical === true,
       read: message.read === true || message.historical === true,
       record: {
+        revision,
+        lastEventTime: updateTime,
         eventID: baseID,
         fingerprint,
         contentFingerprint,
@@ -825,6 +850,19 @@ export class BrowserBridge {
   private async deliver(delivery: Delivery) {
     if (this.paused) throw Error('Beeper connection is paused.');
     await this.api.members(this.room);
+    for (const removal of delivery.redactions || []) {
+      await this.api.request(
+        'PUT',
+        '/_matrix/client/v3/rooms/' +
+          enc(this.room) +
+          '/redact/' +
+          enc(removal.eventID) +
+          '/' +
+          enc(removal.transactionID),
+        {},
+        removal.actor === 'user' ? this.api.config.owner : this.api.config.bot,
+      );
+    }
     if (!delivery.events.length) return;
     const response = await this.api.request<{ event_ids: string[] }>(
       'POST',
@@ -863,6 +901,24 @@ export class BrowserBridge {
     this.crypto.close();
     this.state.close();
   }
+}
+function sourceReactionKeys(value: unknown): string[] | undefined {
+  if (value === undefined) return;
+  if (!Array.isArray(value) || value.length > 32)
+    throw Error('Invalid Muse reactions.');
+  const keys = value.map((reaction) => {
+    if (
+      !reaction ||
+      typeof reaction !== 'object' ||
+      !['user', 'assistant'].includes(reaction.actor) ||
+      typeof reaction.key !== 'string' ||
+      !reaction.key ||
+      Array.from(reaction.key).length > 64
+    )
+      throw Error('Invalid Muse reaction.');
+    return JSON.stringify([reaction.actor, reaction.key]);
+  });
+  return [...new Set(keys)].sort();
 }
 export function validateSourceHTML(html: string): string {
   if (html.length > 200000) throw Error('Muse formatting is too large.');

@@ -208,3 +208,36 @@ state. The new source selectors are synthetic hypotheses until inspected against
 the live header and upload controls. Track all remaining work in the
 [parity ledger](parity.md); neither avatar display nor full message parity is
 claimed from passing tests.
+
+## Reaction/revision recovery and current-turn activity (0.8.5)
+
+All 181 JS/TS tests, TypeScript checks, Go tests, builds and formatting pass.
+New regressions verify unknown versus explicitly empty reaction observations;
+re-added reactions with fresh IDs; text/image cycles with fresh revision IDs and
+ordered update times; exact retry payloads; and recovery when newer source state
+reverts after an uncertain edit or reaction-removal response. Original message
+times remain unchanged. These are protocol tests against a recording transport,
+not proof of Desktop/mobile rendering.
+
+A partial Muse transcript saved during earlier authorized browser inspection
+contains assistant renderer `aria-busy` attributes and turn identifiers. The
+adapter now reads busy state from the current assistant turn, excluding older
+turns, nested loading widgets and avatar loading. The captured values were idle;
+the synthetic busy transition still requires live confirmation.
+
+The browser tool continues to list the Muse tab but rejects page inspection with
+`Debugger unattached`. The selected diagnostic file remains stale at 0.8.2. No
+additional conversation test, held-job dismissal or photo retry was performed.
+The live-check goal remains open; the parity ledger records the remaining work.
+
+### Source-order regression follow-up
+
+The sync tracker could import a settled later message before an earlier first
+import that was still changing. A source-order barrier now holds later items
+until that earlier item settles. Edits to already imported messages retain their
+existing position and do not block later first deliveries. Both cases pass
+synthetic regressions. This does not establish native client ordering for older
+history first observed after newer messages were already imported.
+
+Full check after the source-order fix passed: 183 JS/TS tests, TypeScript,
+Go tests/build and formatting. Live diagnostics remain stale at version 0.8.2.

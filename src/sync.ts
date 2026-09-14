@@ -214,6 +214,7 @@
         this.initialized = true;
       }
       const ready: { message: Muse.Message; source: Muse.Source }[] = [];
+      let waitingForEarlierMessage = false;
       for (let i = 0; i < items.length; i++) {
         const message = items[i]!,
           source = sources[i]!;
@@ -231,9 +232,19 @@
         // long-running Muse task must not hold up settled earlier messages.
         const streaming =
           view.busy && message.role === 'assistant' && i === items.length - 1;
-        if (!streaming && this.now() - candidate.at >= 4000)
+        if (
+          !waitingForEarlierMessage &&
+          !streaming &&
+          this.now() - candidate.at >= 4000
+        )
           ready.push({ message, source });
-        else this.current.waiting++;
+        else {
+          this.current.waiting++;
+          // A first delivery establishes timeline position. Later items must
+          // not overtake it while it settles. An edit to an already imported
+          // item keeps its original position and need not block new messages.
+          if (!this.seen.has(source.id)) waitingForEarlierMessage = true;
+        }
       }
       for (let i = 0; i < ready.length; i += 1) {
         if (!active()) return;
