@@ -3,7 +3,7 @@ module github.com/nishu-builder/beeper-muse
 go 1.26.0
 
 require (
-	github.com/mattn/go-sqlite3 v1.14.49
+	github.com/mattn/go-sqlite3 v1.14.52
 	go.mau.fi/util v0.10.0
 	golang.org/x/net v0.58.0
 	maunium.net/go/mautrix v0.30.0
