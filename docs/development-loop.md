@@ -48,7 +48,7 @@ npm run dev:doctor
 npm run dev:cycle
 ```
 
-`dev:doctor` sends nothing. It checks target identity, chat-scoped message search,
+`dev:doctor` sends nothing. It checks target identity, per-chat retrieval, chat-scoped message search,
 log freshness, exact running build fingerprint, connection state, empty composer
 and outstanding work. It saves a sanitized report in `.local/dev-doctor.json`.
 Missing logging, a stale build, a draft or an interrupted job stops a test before
@@ -127,11 +127,17 @@ another running test's lock to make progress.
 
 ## Evidence boundaries
 
-The driver uses `/v1/chats`, `/v1/messages/search`, `/v1/assets/upload/base64` and
+The driver uses `/v1/chats`, `/v1/chats/{chatID}`, `/v1/messages/search`,
+`/v1/assets/upload/base64` and
 `/v1/chats/{chatID}/messages`, following the
 [Beeper Desktop SDK](https://github.com/beeper/desktop-api-js). On the development
 installation, the ordinary chat-detail/message-list endpoints return HTTP 500;
-chat-scoped search works and is limited to 20 results per page. The driver rejects
+chat-scoped search works and is limited to 20 results per page. A new send
+requires successful per-chat retrieval and matching participants before uploading
+or submitting anything. This catches the known failure without treating listing
+as send readiness. It cannot guarantee that a subsequent send will succeed.
+Read-only observation of an existing test can still use search while retrieval
+fails. The driver rejects
 truncated search results instead of declaring success from incomplete evidence.
 
 A live report distinguishes the Muse reply from native delivery confirmation.

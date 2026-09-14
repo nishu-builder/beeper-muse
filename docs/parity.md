@@ -10,14 +10,16 @@ The product remains Chrome-only. Maintainer test tools are optional.
 
 ## Current priorities
 
-1. Complete the live iteration loop. Fresh 0.8.8 diagnostics now confirm the exact
-   build, both connections, an idle composer and an empty queue. The first Desktop
-   API text test returned HTTP 500; its send record is retained and must not be
-   replayed. Resolve the Desktop send/get-chat failure before the photo cycle.
-2. Verify incoming photo delivery. The current live queue has no held or queued
-   jobs; the earlier photo's outcome is unknown. No job was dismissed by this
-   agent. Fresh readiness finds one composer file input but no recognized image
-   input; 0.8.9 expands standard accept-filter handling without guessing selectors.
+1. Complete the live iteration loop. The chosen log confirmed 0.8.9 but stopped
+   at 22:04:35 UTC. The user subsequently connected Muse; current Desktop account
+   status is connected, but source readiness and queue counts need fresh evidence.
+   Desktop get-chat still returns HTTP 500 for canonical and local identifiers.
+   The earlier send record remains open; do not replay it. Resolve that API failure
+   and restore diagnostic updates before the photo cycle.
+2. Verify incoming photo delivery. The last fresh queue had no held or queued
+   jobs; current counts and the earlier photo's outcome are unknown. No job was
+   dismissed by this agent. Earlier readiness found one composer file input but
+   no recognized image input; 0.8.9 expands standard accept-filter handling.
 3. Verify the new Babar avatar synchronization and diagnose missing typing indicators.
 4. Verify both-direction photos and native delivery status end to end.
 5. Work through the rendering/type inventory below; inspect actual source support
@@ -242,3 +244,24 @@ During the automatic update attempt, the chosen log stopped advancing again afte
 are unverified. A fresh connection-page status is needed to distinguish lost file
 permission from a stopped or duplicate connection document. Do not treat the last
 healthy snapshot as current readiness.
+
+## September 14 follow-up: Desktop send preflight
+
+The selected export confirmed the exact 0.8.9 build after file permission was
+renewed, then stopped at 22:04:35 UTC. The user's subsequent Muse connection is
+not yet visible in that export. Current Desktop account status is connected.
+Do not interpret old source-disconnected state or queue counts as current.
+
+Both the canonical chat ID and the local ID returned by chat listing produce
+HTTP 500 from get-chat. Read-only inspection of the installed Desktop code shows
+that get-chat and send use per-chat platform calls, whereas listing/search have
+other retrieval paths. This narrows the failure but does not establish its root
+cause. No installed app code was changed.
+
+The development driver now checks per-chat retrieval and pinned identity before
+any test upload/send. Its doctor reports this prerequisite separately; read-only
+observation remains available when that prerequisite fails. Synthetic regression
+tests cover working listing with failing retrieval, changed participants, wrong
+chat, malformed responses and read-only rooms. The live doctor detects this
+installation's failure without sending. Photo delivery, avatar and typing remain
+open; the earlier uncertain test journal is retained.

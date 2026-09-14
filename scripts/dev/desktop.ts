@@ -21,6 +21,22 @@ export function object(value: unknown): Record<string, unknown> {
     throw new DevError('Invalid Desktop API response.');
   return value as Record<string, unknown>;
 }
+function verifyChat(chat: Record<string, unknown>, target: Target) {
+  const members = object(chat.participants).items;
+  if (
+    chat.id !== target.chatID ||
+    chat.isReadOnly ||
+    !Array.isArray(members) ||
+    members.length !== 2 ||
+    !members.some((m) => object(m).id === target.botID) ||
+    !members.some(
+      (m) => object(m).id === target.ownerID && object(m).isSelf === true,
+    )
+  )
+    throw new DevError(
+      'Pinned chat does not match the expected owner and Muse bot.',
+    );
+}
 export class Desktop {
   constructor(
     private token: string,
@@ -66,19 +82,7 @@ export class Desktop {
       if (!Array.isArray(data.items)) throw new DevError('Invalid chat list.');
       const chat = data.items.map(object).find((c) => c.id === target.chatID);
       if (chat) {
-        const members = object(chat.participants).items;
-        if (
-          chat.isReadOnly ||
-          !Array.isArray(members) ||
-          members.length !== 2 ||
-          !members.some((m) => object(m).id === target.botID) ||
-          !members.some(
-            (m) => object(m).id === target.ownerID && object(m).isSelf === true,
-          )
-        )
-          throw new DevError(
-            'Pinned chat does not match the expected owner and Muse bot.',
-          );
+        verifyChat(chat, target);
         return;
       }
       if (
@@ -90,6 +94,20 @@ export class Desktop {
       cursor = data.oldestCursor;
     }
     throw new DevError('Pinned Muse chat was not found. No messages sent.');
+  }
+  async verifySendPath(target: Target) {
+    // Listing/search can work while Desktop's per-chat platform calls fail.
+    // This read detects that condition; it is not a delivery guarantee.
+    try {
+      const chat = await this.request(
+        '/chats/' + encodeURIComponent(target.chatID),
+      );
+      verifyChat(chat, target);
+    } catch {
+      throw new DevError(
+        'Desktop could not open the pinned Muse chat for sending. No test was sent. Chat listing alone does not establish readiness.',
+      );
+    }
   }
   async messages(target: Target, after: number): Promise<Message[]> {
     const query = new URLSearchParams({

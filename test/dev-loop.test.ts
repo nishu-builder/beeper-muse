@@ -20,6 +20,13 @@ const target: Target = {
   ownerID: '@owner:example',
   botID: '@bot:example',
 };
+const pinnedChat = () => ({
+  id: target.chatID,
+  isReadOnly: false,
+  participants: {
+    items: [{ id: target.botID }, { id: target.ownerID, isSelf: true }],
+  },
+});
 function health() {
   return {
     at: Date.now(),
@@ -111,7 +118,8 @@ test('Desktop credentials stay on loopback; response bodies and tokens are never
 test('send journal precedes all mutations and an ambiguous response cannot be retried', async () => {
   const run = newRun(target, 'image');
   const sequence: string[] = [];
-  const client = new Desktop('synthetic', async (input) => {
+  const client = new Desktop('synthetic', async (input, init) => {
+    if (init?.method === 'GET') return Response.json(pinnedChat());
     sequence.push(String(input).includes('upload') ? 'upload' : 'send');
     if (String(input).includes('upload'))
       return Response.json({ uploadID: 'fixture' });
@@ -132,7 +140,8 @@ test('send journal precedes all mutations and an ambiguous response cannot be re
 });
 test('failed journal persistence prevents network mutations', async () => {
   let calls = 0;
-  const client = new Desktop('synthetic', async () => {
+  const client = new Desktop('synthetic', async (_input, init) => {
+    if (init?.method === 'GET') return Response.json(pinnedChat());
     calls++;
     return Response.json({});
   });
@@ -142,6 +151,59 @@ test('failed journal persistence prevents network mutations', async () => {
     }),
   );
   assert.equal(calls, 0);
+});
+test('working chat listing cannot authorize a send when per-chat lookup fails', async () => {
+  const paths: string[] = [];
+  const client = new Desktop('synthetic', async (input, init) => {
+    assert.equal(init?.method, 'GET');
+    const path = new URL(String(input)).pathname;
+    paths.push(path);
+    if (path === '/v1/chats') return Response.json({ items: [pinnedChat()] });
+    if (path === '/v1/messages/search')
+      return Response.json({ items: [], hasMore: false });
+    return new Response('PRIVATE internal error', { status: 500 });
+  });
+  await client.verify(target);
+  assert.deepEqual(await client.messages(target, Date.now()), []);
+  const run = newRun(target, 'image');
+  let saves = 0;
+  await assert.rejects(
+    sendOnce(client, run, async () => {
+      saves++;
+    }),
+    /No test was sent/,
+  );
+  assert.equal(run.phase, 'prepared');
+  assert.equal(saves, 0);
+  assert.deepEqual(paths, [
+    '/v1/chats',
+    '/v1/messages/search',
+    '/v1/chats/' + encodeURIComponent(target.chatID),
+  ]);
+});
+test('send preflight rejects changed identity, read-only and malformed chat details', async () => {
+  for (const chat of [
+    { ...pinnedChat(), id: 'another-chat' },
+    { ...pinnedChat(), isReadOnly: true },
+    { ...pinnedChat(), participants: { items: [{ id: target.botID }] } },
+    {
+      ...pinnedChat(),
+      participants: {
+        items: [{ id: target.botID }, { id: target.ownerID, isSelf: false }],
+      },
+    },
+    {},
+  ]) {
+    const client = new Desktop('synthetic', async (_input, init) => {
+      assert.equal(init?.method, 'GET');
+      return Response.json(chat);
+    });
+    await assert.rejects(client.verifySendPath(target), /No test was sent/);
+  }
+  const client = new Desktop('synthetic', async () =>
+    Response.json(pinnedChat()),
+  );
+  await client.verifySendPath(target);
 });
 test('reply, native delivery and image evidence are independent; old/foreign/duplicate messages cannot pass', () => {
   const run = newRun(target, 'image');
