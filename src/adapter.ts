@@ -28,9 +28,16 @@
   };
   function cleanContent(element: Element, role: Muse.Role): Element {
     const clone = element.cloneNode(true) as Element;
+    clone.querySelectorAll('button').forEach((button) => {
+      if (
+        button.querySelector('img') ||
+        (button.closest('.prose') && !button.hasAttribute('aria-label'))
+      )
+        button.replaceWith(...button.childNodes);
+    });
     clone
       .querySelectorAll(
-        'button,script,style,svg,iframe,object,form,input,textarea,[aria-hidden="true"],[role="status"],[role="toolbar"],[role="progressbar"],.reactions,[data-reaction],[data-message-status]',
+        'button,[data-message-accessibility-surrogate],[aria-label^="Assistant reaction:"],script,style,svg,iframe,object,form,input,textarea,[aria-hidden="true"],[role="status"],[role="toolbar"],[role="progressbar"],.reactions,[data-reaction],[data-message-status]',
       )
       .forEach((n) => n.remove());
     if (role === 'user')
@@ -108,7 +115,7 @@
         images: true,
         formatting: true,
         timestamps: true,
-        reactions: false,
+        reactions: true,
         readReceipts: false,
       },
       snapshot: () => snapshot(document),
@@ -128,6 +135,34 @@
       .forEach((n) => n.after(element.ownerDocument.createTextNode('\n')));
     return (clone.textContent || '').trim();
   }
+  function reactions(element: Element): Muse.Reaction[] | undefined {
+    const result: Muse.Reaction[] = [];
+    if (element.querySelector('.reactions,[data-reaction]')) return undefined;
+    for (const node of element.querySelectorAll('[aria-label]')) {
+      const label = node.getAttribute('aria-label') || '';
+      const assistant =
+        node.getAttribute('role') === 'img' &&
+        label.match(/^Assistant reaction: (.+)$/u);
+      const self =
+        node.tagName === 'BUTTON' &&
+        node.getAttribute('aria-pressed') === 'true' &&
+        node.getAttribute('data-pel-click') === 'reaction_remove' &&
+        label.match(/^Remove (.+) reaction$/u);
+      const match = assistant || self;
+      const key = match ? match[1]?.trim() : undefined;
+      if (key && Array.from(key).length <= 64) {
+        const actor = assistant ? 'assistant' : 'user';
+        if (!result.some((r) => r.actor === actor && r.key === key))
+          result.push({ actor, key });
+      } else if (/reaction:|^Remove .+ reaction$/i.test(label)) {
+        // Unknown markup is not an authoritative empty reaction set.
+        return undefined;
+      }
+    }
+    return result.sort((a, b) =>
+      (a.actor + a.key).localeCompare(b.actor + b.key),
+    );
+  }
   function snapshot(document: Document): Muse.Snapshot {
     const logs = [
       ...document.querySelectorAll('[role="log"][aria-label="Chat messages"]'),
@@ -146,7 +181,25 @@
         const id = e.getAttribute('data-message-id');
         const role = e.getAttribute('data-message-role');
         if (!id || (role !== 'user' && role !== 'assistant')) return [];
-        const bubble = e.querySelector('.hatch-chat-groupable-bubble') || e;
+        const rendered = e.querySelector('.hatch-chat-groupable-bubble');
+        const surrogate = e.querySelector(
+          '[data-message-accessibility-surrogate="true"]',
+        );
+        if (!rendered && surrogate) {
+          const prefix =
+            role === 'user' ? 'User message: ' : 'Assistant message: ';
+          const raw = surrogate.textContent || '';
+          return [
+            {
+              id,
+              role,
+              text: raw.startsWith(prefix) ? raw.slice(prefix.length) : raw,
+              partial: true,
+              widget: false,
+            },
+          ];
+        }
+        const bubble = rendered || e;
         const clean = cleanContent(bubble, role);
         const images: Muse.Image[] = [...clean.querySelectorAll('img[src]')]
           .slice(0, 4)
@@ -172,7 +225,8 @@
             : NaN;
         clean.querySelectorAll('img').forEach((n) => n.remove());
         const widget =
-          e.getAttribute('data-message-has-presentation') === 'true';
+          e.getAttribute('data-message-has-presentation') === 'true' &&
+          !bubble.querySelector('.prose');
         return [
           {
             id,
@@ -180,6 +234,7 @@
             text: text(bubble, role),
             html: clean.innerHTML.slice(0, 128000),
             images,
+            reactions: reactions(e),
             ...(Number.isFinite(timestampMs) &&
             timestampMs >= 946684800000 &&
             timestampMs <= Date.now() + 300000

@@ -45,7 +45,7 @@ async function tabReport(tabID, type = 'probe') {
   try {
     const result = await chrome.tabs.sendMessage(tabID, { type });
     if (
-      result?.protocol === 5 &&
+      result?.protocol === 6 &&
       ['ready', 'busy', 'draft', 'unavailable'].includes(result.health)
     )
       return {
@@ -175,6 +175,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
           museSync: status.museSync === true,
           sourceProtocol: status.sourceProtocol,
           activitySync: status.activitySync,
+          partialSync: status.partialSync,
           historyMode: settings.historyMode || 'recent',
           imported: sync.imported || 0,
           syncError: sync.syncError || false,

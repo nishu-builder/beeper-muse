@@ -45,6 +45,7 @@
       .map((m) => ({
         id: m.id,
         role: m.role,
+        partial: m.partial,
         html: m.html ? Array.from(m.html).slice(0, 32000).join('') : undefined,
         images: m.images,
         timestampMs: m.timestampMs,
@@ -60,6 +61,7 @@
     const bytes = new TextEncoder().encode(
       JSON.stringify([
         message.role,
+        message.partial === true,
         message.text,
         message.html || '',
         (message.images || []).map(({ url, alt }) => ({ url, alt })),
@@ -201,7 +203,10 @@
           source = sources[i]!;
         if (this.excluded.has(source.id)) continue;
         this.current.eligible++;
-        if (this.seen.get(source.id) === source.hash) {
+        if (
+          this.seen.get(source.id) === source.hash ||
+          (message.partial && this.seen.has(source.id))
+        ) {
           this.current.checked++;
           continue;
         }

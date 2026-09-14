@@ -23,6 +23,8 @@ declare namespace Muse {
     images?: Image[];
     timestampMs?: number;
     observedAtMs?: number;
+    /** Incomplete text fallback: may create missing history, never overwrite a known message. */
+    partial?: boolean;
     historical?: boolean;
     read?: boolean;
     reactions?: Reaction[];

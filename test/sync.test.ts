@@ -256,3 +256,21 @@ test('older messages loaded by scrolling remain silent history; new-only ignores
     else assert.equal(imported?.historical, true);
   }
 });
+
+test('partial history can be upgraded but never replaces a known rich snapshot', async () => {
+  const h = harness();
+  const partial = { ...message('a'), partial: true };
+  const full = {
+    ...message('a'),
+    html: '<strong>Synthetic answer</strong>',
+    reactions: [],
+  };
+  for (const m of [partial, full, partial, full]) {
+    await h.tracker.sync(view(m), 'all', () => true);
+    h.tick();
+    await h.tracker.sync(view(m), 'all', () => true);
+  }
+  assert.equal(h.sent.length, 2);
+  assert.equal((h.sent[0] as typeof partial).partial, true);
+  assert.equal((h.sent[1] as typeof full).html, full.html);
+});

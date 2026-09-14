@@ -38,7 +38,7 @@ func Handler(q *Queue, token, host string, callbacks ...Callbacks) http.Handler 
 				http.Error(w, `{"error":"unavailable"}`, 503)
 				return
 			}
-			reply(map[string]any{"phase": s.Phase, "queued": s.Queued, "museSync": handlers.Import != nil, "sourceProtocol": 2, "activitySync": handlers.Activity != nil})
+			reply(map[string]any{"phase": s.Phase, "queued": s.Queued, "museSync": handlers.Import != nil, "sourceProtocol": 2, "partialSync": true, "activitySync": handlers.Activity != nil})
 			return
 		}
 		if r.Method != http.MethodPost || !strings.EqualFold(r.Header.Get("Content-Type"), "application/json") {

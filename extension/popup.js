@@ -64,7 +64,7 @@ async function refresh() {
       'Sign in to Muse and open its main chat, then connect again.';
   else if (
     result.connected &&
-    (!result.museSync || result.sourceProtocol !== 2)
+    (!result.museSync || result.sourceProtocol !== 2 || !result.partialSync)
   )
     status.textContent =
       'Update and restart the local bridge to enable catch-up and new Muse messages.';

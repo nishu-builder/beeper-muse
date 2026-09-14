@@ -188,7 +188,7 @@
   chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     if (message.type === 'probe') {
       respond({
-        protocol: 5,
+        protocol: 6,
         health: health(),
         progress: tracker.progress,
         rescanning: rescanPending,
@@ -206,14 +206,14 @@
       generation++;
       void reportActivity(null);
       guardClosing(false);
-      respond({ protocol: 5 });
+      respond({ protocol: 6 });
     }
     if (message.type === 'start') {
       stopped = false;
       tracker = new BeeperMuseSync.Tracker(send, undefined, muse.prepare);
       const state = health();
       guardClosing(state !== 'unavailable');
-      respond({ protocol: 5, health: state });
+      respond({ protocol: 6, health: state });
       void poll();
     }
   });

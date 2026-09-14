@@ -48,7 +48,7 @@ account directly; enabling the Beeper Desktop local API is not necessary.
 
 ## 3. Install the Chrome extension
 
-The current source includes version 0.5.2. Until that version is released, use
+The current source includes version 0.5.3. Until that version is released, use
 **From source** below and rebuild the bridge for catch-up and automatic popups.
 Version 0.3.0 is pending Chrome Web Store review as of September 13, 2026.
 Until it is approved, choose one of these:
@@ -192,7 +192,7 @@ exposes an absolute machine-readable time; otherwise the capture time is used.
 Already imported messages keep their existing position in the Beeper timeline.
 
 After updating an unpacked extension, reload it in `chrome://extensions` **and
-refresh the Muse webpage**, then reconnect. Version 0.5.2 still requires the
+refresh the Muse webpage**, then reconnect. Version 0.5.3 still requires the
 local bridge. The extension-only runtime is described in
 [browser-runtime.md](browser-runtime.md); it is not shipped yet.
 
@@ -205,9 +205,17 @@ both the 0.5.2 extension and the updated bridge; update and restart the bridge
 as well as reloading the extension and Muse page. Your draft text is never sent
 as typing activity.
 
-Reactions are **not captured from the Muse page yet**. The bridge can map an
-explicit source reaction to a native Matrix reaction, but the browser adapter
-still cannot identify the actor reliably. It does not turn acknowledgment text
-into reactions or read receipts. Outgoing reactions from Beeper are also not
-supported. These limits are independent of whether the bridge runs natively or
-inside Chrome.
+Version 0.5.3 captures Muse's explicit assistant reaction labels and your selected
+reaction controls. They appear as native reactions from the corresponding sender;
+removing a reaction in Muse removes it in Beeper. Scroll a message into view in
+Muse to expose its current reaction state. Offscreen text placeholders do not
+contain reactions or media, and never clear already imported content.
+
+Reload both the extension and Muse after updating and restarting the bridge.
+Catch-up can import text from offscreen placeholders; rendering those messages
+later upgrades their formatting and attachments. Original timestamps are still
+unavailable when Muse does not expose an absolute time.
+
+Outgoing reactions from Beeper and source read receipts are not supported.
+Acknowledgment text does not become a reaction or a read receipt. These limits
+are independent of whether the bridge runs natively or inside Chrome.

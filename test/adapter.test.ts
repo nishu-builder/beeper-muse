@@ -220,3 +220,52 @@ test('an image-only answer completes capture and retains the attachment', () => 
   assert.equal(view.messages[1].images[0].url, 'https://example.com/shape.png');
   f.dom.window.close();
 });
+
+test('verified reaction labels preserve actors and removals without leaking into message text', () => {
+  const f = fixture();
+  const log = f.document.querySelector('[role="log"]')!;
+  log.innerHTML = `<div data-message-item data-message-id="a" data-message-role="assistant"><div class="hatch-chat-groupable-bubble"><p>Answer</p></div><span role="img" aria-label="Assistant reaction: &#128077;"></span><button aria-pressed="true" data-pel-click="reaction_remove" aria-label="Remove &#128077; reaction">Remove</button></div>`;
+  let m = f.adapter.snapshot(f.document).messages[0];
+  assert.deepEqual(JSON.parse(JSON.stringify(m.reactions)), [
+    { actor: 'assistant', key: '\u{1f44d}' },
+    { actor: 'user', key: '\u{1f44d}' },
+  ]);
+  assert.equal(m.text, 'Answer');
+  log.querySelector('button')!.remove();
+  assert.equal(f.adapter.snapshot(f.document).messages[0].reactions.length, 1);
+  log.querySelector('span')!.remove();
+  assert.equal(f.adapter.snapshot(f.document).messages[0].reactions.length, 0);
+  log.firstElementChild!.insertAdjacentHTML(
+    'beforeend',
+    '<span role="img" aria-label="Someone reaction: unknown"></span>',
+  );
+  assert.equal(f.adapter.snapshot(f.document).messages[0].reactions, undefined);
+  f.dom.window.close();
+});
+
+test('virtualized history removes only its generated transcript prefix and stays incomplete', () => {
+  const f = fixture();
+  f.document.querySelector('[role="log"]')!.innerHTML =
+    `<div data-message-item data-message-id="u" data-message-role="user" data-message-has-presentation="true"><div class="opacity-0"><div style="height:150px"></div></div><span data-message-accessibility-surrogate="true" class="sr-only">User message: User message: keep my words</span></div>`;
+  const m = f.adapter.snapshot(f.document).messages[0];
+  assert.equal(m.text, 'User message: keep my words');
+  assert.equal(m.partial, true);
+  assert.equal(m.widget, false);
+  assert.equal(m.html, undefined);
+  assert.equal(m.images, undefined);
+  assert.equal(m.reactions, undefined);
+  f.dom.window.close();
+});
+
+test('media buttons and inline product names survive while choices remain inert', () => {
+  const f = fixture();
+  f.document.querySelector('[role="log"]')!.innerHTML =
+    `<div data-message-item data-message-id="a" data-message-role="assistant" data-message-has-presentation="true"><div class="hatch-chat-groupable-bubble"><div class="prose"><p>See <button data-pel-click="mention">Sample product</button>.</p></div><button aria-label="Open browser preview"><img src="/preview.png" alt="Preview"></button><button>Approve purchase</button></div></div>`;
+  const m = f.adapter.snapshot(f.document).messages[0];
+  assert.equal(m.widget, false);
+  assert.match(m.text, /See Sample product/);
+  assert.doesNotMatch(m.text, /Approve/);
+  assert.doesNotMatch(m.html, /button|data-pel/);
+  assert.equal(m.images[0].url, 'https://muse.ai/preview.png');
+  f.dom.window.close();
+});
