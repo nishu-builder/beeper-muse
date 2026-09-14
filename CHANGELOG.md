@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.14
+
+- Read all top-level bubbles in each Muse message. Photo and caption surfaces now
+  stay together, and nested bubbles are not duplicated.
+- Cover the observed image-first, caption-second layout that still failed reply
+  matching in 0.8.13.
+
 ## 0.8.13
 
 - Include user photo attachments rendered beside their caption bubble, using the

@@ -873,3 +873,38 @@ test('captioned user photos include sibling media controls without importing nea
   );
   f.dom.window.close();
 });
+
+test('photo media and caption bubbles are read together exactly once in source order', () => {
+  const f = fixture();
+  f.document.querySelector('[role="log"]')!.insertAdjacentHTML(
+    'beforeend',
+    `
+ <div data-message-item data-message-id="photo" data-message-role="user">
+ <button class="hatch-chat-groupable-bubble" data-pel-click="chat_media_click"><img src="blob:https://muse.ai/photo" alt="renamed.png"></button>
+ <div class="hatch-chat-groupable-bubble"><span class="sr-only" data-copy-exclude="true">You:</span><p>Inspect this photo.</p></div></div>
+ <div data-message-item data-message-id="reply" data-message-role="assistant">
+ <div class="hatch-chat-groupable-bubble"><p>First paragraph.</p><div class="hatch-chat-groupable-bubble">Nested text.</div></div>
+ <div class="hatch-chat-groupable-bubble">Second paragraph.</div></div>`,
+  );
+  const view = f.adapter.snapshot(f.document);
+  const photo = view.messages.find((m: { id: string }) => m.id === 'photo');
+  assert.equal(photo.text, 'Inspect this photo.');
+  assert.equal(photo.images.length, 1);
+  assert.equal(photo.images[0].url, 'blob:https://muse.ai/photo');
+  const reply = view.messages.at(-1);
+  assert.equal((reply.text.match(/Nested text/g) || []).length, 1);
+  assert.ok(
+    reply.text.indexOf('First paragraph.') <
+      reply.text.indexOf('Second paragraph.'),
+  );
+  assert.equal(
+    f.adapter.responseAfter(
+      new Set(['old']),
+      'Inspect this photo.',
+      view,
+      'original.png',
+    ),
+    reply.text,
+  );
+  f.dom.window.close();
+});

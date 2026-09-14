@@ -409,3 +409,16 @@ Native success remains unverified; no resend or post-photo text was sent.
 Synthetic regression tests for 0.8.13 cover owned sibling media, renamed image
 labels, unchanged captions, excluded decoration, delayed media evidence and
 rejection of unrelated prompts. The original submitted job remains held.
+
+## Image-first multi-bubble regression (0.8.14)
+
+The next 0.8.13 test submitted its image, and browser inspection verified the
+correct uniquely marked photo and color response. Native failure occurred at
+reply-attribution again. The media button and caption each carry the bubble class;
+the parser selected only the first, dropping the caption. Version 0.8.14 reads
+all top-level surfaces once. Its regression uses that observed structure and
+checks nested deduplication and ordered assistant text. No failed prompt was
+replayed or following text sent; native SUCCESS remains pending live verification.
+
+Read-only Desktop observation confirmed that this test's correct reply also
+returned to Beeper (roundTrip=true). Native failure remains; it was not resent.
