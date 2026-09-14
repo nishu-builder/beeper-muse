@@ -354,7 +354,7 @@ test('readiness probes expose no draft or chat text', () => {
   ] as const) {
     h.view(view);
     const probe = h.signal('probe');
-    assert.equal(probe.protocol, 17);
+    assert.equal(probe.protocol, 18);
     assert.equal(probe.health, health);
     assert.deepEqual(Object.keys(probe).sort(), [
       'active',

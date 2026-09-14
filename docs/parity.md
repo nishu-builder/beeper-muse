@@ -15,13 +15,12 @@ The product remains Chrome-only. Maintainer test tools are optional.
    the 0.8.10 status fix, that same test also reports native delivery. Automatic
    reload, diagnostic-file retention and selected-tab recovery were verified
    during the 0.8.10 → 0.8.11 update; the held photo job stayed held.
-2. Finish photo confirmation. A fresh 0.8.12 image was submitted and Muse returned
-   the correct undisclosed test color, verified through live browser inspection.
-   The bridge incorrectly rejected its caption because the image was a sibling
-   outside that text bubble. Version 0.8.13 parses that media control and waits
-   for delayed image evidence. The correct reply returned to Beeper through sync.
-   Native success and post-photo text remain open;
-   the already submitted test is held and must not be replayed.
+2. Finish native photo confirmation. Two submitted photos received correct
+   undisclosed test-color replies, but reply matching still failed in 0.8.13.
+   Live inspection established that the media button and caption are both
+   top-level bubble surfaces. Version 0.8.14 reads both, with an exact synthetic
+   layout regression. Native SUCCESS and post-photo text remain unverified;
+   the newest already submitted test is held and must not be replayed.
 3. Verify the new Babar avatar synchronization and diagnose missing typing indicators.
 4. Verify both-direction photos and native delivery status end to end.
 5. Work through the rendering/type inventory below; inspect actual source support
@@ -385,3 +384,22 @@ image-only avatar selector therefore cannot find it. Next: support a bounded,
 cached still frame from the uniquely identified current avatar, preserve original
 image support, and verify the resulting native chat avatar. Do not infer typing
 from avatar animation. No avatar implementation is claimed by this entry.
+
+## September 14 follow-up: image-first message surfaces (0.8.14)
+
+After confirmed dismissal and a clear queue, one new 0.8.13 photo reached Send
+but failed reply-attribution. Live browser inspection again showed the exact
+marked photo caption and correct undisclosed RED answer. The 0.8.13 fix was
+incomplete: the media button itself has the same bubble class as the caption,
+so selecting the first bubble found the image but omitted the prompt text.
+No resend or following text was attempted; the submitted test is held.
+
+Version 0.8.14 collects all owned top-level bubble surfaces in DOM order. Nested
+surfaces are not counted twice. The regression reproduces the observed media
+button first and caption div second, plus nested and multiple assistant bubbles.
+The prior sibling-media regression remains in place. Actual native SUCCESS and
+post-photo text acceptance still require a fresh live test after safe dismissal;
+passing synthetic coverage alone does not close REL-01/REL-03.
+
+Read-only Desktop observation confirmed that this test's correct reply also
+returned to Beeper (roundTrip=true). Native failure remains; it was not resent.

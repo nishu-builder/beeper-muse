@@ -377,11 +377,18 @@
         const id = e.getAttribute('data-message-id');
         const role = e.getAttribute('data-message-role');
         if (!id || (role !== 'user' && role !== 'assistant')) return [];
-        const rendered = e.querySelector('.hatch-chat-groupable-bubble');
+        const rendered = [
+          ...e.querySelectorAll('.hatch-chat-groupable-bubble'),
+        ].filter(
+          (node) =>
+            node.closest('[data-message-item]') === e &&
+            !node.parentElement?.closest('.hatch-chat-groupable-bubble'),
+        );
+
         const surrogate = e.querySelector(
           '[data-message-accessibility-surrogate="true"]',
         );
-        if (!rendered && surrogate) {
+        if (!rendered.length && surrogate) {
           const prefix =
             role === 'user' ? 'User message: ' : 'Assistant message: ';
           const raw = surrogate.textContent || '';
@@ -395,7 +402,14 @@
             },
           ];
         }
-        const bubble = rendered || e;
+        // A captioned photo has two sibling bubbles: media, then text. Read
+        // every top-level surface once instead of dropping everything after it.
+        let bubble: Element = rendered[0] || e;
+        if (rendered.length > 1) {
+          bubble = document.createElement('div');
+          for (const surface of rendered)
+            bubble.append(cleanContent(surface, role));
+        }
         const clean = cleanContent(bubble, role);
         // User attachments can sit beside their caption bubble. Only include
         // the observed media control owned by this message, never nearby cards.
