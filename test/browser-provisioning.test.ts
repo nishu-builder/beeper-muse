@@ -91,3 +91,28 @@ test('foreign identities, malformed requests and unsupported writes fail explici
   }
   assert.equal(calls, 1);
 });
+
+test('account discovery reports current source availability instead of unconditional Connected', async () => {
+  const { SourceConnectionHealth } =
+    await import('../browser-runtime/runtime/source-connection.ts');
+  const health = new SourceConnectionHealth();
+  const api = new MatrixAPI(config, async () =>
+    Response.json({ user_id: config.owner }),
+  );
+  const state = async () =>
+    JSON.parse(
+      await provisioningResponse(request('whoami'), api, () =>
+        health.state(config.owner),
+      ),
+    ).data.body.logins[0];
+  assert.equal((await state()).state_event, 'TRANSIENT_DISCONNECT');
+  health.observe(true);
+  assert.equal((await state()).state_event, 'CONNECTED');
+  health.observe(false);
+  const disconnected = await state();
+  assert.equal(disconnected.state_event, 'TRANSIENT_DISCONNECT');
+  assert.equal(
+    disconnected.state.message,
+    'Muse is disconnected. Open Chrome and connect your Muse tab.',
+  );
+});

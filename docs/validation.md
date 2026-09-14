@@ -241,3 +241,20 @@ history first observed after newer messages were already imported.
 
 Full check after the source-order fix passed: 183 JS/TS tests, TypeScript,
 Go tests/build and formatting. Live diagnostics remain stale at version 0.8.2.
+
+### Native source connection status (0.8.6)
+
+Synthetic tests cover selected-tab/protocol/active-source checks, disconnected,
+draft and busy states, stale evidence, backward clock movement, hung probes,
+late responses after detach, nonoverlapping probes, current provisioning state
+and transport heartbeats not renewing stale source status. Content-script probes
+expose only fixed health and active state, not drafts or conversation content.
+The native payload matches the installed mautrix bridgev2 status schema.
+
+No live offline banner, server-side TTL expiration or mobile/desktop recovery has
+been verified. Browser inspection still fails with `Debugger unattached`; the
+chosen diagnostic export remains stale. No existing user job was dismissed or
+resent and no new conversation test was sent.
+
+Full validation passed with 190 JS/TS tests, TypeScript checks, Go tests/build
+and formatting. The extension package remains free of private registration data.

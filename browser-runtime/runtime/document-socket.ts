@@ -9,8 +9,6 @@ type State = 'connected' | 'disconnected' | 'conflict' | 'error';
 export class DocumentSocket {
   private port?: chrome.runtime.Port;
   private stopped = false;
-  private bridgeState?: BridgeState;
-  private stateSentAt = 0;
   private heartbeat?: ReturnType<typeof setInterval>;
   private timer?: ReturnType<typeof setTimeout>;
   constructor(
@@ -28,11 +26,6 @@ export class DocumentSocket {
     this.heartbeat = setInterval(() => {
       try {
         this.port?.postMessage({ type: 'pulse' });
-        if (this.bridgeState && Date.now() - this.stateSentAt >= 3600000)
-          this.publishBridgeState({
-            ...this.bridgeState,
-            timestamp: Math.floor(Date.now() / 1000),
-          });
       } catch {
         this.port?.disconnect();
       }
@@ -75,7 +68,6 @@ export class DocumentSocket {
     if (this.timer) clearTimeout(this.timer);
     this.port?.disconnect();
     this.port = port;
-    this.bridgeState = undefined;
     const send = (message: unknown) => {
       if (this.port !== port || this.stopped)
         throw Error('Connection tab closed.');
@@ -147,8 +139,6 @@ export class DocumentSocket {
   publishBridgeState(state: BridgeState) {
     if (!this.port || this.stopped) return;
     this.port.postMessage({ type: 'bridge-state', state });
-    this.bridgeState = state;
-    this.stateSentAt = Date.now();
   }
   async stop() {
     this.stopped = true;

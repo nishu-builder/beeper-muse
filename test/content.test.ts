@@ -354,9 +354,10 @@ test('readiness probes expose no draft or chat text', () => {
   ] as const) {
     h.view(view);
     const probe = h.signal('probe');
-    assert.equal(probe.protocol, 11);
+    assert.equal(probe.protocol, 12);
     assert.equal(probe.health, health);
     assert.deepEqual(Object.keys(probe).sort(), [
+      'active',
       'health',
       'progress',
       'protocol',
@@ -529,4 +530,14 @@ test('delivery confirmation waits for the matching source echo and a new Muse re
     h.messages.findIndex((m) => m.type === 'delivered') <
       h.messages.findIndex((m) => m.type === 'result'),
   );
+});
+
+test('source health distinguishes a stopped connector from an available composer', () => {
+  const h = harness();
+  assert.equal(h.signal('probe').active, false);
+  h.signal('start');
+  assert.equal(h.signal('probe').active, true);
+  h.signal('stop');
+  assert.equal(h.signal('probe').health, 'ready');
+  assert.equal(h.signal('probe').active, false);
 });

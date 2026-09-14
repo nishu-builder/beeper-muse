@@ -1,9 +1,18 @@
 # Changelog
 
+## 0.8.6
+
+- Report native Beeper connection status from fresh checks of the selected Muse
+  tab, including disconnected/stopped, discarded and unavailable source states.
+- Use the same source state for account discovery. Stop renewing stale Connected
+  status from socket heartbeats; use a 90-second expiry and bounded source probes.
+- Ignore delayed probes after disconnect or tab navigation. Record sanitized
+  source connection transitions for diagnostics.
+- Native client banners and offline expiry still need installed-app verification.
+
 ## 0.8.5
 
 - Preserve source order when an earlier first delivery is still settling.
-
 - Preserve known reactions when source observation is unknown; reject malformed
   observations without treating them as removals.
 - Give re-added reactions and reverted text/images fresh event IDs. Keep original

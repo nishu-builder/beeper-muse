@@ -235,3 +235,21 @@ redactions are journaled with deterministic transaction IDs alongside message
 events, before sending. Pending mutations finish before a newer observation is
 compared with saved state, including when that observation reverts to older text
 or re-adds a reaction whose removal had an uncertain response.
+
+## Source connection status
+
+The Beeper WebSocket being open does not mean Muse is available. A typed source
+probe checks the selected tab, main-chat URL, discard state, current content
+protocol, active connector and readable composer health. Source probes run every
+20 seconds with a five-second timeout. Detach, navigation and transport loss
+invalidate in-flight results. Busy and draft states remain connected; delivery
+confirmation is a separate state.
+
+Both native `bridge_status` and authenticated provisioning use this source health.
+Without fresh evidence, they report `TRANSIENT_DISCONNECT` and a reconnect message.
+In-memory evidence expires after 30 seconds, and transmitted native status uses a
+90-second TTL. Socket heartbeats never renew cached source health. Closing Chrome
+cannot guarantee a final packet, so Beeper must detect the lost transport or expire
+its last status. Server expiry and visible Desktop/mobile banners remain unverified.
+Source transitions use fixed `muse-connected` / `muse-disconnected` diagnostic codes;
+they contain no chat content or account identifiers.

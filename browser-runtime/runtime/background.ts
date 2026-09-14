@@ -3,7 +3,10 @@ import { Updates, localUpdate } from './updates.js';
 import { ensureMuseTab, isMuseURL, resumeTicket } from './muse-tab.js';
 declare const __BEEPER_MUSE_BUILD_ID__: string;
 import { ActivityPulse } from './activity-pulse.js';
-import { connectedBridgeState } from './bridge-metadata.js';
+import {
+  readSourceConnection,
+  SourceConnectionMonitor,
+} from './source-connection.js';
 import { BrowserBridge } from './bridge.js';
 import { configuration, type Configuration } from './matrix.js';
 import { startupFailure } from './diagnostics.js';
@@ -54,6 +57,39 @@ const log = new DiagnosticLog(
 );
 const museURL = isMuseURL;
 let lastTyping: { activity: Muse.Activity; at: number } | undefined;
+let lastSourceAvailable: boolean | undefined;
+const sourceConnection = new SourceConnectionMonitor(
+  () =>
+    readSourceConnection({
+      beeperConnected: () => phase === 'connected' && !!bridge,
+      selectedTab: async () => {
+        const { tabID } = await chrome.storage.session.get('tabID');
+        return typeof tabID === 'number' && Number.isInteger(tabID)
+          ? tabID
+          : undefined;
+      },
+      tab: (id) => chrome.tabs.get(id),
+      probe: (id) => chrome.tabs.sendMessage(id, { type: 'probe' }),
+    }),
+  (available) => {
+    if (available !== lastSourceAvailable) {
+      lastSourceAvailable = available;
+      void log.record(available ? 'muse-connected' : 'muse-disconnected');
+    }
+    bridge?.sourceConnection.observe(available);
+    if (phase === 'connected' && bridge) {
+      try {
+        socket?.publishBridgeState(
+          bridge.sourceConnection.state(bridge.api.config.owner),
+        );
+      } catch {
+        // The connection can close between the health probe and publication.
+        // Do not let a failed status update interrupt message recovery.
+      }
+    }
+  },
+);
+setInterval(() => void sourceConnection.tick(), 20000);
 async function start() {
   await secure;
   if (applyingUpdate) return;
@@ -102,9 +138,10 @@ async function start() {
           startup.stop();
           if (reason) failure = reason;
           phase = state;
+          sourceConnection.invalidate();
           void log.record('beeper-' + state);
           if (state === 'connected') {
-            socket?.publishBridgeState(connectedBridgeState(config.owner));
+            void sourceConnection.tick();
             failure = '';
             failures = 0;
             retryAt = 0;
@@ -142,6 +179,7 @@ async function start() {
 async function detach() {
   const { tabID } = await chrome.storage.session.get('tabID');
   await chrome.storage.session.remove('tabID');
+  sourceConnection.invalidate();
   if (bridge) await bridge.activity('idle').catch(() => {});
   if (typeof tabID === 'number')
     await chrome.tabs.sendMessage(tabID, { type: 'stop' }).catch(() => {});
@@ -211,7 +249,9 @@ async function report() {
     starting: !!starting,
     retrySeconds: Math.max(0, Math.ceil((retryAt - Date.now()) / 1000)),
     connected:
-      !!tabID && ['ready', 'busy', 'draft'].includes(String(tab.health)),
+      !!tabID &&
+      tab.active === true &&
+      ['ready', 'busy', 'draft'].includes(String(tab.health)),
     health: tab.health,
     progress: tab.progress,
     historyMode: historyMode || 'recent',
@@ -312,6 +352,7 @@ async function handle(
       await chrome.storage.local.set({ historyMode });
       await chrome.storage.session.set({ tabID: tab.id });
       await chrome.tabs.sendMessage(tab.id, { type: 'start' });
+      void sourceConnection.tick();
       return { ok: true };
     }
     if (message.type === 'rescan') {
@@ -502,6 +543,12 @@ chrome.runtime.onInstalled.addListener(() => {
       await restoreAfterUpdate();
     })
     .catch(() => {});
+});
+chrome.tabs.onUpdated.addListener((tabID, change) => {
+  if (change.status !== 'loading' && !change.url) return;
+  void chrome.storage.session.get('tabID').then((saved) => {
+    if (saved.tabID === tabID) sourceConnection.invalidate();
+  });
 });
 chrome.tabs.onRemoved.addListener((tabID) => {
   void chrome.storage.session.get('tabID').then((saved) => {

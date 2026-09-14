@@ -37,6 +37,8 @@ const events = new Set<string>([
   'reply-delivered',
   'job-dismissed',
   'beeper-connected',
+  'muse-connected',
+  'muse-disconnected',
   'beeper-disconnected',
   'beeper-error',
   'startup-failed',
