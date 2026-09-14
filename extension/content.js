@@ -75,7 +75,11 @@
     const active = () => !stopped && generation === current;
     try {
       if (!active()) throw new Error('Tab disconnected.');
-      const before = await muse.submit(job.prompt, wait, active);
+      if (job.image && !muse.submitImage)
+        throw Error('Muse image uploads are unavailable.');
+      const before = job.image
+        ? await muse.submitImage(job.prompt, job.image, wait, active)
+        : await muse.submit(job.prompt, wait, active);
       let stableSince = Date.now();
       let previous = '';
       const deadline = Date.now() + 25 * 60 * 1000;
@@ -87,7 +91,12 @@
         await reportActivity(view);
         if (!active()) throw new Error('Tab disconnected.');
         if (view.draft.trim()) throw new Error('A new draft was entered.');
-        const answer = BeeperMuseSync.responseAfter(before, job.prompt, view);
+        const answer = BeeperMuseSync.responseAfter(
+          before,
+          job.prompt,
+          view,
+          job.image?.name,
+        );
         if (view.busy || !answer || answer !== previous) {
           previous = answer || '';
           stableSince = Date.now();
@@ -216,7 +225,7 @@
     }
     if (message.type === 'probe') {
       respond({
-        protocol: 7,
+        protocol: 8,
         health: health(),
         progress: tracker.progress,
         rescanning: rescanPending,
@@ -234,14 +243,14 @@
       generation++;
       void reportActivity(null);
       guardClosing(false);
-      respond({ protocol: 7 });
+      respond({ protocol: 8 });
     }
     if (message.type === 'start') {
       stopped = false;
       tracker = new BeeperMuseSync.Tracker(send, undefined, muse.prepare);
       const state = health();
       guardClosing(state !== 'unavailable');
-      respond({ protocol: 7, health: state });
+      respond({ protocol: 8, health: state });
       void poll();
     }
   };

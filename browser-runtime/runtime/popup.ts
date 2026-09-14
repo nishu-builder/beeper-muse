@@ -100,10 +100,11 @@ async function refresh() {
     for (const job of s.blockedJobs || []) {
       const p = document.createElement('p');
       p.textContent =
-        'This prompt was interrupted. Check Muse before sending it again: ' +
-        job.prompt;
+        'This message needs attention. Check Muse before sending it again: ' +
+        job.prompt +
+        (job.error ? '\n' + job.error : '');
       const button = document.createElement('button');
-      button.textContent = 'I handled this in Muse';
+      button.textContent = 'Dismiss this job';
       button.onclick = () => {
         void action('resolve-blocked', { id: job.id });
       };

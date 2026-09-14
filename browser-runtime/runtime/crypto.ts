@@ -1,3 +1,4 @@
+import { encodeImage, imageSignature, type IncomingImage } from './media.js';
 import * as Rust from '@matrix-org/matrix-sdk-crypto-wasm';
 import { MatrixAPI } from './matrix.js';
 import { StateStore } from './state.js';
@@ -227,20 +228,40 @@ export class MatrixCrypto {
     const clear = JSON.parse(result.event) as Pick<Event, 'type' | 'content'>;
     return { ...event, type: clear.type, content: clear.content };
   }
+  async downloadImage(image: IncomingImage): Promise<Muse.Upload> {
+    let bytes = await this.api.downloadImage(image.url);
+    if (image.file) {
+      const encrypted = new Rust.EncryptedAttachment(
+        bytes,
+        JSON.stringify(image.file),
+      );
+      try {
+        bytes = Rust.Attachment.decrypt(encrypted);
+      } finally {
+        encrypted.free();
+      }
+    }
+    if (!imageSignature(bytes, image.mime))
+      throw Error('Image bytes do not match its format.');
+    return { name: image.name, mime: image.mime, data: encodeImage(bytes) };
+  }
   async image(bytes: Uint8Array) {
     const encrypted = Rust.Attachment.encrypt(bytes);
-    const info = encrypted.mediaEncryptionInfo;
-    if (!info) throw Error('Image encryption failed.');
-    const file = JSON.parse(info) as Record<string, unknown>;
-    const uploaded = await this.api.request<{ content_uri: string }>(
-      'POST',
-      '/_matrix/media/v3/upload',
-      encrypted.encryptedData,
-    );
-    encrypted.free();
-    if (!/^mxc:\/\//.test(uploaded.content_uri))
-      throw Error('Beeper media upload failed.');
-    return { ...file, url: uploaded.content_uri };
+    try {
+      const info = encrypted.mediaEncryptionInfo;
+      if (!info) throw Error('Image encryption failed.');
+      const file = JSON.parse(info) as Record<string, unknown>;
+      const uploaded = await this.api.request<{ content_uri: string }>(
+        'POST',
+        '/_matrix/media/v3/upload',
+        encrypted.encryptedData,
+      );
+      if (!/^mxc:\/\//.test(uploaded.content_uri))
+        throw Error('Beeper media upload failed.');
+      return { ...file, url: uploaded.content_uri };
+    } finally {
+      encrypted.free();
+    }
   }
   close() {
     this.machine.close();

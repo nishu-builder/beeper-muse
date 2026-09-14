@@ -29,8 +29,25 @@
       return false;
     }
   };
+  const safeImageURL = (raw: string) =>
+    safeURL(raw) ||
+    (raw.length <= 3 * 1024 * 1024 &&
+      /^data:image\/(png|jpeg|gif|webp);base64,[a-zA-Z0-9+/=]+$/.test(raw)) ||
+    (raw.startsWith('blob:') &&
+      (() => {
+        try {
+          return new URL(raw).origin === 'https://muse.ai';
+        } catch {
+          return false;
+        }
+      })());
   function cleanContent(element: Element, role: Muse.Role): Element {
     const clone = element.cloneNode(true) as Element;
+    const sourceImages = [...element.querySelectorAll<HTMLImageElement>('img')];
+    clone.querySelectorAll('img').forEach((image, index) => {
+      const selected = sourceImages[index]?.currentSrc;
+      if (selected) image.setAttribute('src', selected);
+    });
     clone.querySelectorAll('button').forEach((button) => {
       if (
         button.querySelector('img') ||
@@ -47,7 +64,7 @@
       clone.querySelectorAll('.sr-only').forEach((n) => {
         if (n.textContent?.trim() === 'You:') n.remove();
       });
-    // Keep only formatting attributes. The daemon sanitizes again before Matrix.
+    // Keep only formatting attributes. The worker sanitizes again before Matrix.
     clone.querySelectorAll('*').forEach((n) => {
       for (const a of [...n.attributes]) {
         if (!['href', 'src', 'alt'].includes(a.name)) n.removeAttribute(a.name);
@@ -59,7 +76,7 @@
     const images: Muse.Image[] = [];
     let remaining = 4 * 1024 * 1024;
     for (const image of message.images || []) {
-      if (!safeURL(image.url)) continue;
+      if (!safeImageURL(image.url)) continue;
       try {
         // Ordinary page-origin fetch: no added host permissions or CORS bypass.
         const response = await fetch(image.url, {
@@ -123,6 +140,8 @@
       },
       snapshot: () => snapshot(document),
       activity: () => activity(document),
+      submitImage: (prompt, image, wait, active) =>
+        submitImage(document, prompt, image, wait, active),
       submit: (prompt, wait, active) => submit(document, prompt, wait, active),
       prepare,
     };
@@ -220,7 +239,7 @@
             } catch {
               return [];
             }
-            if (!safeURL(url)) return [];
+            if (!safeImageURL(url)) return [];
             return [
               { url, alt: (img.getAttribute('alt') || '').slice(0, 1000) },
             ];
@@ -254,6 +273,107 @@
         ];
       }),
     };
+  }
+  async function submitImage(
+    document: Document,
+    prompt: string,
+    image: Muse.Upload,
+    wait: (ms: number) => Promise<void>,
+    active = () => true,
+  ) {
+    const initial = snapshot(document),
+      field = composer(document),
+      form = field.closest('form');
+    if (!active() || initial.busy || initial.draft.trim())
+      throw Error('Muse is busy or has a draft.');
+    // A profile/avatar picker elsewhere in the page must never receive a photo.
+    if (!form || form.querySelector('[role="log"]'))
+      throw Error('Muse image composer unavailable.');
+    const inputs = [
+      ...form.querySelectorAll<HTMLInputElement>('input[type="file"]'),
+    ].filter((e) => !e.disabled && /image\//i.test(e.accept));
+    if (
+      inputs.length !== 1 ||
+      inputs[0]!.files?.length ||
+      form.querySelector('img[src]')
+    )
+      throw Error(
+        'Muse image composer is ambiguous or already has an attachment.',
+      );
+    if (
+      !/^image\/(png|jpeg|gif|webp)$/.test(image.mime) ||
+      image.data.length > 7 * 1024 * 1024 ||
+      !/^[a-zA-Z0-9+/]+={0,2}$/.test(image.data)
+    )
+      throw Error('Unsupported image.');
+    const raw = atob(image.data);
+    if (!raw.length || raw.length > 5 * 1024 * 1024)
+      throw Error('Image exceeds 5 MB.');
+    const win = document.defaultView as Window & typeof globalThis;
+    const file = new win.File(
+      [Uint8Array.from(raw, (c) => c.charCodeAt(0))],
+      image.name,
+      { type: image.mime },
+    );
+    const transfer = new win.DataTransfer();
+    transfer.items.add(file);
+    const input = inputs[0]!;
+    input.files = transfer.files;
+    input.dispatchEvent(new win.Event('change', { bubbles: true }));
+    const deadline = Date.now() + 60000;
+    while (Date.now() < deadline) {
+      await wait(250);
+      if (!active())
+        throw Error(
+          'Image submission interrupted. Check Muse before retrying.',
+        );
+      if (
+        !input.isConnected ||
+        input.files?.[0] !== file ||
+        composer(document) !== field ||
+        field.value.trim()
+      )
+        throw Error('The image composer changed.');
+      const send = [
+        ...form.querySelectorAll<HTMLButtonElement>(
+          'button[aria-label="Send"]',
+        ),
+      ].filter(visible);
+      const previews = [
+        ...form.querySelectorAll<HTMLImageElement>('img[src]'),
+      ].filter(visible);
+      if (
+        previews.length === 1 &&
+        previews[0]!.complete &&
+        previews[0]!.naturalWidth > 0 &&
+        send.length === 1 &&
+        !send[0]!.disabled &&
+        !form.querySelector('[aria-busy="true"],[role="progressbar"]')
+      ) {
+        if (prompt) {
+          const setter = Object.getOwnPropertyDescriptor(
+            win.HTMLTextAreaElement.prototype,
+            'value',
+          )!.set!;
+          setter.call(field, prompt);
+          field.dispatchEvent(new win.Event('input', { bubbles: true }));
+          await wait(150);
+        }
+        if (
+          !active() ||
+          input.files?.[0] !== file ||
+          field.value !== prompt ||
+          !send[0]!.isConnected ||
+          send[0]!.disabled
+        )
+          throw Error('Image submission changed.');
+        send[0]!.click();
+        return new Set(initial.messages.map((m) => m.id));
+      }
+    }
+    throw Error(
+      'Image preview did not become ready. Check Muse before retrying.',
+    );
   }
   async function submit(
     document: Document,

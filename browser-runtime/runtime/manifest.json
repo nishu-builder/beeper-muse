@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Beeper Muse \u2014 Chrome-only",
-  "version": "0.7.2",
+  "version": "0.8.0",
   "description": "Your Muse conversation, in Beeper. Setup instructions on GitHub.",
   "minimum_chrome_version": "127",
   "permissions": [
@@ -16,7 +16,8 @@
   "host_permissions": [
     "https://muse.ai/*",
     "https://matrix.beeper.com/*",
-    "wss://matrix.beeper.com/*"
+    "wss://matrix.beeper.com/*",
+    "https://*.r2.cloudflarestorage.com/*"
   ],
   "background": {
     "service_worker": "background.js",
@@ -45,6 +46,6 @@
   ],
   "homepage_url": "https://github.com/nishu-builder/beeper-muse",
   "content_security_policy": {
-    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'none'"
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'none'; connect-src 'self' https://matrix.beeper.com wss://matrix.beeper.com https://*.r2.cloudflarestorage.com"
   }
 }

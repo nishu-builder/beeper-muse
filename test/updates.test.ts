@@ -97,7 +97,7 @@ test('reconnection injects only packaged scripts into the selected Muse main fra
     send: async () => {
       sends++;
       if (!injected) throw Error('Old context invalidated');
-      return { protocol: 7, health: 'draft' };
+      return { protocol: 8, health: 'draft' };
     },
     inject: async (id, files) => {
       assert.equal(id, 42);

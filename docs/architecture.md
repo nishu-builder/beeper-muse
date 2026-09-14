@@ -92,7 +92,9 @@ message. A rendered observation can upgrade a partial one.
 `Muse.Adapter` exposes `snapshot()`, `submit()`, `prepare()`, optional `activity()`,
 and `capabilities`.
 The contract contains source IDs and data, not DOM nodes, Matrix identifiers,
-credentials, or database handles. `snapshot()` may be asynchronous, so a future
+credentials, or database handles. `submitImage(prompt, upload, wait, active)` is an optional typed operation for
+photo submissions. `Upload` contains only a filename, MIME type and base64 bytes;
+it contains no Matrix credentials or encryption metadata. `snapshot()` may be asynchronous, so a future
 API adapter can supply observations without forcing synchronous network access.
 
 A future official API implementation would own its authentication, pagination,
@@ -147,3 +149,29 @@ remove their timers/listeners when their extension context is invalidated.
 Chrome may delay store updates while the connection page and worker stay active;
 explicit safe reloads apply an already-downloaded update. This mechanism cannot
 bypass store review, permission prompts, browser shutdown or frozen pages.
+
+## Images in both directions
+
+For incoming `m.image` events, `media.ts` validates the Matrix address, declared
+format and size. `MatrixAPI.downloadImage` uses the authenticated media endpoint;
+native fetch follows Beeper's signed storage redirect and strips Authorization
+when crossing origins. The extension's network policy permits only itself,
+Beeper and HTTPS Cloudflare R2 storage. It sends no browser cookies or referrer.
+The stream is capped at 5 MB regardless of Content-Length. Rust/WASM authenticates
+and decrypts encrypted attachments; MIME signatures are checked before the
+worker passes a source-neutral `Upload` to the selected Muse adapter.
+
+Queued jobs retain the media reference, not downloaded plaintext image bytes.
+Claimed jobs are persisted before the adapter runs. The adapter refuses drafts,
+ambiguous file inputs, missing previews and changed composers. A failure blocks
+the job for user inspection, with no automatic resend. Completion associates
+the source echo with the original Beeper image event so later catch-up cannot
+replace it with text or send it a second time. Observed reactions still target
+that original event. Arbitrary files and interactive approvals stay unsupported.
+
+For outgoing images, the adapter resolves responsive image selection and accepts
+ordinary HTTP URLs, same-origin blob previews and bounded embedded raster images.
+It uses ordinary page-origin fetches and retains fallback links when bytes are
+unavailable. The worker encrypts available bytes as native `m.image` events.
+See the [validation limits](validation.md#image-support-acceptance) before treating
+the incoming adapter as compatible with the current Muse website.

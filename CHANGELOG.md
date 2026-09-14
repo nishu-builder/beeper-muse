@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.0
+
+- Add preview Beeper-to-Muse photo jobs with captions, authenticated media
+  downloads, Matrix attachment decryption, bounded image validation and a typed
+  upload adapter. The current Muse upload controls still need live verification.
+- Require an unambiguous composer and loaded preview before Send; blocked photos
+  are visible and never automatically submitted again after an uncertain result.
+- Preserve original Beeper image events during catch-up instead of replacing
+  them with text or importing a duplicate. Reactions target the original photo.
+- Capture responsive, local blob and embedded raster images from Muse. Show
+  fallback links or explanations when image bytes cannot be retrieved.
+- Add HTTPS Cloudflare R2 storage permission for Beeper's media redirects and
+  constrain extension network destinations. Chrome may require permission approval.
+
 ## 0.7.2
 
 - Add `update:local`: stage complete builds, preserve private configuration and

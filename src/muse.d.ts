@@ -11,6 +11,11 @@ declare namespace Muse {
     data?: string;
     mime?: string;
   }
+  interface Upload {
+    name: string;
+    mime: string;
+    data: string;
+  }
   interface Reaction {
     actor: Role;
     key: string;
@@ -53,6 +58,12 @@ declare namespace Muse {
     activity?(): Activity | Promise<Activity>;
     submit(
       prompt: string,
+      wait: (ms: number) => Promise<void>,
+      active?: () => boolean,
+    ): Promise<Set<string>>;
+    submitImage?(
+      prompt: string,
+      image: Upload,
       wait: (ms: number) => Promise<void>,
       active?: () => boolean,
     ): Promise<Set<string>>;
@@ -99,6 +110,7 @@ declare namespace Muse {
       before: Set<string>,
       prompt: string,
       snapshot: Snapshot,
+      imageName?: string,
     ): string | null;
     messages(view: Snapshot): Message[];
     fingerprint(message: Message): Promise<Source>;

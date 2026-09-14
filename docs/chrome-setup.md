@@ -147,3 +147,20 @@ recorded in [legacy companion](legacy-companion.md).
 
 For pausing, interrupted jobs, removal, and credential revocation, see
 [operations](operations.md). Current testing limits are in [validation](validation.md).
+
+## Photos (0.8 preview)
+
+See [photo support and limits](../README.md#photos). Keep the message box empty
+and remove any existing attachments before sending a photo from Beeper. The
+extension stages one photo at a time and waits for a loaded preview before Send.
+If it cannot identify Muse's upload controls, it stops and lists the interrupted
+photo in the popup. Check the Muse page before dismissing or resending it.
+
+Beeper media downloads redirect to Cloudflare R2 storage. Version 0.8 adds
+`https://*.r2.cloudflarestorage.com/*` for that download. Chrome may require you
+to accept the new permission or reload an unpacked extension once; automatic
+updates cannot accept permission prompts for you. Your registration and saved
+messages do not need to be reset.
+
+The final upload into Muse still needs live verification. A connected status
+only confirms the Beeper connection, not a successful image upload.

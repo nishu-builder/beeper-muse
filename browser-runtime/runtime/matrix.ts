@@ -1,3 +1,4 @@
+import { boundedBytes, mediaPath } from './media.js';
 import { endpoint, type Registration } from '../transport.js';
 export interface Configuration extends Registration {
   owner: string;
@@ -100,6 +101,24 @@ export class MatrixAPI {
           : 'UNKNOWN',
       );
     return data as T;
+  }
+  async downloadImage(uri: string) {
+    const url = new URL(
+      this.config.homeserverURL.replace(/\/$/, '') + mediaPath(uri),
+    );
+    url.searchParams.set('user_id', this.config.bot);
+    return boundedBytes(
+      await this.fetcher(url, {
+        headers: { Authorization: 'Bearer ' + this.config.appserviceToken },
+        credentials: 'omit',
+        // Authenticated Matrix media may redirect to signed object storage.
+        // Native fetch strips Authorization on cross-origin redirects; the
+        // extension CSP permits only Beeper and its HTTPS storage provider.
+        redirect: 'follow',
+        referrerPolicy: 'no-referrer',
+        signal: AbortSignal.timeout(30000),
+      }),
+    );
   }
   async members(room: string) {
     const data = await this.request<{

@@ -43,7 +43,7 @@ use Chrome's update service.
 
 | Direction      | Supported                                                            |
 | -------------- | -------------------------------------------------------------------- |
-| Beeper to Muse | New text prompts from you in the dedicated chat                      |
+| Beeper to Muse | Text prompts; photo uploads in preview (see below)                   |
 | Muse to Beeper | User and assistant messages with native sender identities            |
 | Rich content   | Allowed formatting, links, accessible encrypted images, and edits    |
 | Activity       | Observed Muse reactions and a typing indicator while Muse works      |
@@ -56,10 +56,29 @@ not retrieve the entire account history or reorder older messages already in
 Beeper. Operating-system notification behavior still needs broader live testing.
 
 Interactive cards, approvals, shopping controls, and embedded browsers stay in
-Muse. Beeper-to-Muse attachments, edits, reactions, and typing are not supported.
+Muse. Beeper-to-Muse edits, reactions, typing, video, and general files are not supported.
 Muse read receipts are not inferred from acknowledgments or reaction icons.
-Images blocked by browser access rules remain links. Keep the Muse message box
+Images blocked by browser access rules remain links when possible. Keep the Muse message box
 empty while the bridge is handling a prompt.
+
+## Photos
+
+Muse images can appear as native encrypted images in Beeper, including local
+previews and images selected through responsive loading. Retrieval is limited to
+PNG, JPEG, GIF and WebP, 2 MB per image and 4 MB per message. Inaccessible HTTP
+images remain links; inaccessible local previews show an explanation.
+
+**Beeper-to-Muse photo uploads are a preview.** Send one PNG, JPEG, GIF or WebP
+photo up to 5 MB in the dedicated Beeper chat, optionally with a caption. The
+worker downloads and decrypts it, then the adapter attempts to attach it to
+Muse's message form. It requires an unambiguous image input, a loaded preview
+and an enabled Send button. Failed or interrupted uploads appear in the popup;
+check Muse before dismissing the job and sending the photo again.
+
+The media API round trip and synthetic upload tests pass. Uploading through the
+current Muse website has **not** been verified: browser inspection was unavailable.
+See [image validation](docs/validation.md#image-support-acceptance). The new storage
+permission may require accepting an extension update in Chrome.
 
 ## How it works
 

@@ -85,3 +85,36 @@ outcomes without committing credentials, identifiers or private screenshots.
 Do not mark an item passed based only on synthetic tests or a successful socket.
 Store upload, review submission and publication are separate states. See
 [release process](RELEASING.md) and [troubleshooting](operations.md).
+
+## Image support acceptance
+
+For 0.8.0, 145 JavaScript/TypeScript tests, all type checks, Go tests and race
+tests, both builds, formatting, public packaging and the production dependency
+audit passed locally (zero reported vulnerabilities).
+
+The 0.8 image work adds synthetic coverage for encrypted/plain image descriptors,
+stream limits, MIME signatures, caption handling, single claims, failed-job
+recovery, prompt attribution, existing-draft preservation, loaded previews,
+local image extraction and native-photo deduplication during catch-up. A local
+HTTP redirect test verifies that native fetch removes Authorization before
+requesting a different origin. These are not Chrome permission or live DOM tests.
+
+On September 14, 2026, a synthetic 68-byte PNG was encrypted, uploaded to the
+configured Beeper media API, downloaded through its storage redirect, decrypted
+and byte-compared successfully. No conversation messages were sent by that probe.
+The authenticated download returned a 307 redirect even with `allow_redirect=false`;
+rejecting redirects prevented media downloads.
+
+Browser inspection of the signed-in Muse page repeatedly returned “Debugger
+unattached,” including after the user confirmed DevTools was closed. The current
+upload adapter therefore has only synthetic form/input/preview coverage. Its
+compatibility with Muse's current upload controls is **not verified**. Do not
+claim complete image support from the media API test alone.
+
+Remaining installed-extension checks:
+
+- Accept the new storage permission and download/decrypt a Beeper photo in Chrome.
+- Upload a real photo, with and without a caption, into the selected Muse chat.
+- Verify Muse's reply and image echo without duplicate imports or text replacement.
+- Check a native Muse image and a local preview reach Beeper as actual images.
+- Interrupt an upload, inspect the staged attachment and recover without resending it.

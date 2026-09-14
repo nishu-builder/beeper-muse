@@ -300,3 +300,133 @@ test('activity survives a disabled composer and missing transcript, while sendin
     f.dom.window.close();
   }
 });
+
+test('image submission rejects unrelated file pickers without touching them', async () => {
+  const f = fixture();
+  f.document.body.insertAdjacentHTML(
+    'beforeend',
+    '<input type="file" accept="image/*" aria-label="Profile picture">',
+  );
+  await assert.rejects(
+    f.adapter.create(f.document).submitImage!(
+      '',
+      { name: 'photo.png', mime: 'image/png', data: 'iVBORw0KGgo=' },
+      async () => {},
+    ),
+    /composer/,
+  );
+  assert.equal(
+    f.document.querySelector<HTMLInputElement>('input')!.files!.length,
+    0,
+  );
+  f.dom.window.close();
+});
+test('image upload waits for a loaded preview and preserves an existing draft', async () => {
+  const f = fixture(),
+    doc = f.document,
+    form = doc.createElement('form');
+  const field = doc.querySelector('textarea')!,
+    send = doc.querySelector('button')!;
+  form.append(field, send);
+  doc.body.append(form);
+  const input = doc.createElement('input');
+  input.type = 'file';
+  input.accept = 'image/*';
+  form.append(input);
+  let files: File[] = [];
+  Object.defineProperty(input, 'files', {
+    get: () => files,
+    set: (value: File[]) => {
+      files = value;
+    },
+  });
+  Object.defineProperty(f.dom.window, 'DataTransfer', {
+    value: class {
+      files: File[] = [];
+      items = { add: (file: File) => this.files.push(file) };
+    },
+  });
+  let sends = 0;
+  send.onclick = () => {
+    sends++;
+  };
+  input.onchange = () => {
+    const preview = doc.createElement('img');
+    preview.src = 'blob:https://muse.ai/synthetic';
+    Object.defineProperties(preview, {
+      complete: { value: true },
+      naturalWidth: { value: 10 },
+    });
+    form.append(preview);
+  };
+  field.value = 'private draft';
+  await assert.rejects(
+    f.adapter.create(doc).submitImage!(
+      '',
+      { name: 'photo.png', mime: 'image/png', data: 'iVBORw0KGgo=' },
+      async () => {},
+    ),
+    /draft/,
+  );
+  assert.equal(files.length, 0);
+  field.value = '';
+  await f.adapter.create(doc).submitImage!(
+    'Caption',
+    { name: 'photo.png', mime: 'image/png', data: 'iVBORw0KGgo=' },
+    async () => {},
+  );
+  assert.equal(sends, 1);
+  assert.equal(field.value, 'Caption');
+  assert.equal(files[0]!.name, 'photo.png');
+  f.dom.window.close();
+});
+test('snapshot retains local and embedded image previews and excludes foreign blobs', () => {
+  const f = fixture();
+  f.document.querySelector('[data-message-id]')!.innerHTML =
+    '<img src="blob:https://muse.ai/photo"><img src="data:image/png;base64,iVBORw0KGgo="><img src="blob:https://other.test/photo">';
+  assert.equal(f.adapter.snapshot(f.document).messages[0]!.images!.length, 2);
+  f.dom.window.close();
+});
+
+test('photo attribution requires an image echo and rejects interleaved user messages', () => {
+  const f = fixture();
+  const user = {
+    id: 'photo',
+    role: 'user',
+    text: '',
+    images: [{ url: 'https://muse.ai/photo.png' }],
+  };
+  const reply = { id: 'reply', role: 'assistant', text: 'A photo' };
+  assert.equal(
+    f.adapter.responseAfter(
+      new Set(),
+      '',
+      { messages: [user, reply] },
+      'photo.png',
+    ),
+    'A photo',
+  );
+  assert.throws(() =>
+    f.adapter.responseAfter(
+      new Set(),
+      '',
+      { messages: [{ ...user, images: [] }, reply] },
+      'photo.png',
+    ),
+  );
+  assert.throws(() =>
+    f.adapter.responseAfter(
+      new Set(),
+      '',
+      {
+        messages: [
+          user,
+          { id: 'other', role: 'user', text: 'unrelated' },
+          reply,
+        ],
+      },
+      'photo.png',
+    ),
+  );
+  f.dom.window.close();
+});

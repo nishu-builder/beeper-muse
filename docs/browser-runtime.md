@@ -1,6 +1,6 @@
 # Chrome runtime and protocol
 
-This document describes the implementation shipped in the 0.7 series.
+This document describes the current Chrome implementation.
 For the component overview, see [architecture](architecture.md). For installation,
 see [setup](chrome-setup.md). The older Go companion is separate legacy code.
 
@@ -107,3 +107,15 @@ The successful probe established transport compatibility, not full message sync.
 
 See [validation](validation.md) for acceptance coverage and [releasing](RELEASING.md)
 for public artifacts.
+
+## Image messages
+
+`m.image` jobs use the same owner, room, membership, claim and duplicate checks
+as text prompts. Only Matrix media addresses are accepted. Captions are preserved
+when the event includes a distinct `filename`; the filename alone is not sent as
+a prompt. Unsupported formats, failed downloads/decryption and uncertain uploads
+are blocked visibly. The source adapter's optional typed `submitImage` operation
+keeps future Muse API uploads separate from Matrix media handling.
+
+See [architecture](architecture.md#images-in-both-directions), [limits](../README.md#photos)
+and [acceptance status](validation.md#image-support-acceptance).

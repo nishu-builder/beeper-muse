@@ -33,6 +33,8 @@ function harness(
   deferred = false,
   structured = false,
   activityEnabled = false,
+  photo = false,
+  uploadSupported = true,
 ) {
   let listener!: Listener;
   let resolveClaim!: (value: unknown) => void;
@@ -56,7 +58,13 @@ function harness(
   const claim = new Promise((resolve) => {
     resolveClaim = resolve;
   });
-  const job = { id: 'job', prompt: 'Synthetic prompt' };
+  const image = { name: 'photo.png', mime: 'image/png', data: 'iVBORw0KGgo=' };
+  const job = {
+    id: 'job',
+    prompt: 'Synthetic prompt',
+    ...(photo ? { image } : {}),
+  };
+  let photoSubmits = 0;
   let disposedTimers = 0;
   const context = {
     crypto: webcrypto,
@@ -123,6 +131,15 @@ function harness(
           activity: () => (busy ? 'working' : 'idle'),
           snapshot: this.snapshot,
           submit: this.submit,
+          submitImage: uploadSupported
+            ? async (prompt: string, upload: unknown) => {
+                assert.equal(prompt, job.prompt);
+                assert.deepEqual(upload, image);
+                photoSubmits++;
+                submits++;
+                return new Set();
+              }
+            : undefined,
           prepare: async (m: unknown) => m,
         };
       },
@@ -137,7 +154,14 @@ function harness(
           busy,
           messages: submits
             ? [
-                { id: 'u', role: 'user', text: 'Synthetic prompt' },
+                {
+                  id: 'u',
+                  role: 'user',
+                  text: 'Synthetic prompt',
+                  ...(photo
+                    ? { images: [{ url: 'https://muse.ai/photo.png' }] }
+                    : {}),
+                },
                 { id: 'a', role: 'assistant', text: 'Synthetic answer' },
               ]
             : [],
@@ -163,6 +187,9 @@ function harness(
       visibility = 'visible';
       events.get('focus')?.({ preventDefault() {} });
       await flush();
+    },
+    get photoSubmits() {
+      return photoSubmits;
     },
     get submits() {
       return submits;
@@ -281,7 +308,7 @@ test('readiness probes expose no draft or chat text', () => {
   ] as const) {
     h.view(view);
     const probe = h.signal('probe');
-    assert.equal(probe.protocol, 7);
+    assert.equal(probe.protocol, 8);
     assert.equal(probe.health, health);
     assert.deepEqual(Object.keys(probe).sort(), [
       'health',
@@ -398,4 +425,25 @@ test('reinjecting the content script disposes old timers and cannot revive its p
   h.claim();
   await flush();
   assert.equal(h.submits, 0);
+});
+
+test('a photo claim uses the upload adapter and delivers its image-attributed reply once', async () => {
+  const h = harness(false, true, false, true);
+  h.signal('start');
+  await flush();
+  await h.advance(10000);
+  await h.executed;
+  assert.equal(h.photoSubmits, 1);
+  assert.equal(h.submits, 1);
+  assert.equal(h.messages.filter((m) => m.type === 'result').length, 1);
+  assert.equal(h.messages.filter((m) => m.type === 'block').length, 0);
+});
+test('a missing upload adapter blocks a photo instead of sending its caption alone', async () => {
+  const h = harness(false, true, false, true, false);
+  h.signal('start');
+  await flush();
+  await h.executed;
+  assert.equal(h.submits, 0);
+  assert.equal(h.photoSubmits, 0);
+  assert.equal(h.messages.filter((m) => m.type === 'block').length, 1);
 });

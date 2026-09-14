@@ -91,3 +91,17 @@ mobile differ, the popup's startup step/error, and reproducible steps with a
 synthetic prompt. Redact messages, room/user IDs, registration JSON, tokens,
 private files and browser profiles. Do not attach raw diagnostic logs publicly.
 Use [private vulnerability reporting](../SECURITY.md) for security issues.
+
+## A photo did not arrive
+
+Open the extension popup and check interrupted jobs. Unsupported files or failed
+media downloads block the queue rather than silently sending a text placeholder.
+PNG, JPEG, GIF and WebP are accepted up to 5 MB from Beeper; Muse uploads remain
+in preview pending live website verification. Check for a staged attachment or
+existing draft in Muse before dismissing the job and sending it again. Do not
+clear extension storage or recreate the registration to retry a photo.
+
+After updating from 0.7, check whether Chrome is waiting for the added Beeper
+storage permission. Muse-to-Beeper image fetching still follows the webpage's
+access rules and lower size limits; a fallback link means the image bytes could
+not be retrieved, not that the Beeper connection failed.

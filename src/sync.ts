@@ -9,13 +9,20 @@
     beforeIDs: Set<string>,
     prompt: string,
     snapshot: Muse.Snapshot,
+    imageName?: string,
   ) {
     const users = snapshot.messages.filter(
       (m) => m.role === 'user' && !beforeIDs.has(m.id),
     );
-    if (users.some((m) => !matchesPrompt(m.text, prompt)) || users.length > 1)
+    const matches = (m: Muse.Message) =>
+      (matchesPrompt(m.text, prompt) ||
+        (!prompt &&
+          imageName !== undefined &&
+          normalize(m.text) === normalize(imageName))) &&
+      (imageName === undefined || !!m.images?.length);
+    if (users.some((m) => !matches(m)) || users.length > 1)
       throw new Error('Another message was entered in the Muse tab.');
-    const echo = users.find((m) => matchesPrompt(m.text, prompt));
+    const echo = users.find(matches);
     if (!echo) return null;
     const after = snapshot.messages.slice(snapshot.messages.indexOf(echo) + 1);
     const responses = after.filter(
