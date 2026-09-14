@@ -444,3 +444,24 @@ test('Muse room metadata identifies a DM and the same login advertised in bridge
   assert.equal(info.bridgebot, config.bot);
   assert(!JSON.stringify({ info, state }).includes(config.appserviceToken));
 });
+
+test('Desktop provisioning bypasses message persistence and encryption', async () => {
+  const h = await harness();
+  try {
+    const sent: string[] = [];
+    await h.bridge.receive(
+      JSON.stringify({
+        command: 'http_proxy',
+        id: 61,
+        data: { method: 'GET', path: '/_matrix/provision/v3/capabilities' },
+      }),
+      (data) => sent.push(data),
+    );
+    assert.equal(sent.length, 1);
+    assert.equal(JSON.parse(sent[0]!).data.status, 200);
+    assert.equal(h.encryptions, 0);
+    assert.equal(h.batches.length, 0);
+  } finally {
+    h.close();
+  }
+});

@@ -9,6 +9,7 @@ import {
 import { MatrixCrypto, type Event } from './crypto.js';
 import { StateStore } from './state.js';
 import { museBridgeInfo } from './bridge-metadata.js';
+import { provisioningResponse } from './provisioning.js';
 export interface Job {
   id: string;
   prompt: string;
@@ -217,6 +218,15 @@ export class BrowserBridge {
     }
   }
   async receive(frame: unknown, send: (data: string) => void) {
+    const parsed = typeof frame === 'string' ? JSON.parse(frame) : frame;
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      parsed.command === 'http_proxy'
+    ) {
+      send(await provisioningResponse(parsed, this.api));
+      return;
+    }
     // Persist/acknowledge in arrival order without waiting for image uploads or
     // outgoing encryption. Crypto processing still has exactly one owner.
     const received = this.intake.then(() =>

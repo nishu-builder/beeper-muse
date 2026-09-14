@@ -148,3 +148,19 @@ test('a failed handshake keeps its error after the socket closes', async (t) => 
   t.mock.timers.tick(60000);
   assert.equal(h.states.at(-1), 'error');
 });
+
+test('Desktop provisioning requests reach the consumer instead of being silently discarded', async (t) => {
+  const h = await harness(t);
+  h.network.open();
+  h.network.reply({ command: 'response', id: 1 });
+  const frame = {
+    command: 'http_proxy',
+    id: 81,
+    data: { method: 'GET', path: '/_matrix/provision/v3/capabilities' },
+  };
+  h.network.reply(frame);
+  await Promise.resolve();
+  assert.deepEqual(JSON.parse(h.frames[0]!), frame);
+  assert.equal(h.network.sent.at(-1), '{"ack":"fixture"}');
+  assert.equal(h.network.closed, false);
+});

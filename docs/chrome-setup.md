@@ -1,6 +1,6 @@
 # Chrome-only setup
 
-Beeper Muse 0.6.5 is a preview that runs in Chrome. A small extension tab holds
+Beeper Muse 0.6.6 is a preview that runs in Chrome. A small extension tab holds
 the Beeper connection; a service worker handles encryption and saved messages.
 The selected Muse tab supplies the conversation. No companion,
 localhost server, native messaging host, or background terminal is needed while
@@ -60,19 +60,24 @@ If it is missing, use **Load unpacked** and select `.local/chrome-extension`,
 not `.local/extension` or `.local/chrome-probe`.
 
 Refresh the Muse webpage, then open **Beeper Muse — Chrome-only** from Chrome's
-extensions menu. The new panel says **Chrome-only v0.6.5** under its title and
+extensions menu. The new panel says **Chrome-only v0.6.6** under its title and
 shows separate **Beeper** and **Muse tab** connection states. Reloading the old
 extension does not switch it to the new folder. You do not need to restart the
 retired companion.
 
 ## Room visible on a phone but missing from Desktop
 
-Version 0.6.5 adds the bridge account announcement and Beeper direct-chat metadata
-used by the native bridge. Reload the existing extension to migrate its current
-room and announce the account on the live connection. Startup also refreshes its
-own connection tab so older code cannot ignore the announcement. This preserves
-the room, history and encryption keys. Desktop visibility still needs a live
-acceptance check; an authenticated socket alone does not establish it.
+Version 0.6.6 answers Desktop's bridge capabilities request over the existing
+Beeper WebSocket. Earlier versions silently ignored this request, leaving
+Desktop waiting to load the account and queuing its room events. It also serves
+read-only login discovery; unsupported provisioning operations return an error.
+There is no local HTTP server.
+
+Reload the existing unpacked extension once. Its own connection tab refreshes
+automatically, retaining the room, history and encryption keys. This release
+also includes the account announcement and direct-chat metadata added in 0.6.5.
+Desktop visibility still needs a live acceptance check; an authenticated socket
+alone does not establish it.
 
 ## What syncs
 

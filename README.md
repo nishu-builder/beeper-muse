@@ -9,7 +9,7 @@ bridge.
 · [Privacy](PRIVACY.md) · [Troubleshooting](docs/operations.md)
 
 **Chrome-only preview:** [setup instructions](docs/chrome-setup.md). Version
-0.6.5 bundles encryption and durable storage in Chrome; no companion runs during
+0.6.6 bundles encryption and durable storage in Chrome; no companion runs during
 use. Live Chrome acceptance testing is still in progress. The instructions below
 are for the existing companion release.
 

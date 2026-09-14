@@ -160,7 +160,11 @@ export class BeeperSocket {
         socket.close();
         return;
       }
-      if (!m.command || m.command === 'transaction')
+      if (
+        !m.command ||
+        m.command === 'transaction' ||
+        m.command === 'http_proxy'
+      )
         void this.receive(data, send).catch(() => {
           if (!this.stopped)
             this.fail(
