@@ -426,3 +426,11 @@ Image preparation previously swallowed fetch, format and size failures while
 retaining only the source URL. Version 0.8.15 reports fixed diagnostic codes for
 those cases and successful preparation, without identifiers, URLs or contents.
 Synthetic tests cover the error distinctions and successful data preparation.
+
+After the automatic 0.8.15 update, fresh logs showed image-prepared and Desktop's
+message list gained an assistant image after the marked reply. No generation
+prompt was replayed. This is partial recovery evidence, not a passed autonomous
+reverse-image test: the delay/reload dependency is unexplained, and Desktop's
+numeric message IDs do not expose the deterministic Matrix/source IDs used by
+the attempted correlation check. Retain the active generation journal and
+investigate automatic image retry/association before claiming full parity.

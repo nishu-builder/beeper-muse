@@ -445,3 +445,11 @@ show it. The automatic checker requires an attachment on the marked reply, so
 that scenario remains unverified. No generation was replayed. Fixed preparation
 codes now distinguish fetching, unsupported formats and exceeded size budgets;
 regression tests check these without logging image URLs or response contents.
+
+After the automatic 0.8.15 update, fresh logs showed image-prepared and Desktop's
+message list gained an assistant image after the marked reply. No generation
+prompt was replayed. This is partial recovery evidence, not a passed autonomous
+reverse-image test: the delay/reload dependency is unexplained, and Desktop's
+numeric message IDs do not expose the deterministic Matrix/source IDs used by
+the attempted correlation check. Retain the active generation journal and
+investigate automatic image retry/association before claiming full parity.
