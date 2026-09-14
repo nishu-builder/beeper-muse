@@ -1,12 +1,13 @@
 # Chrome-only setup
 
-Beeper Muse 0.6.3 is a preview that runs in Chrome. A service worker connects
-to Beeper; the selected Muse tab supplies the conversation. No companion,
+Beeper Muse 0.6.4 is a preview that runs in Chrome. A small extension tab holds
+the Beeper connection; a service worker handles encryption and saved messages.
+The selected Muse tab supplies the conversation. No companion,
 localhost server, native messaging host, or background terminal is needed while
 it runs. Registration is a one-time setup using Beeper's `bbctl` tool.
 
 The transport handshake and encrypted API delivery have passed live tests.
-The complete Chrome worker, encryption storage, and both-direction conversation
+The production connection tab, encryption storage, and both-direction conversation
 flow still need a live Chrome acceptance run. Use the preview for testing.
 
 ## Prepare the extension
@@ -37,7 +38,8 @@ stops this runtime until you explicitly reconnect.
 3. Open and sign in to `https://muse.ai/`. Refresh the webpage after loading or
    reloading the extension; reloading the extension does not replace an existing
    page's content script.
-4. Open **Beeper Muse — Chrome-only** from the toolbar. Wait for **Beeper connected**, then choose
+4. Keep the automatically opened **Beeper Muse connection** tab open; you can pin it.
+   Open **Beeper Muse — Chrome-only** from the toolbar on your Muse tab. Wait for **Beeper connected**, then choose
    **Connect this Muse tab**. A new **Muse** chat appears in Beeper.
 5. Send a short message in that Beeper chat and verify the reply returns.
 
@@ -58,7 +60,7 @@ If it is missing, use **Load unpacked** and select `.local/chrome-extension`,
 not `.local/extension` or `.local/chrome-probe`.
 
 Refresh the Muse webpage, then open **Beeper Muse — Chrome-only** from Chrome's
-extensions menu. The new panel says **Chrome-only v0.6.3** under its title and
+extensions menu. The new panel says **Chrome-only v0.6.4** under its title and
 shows separate **Beeper** and **Muse tab** connection states. Reloading the old
 extension does not switch it to the new folder. You do not need to restart the
 retired companion.
@@ -97,8 +99,13 @@ A lost send response retries the same ciphertext and event IDs. Crypto keys and
 the device identity persist across worker restarts. If the saved keys do not match
 the registered device, startup stops rather than replacing that device's keys.
 
-The worker sends a protocol ping every 20 seconds. A Chrome alarm can restart a
-failed connection with bounded backoff. Closing Chrome pauses delivery. Reopening
+The worker drives a protocol ping through the connection tab every 20 seconds;
+the tab replies to keep the worker active. This avoids relying on hidden-tab
+timers for connection health. Its WebSocket uses the extension-document path verified by the
+connection test. The worker durably stores each incoming transaction before
+returning an acknowledgement through the tab. The connection tab holds no crypto
+database and does not acknowledge messages on its own. A Chrome alarm can restart a
+failed connection with bounded backoff and reopen the connection tab if needed. Closing Chrome pauses delivery. Reopening
 Chrome reconnects Beeper; connect a Muse tab again if the previous browser session
 ended. The popup distinguishes Beeper connectivity from Muse-tab connectivity.
 

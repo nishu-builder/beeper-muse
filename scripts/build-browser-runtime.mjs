@@ -8,6 +8,7 @@ await build({
   entryPoints: [
     'browser-runtime/runtime/background.ts',
     'browser-runtime/runtime/popup.ts',
+    'browser-runtime/runtime/connection.ts',
   ],
   outdir: output.pathname,
   bundle: true,
@@ -17,7 +18,13 @@ await build({
   sourcemap: false,
   legalComments: 'eof',
 });
-for (const name of ['manifest.json', 'popup.html', 'popup.css'])
+for (const name of [
+  'manifest.json',
+  'popup.html',
+  'popup.css',
+  'connection.html',
+  'connection.css',
+])
   await copyFile(
     new URL('browser-runtime/runtime/' + name, root),
     new URL(name, output),

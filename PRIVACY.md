@@ -10,11 +10,16 @@ service for this extension.
 
 ## Chrome-only preview
 
-Version 0.6.0 connects directly from Chrome to `matrix.beeper.com` over HTTPS
+Version 0.6.4 connects directly from Chrome to `matrix.beeper.com` over HTTPS
 and WebSocket. It does not contact a localhost service. Its one-time registration
 setup uses Beeper's official bridge manager. The imported application-service
 credential stays in trusted extension storage and is never sent to the Muse
-page or Chrome Sync.
+page or Chrome Sync. A dedicated extension tab receives the credential in memory
+through a private extension port to open the authenticated WebSocket. Only that
+tab and the extension worker exchange socket frames. The `webRequest` permission
+observes the handshake for that exact endpoint and tab, displaying only header
+verification results, HTTP status, and bounded network error codes. It does not
+send diagnostics to the maintainer or display credentials.
 
 IndexedDB stores the device access token, encrypted crypto database, its local
 passphrase, source IDs and hashes, pending encrypted Matrix transactions and

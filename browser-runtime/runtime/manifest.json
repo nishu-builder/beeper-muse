@@ -1,13 +1,14 @@
 {
   "manifest_version": 3,
   "name": "Beeper Muse — Chrome-only",
-  "version": "0.6.3",
+  "version": "0.6.4",
   "description": "Your Muse conversation, in Beeper. Setup instructions on GitHub.",
   "minimum_chrome_version": "127",
   "permissions": [
     "storage",
     "alarms",
     "activeTab",
+    "webRequest",
     "declarativeNetRequestWithHostAccess",
     "unlimitedStorage"
   ],

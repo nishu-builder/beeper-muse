@@ -1,4 +1,8 @@
 import {
+  describeRequest,
+  type RequestObservation,
+} from '../request-observation.js';
+import {
   authenticationRule,
   endpoint,
   RULE_ID,
@@ -13,6 +17,8 @@ export class BeeperSocket {
   private confirmed = false;
   private stopped = false;
   private failed = false;
+  private cleanupObservation?: () => void;
+  private beat?: () => void;
   constructor(
     private registration: Registration,
     private receive: (
@@ -24,6 +30,8 @@ export class BeeperSocket {
       reason?: string,
     ) => void,
     private report: (stage: string) => void = () => {},
+    private tabId?: number,
+    private externalHeartbeat = false,
   ) {}
   private fail(reason: string) {
     this.failed = true;
@@ -35,6 +43,37 @@ export class BeeperSocket {
       chrome.runtime.id,
       crypto.randomUUID(),
     );
+    if (this.tabId !== undefined) rule.condition.tabIds = [this.tabId];
+    if (this.tabId !== undefined && chrome.webRequest?.onSendHeaders) {
+      const scope = {
+        url: endpoint(this.registration),
+        origin: chrome.runtime.getURL('').replace(/\/$/, ''),
+        tabId: this.tabId,
+        headers: rule.action.requestHeaders.flatMap((h) =>
+          h.operation === 'set' ? [h] : [],
+        ),
+      };
+      const observe = (request: RequestObservation) => {
+        for (const line of describeRequest(scope, request)) this.report(line);
+        return undefined;
+      };
+      const filter: chrome.webRequest.RequestFilter = {
+        urls: [scope.url],
+        types: ['websocket'],
+        tabId: this.tabId,
+      };
+      chrome.webRequest.onSendHeaders.addListener(observe, filter, [
+        'requestHeaders',
+        'extraHeaders',
+      ]);
+      chrome.webRequest.onHeadersReceived.addListener(observe, filter);
+      chrome.webRequest.onErrorOccurred.addListener(observe, filter);
+      this.cleanupObservation = () => {
+        chrome.webRequest.onSendHeaders.removeListener(observe);
+        chrome.webRequest.onHeadersReceived.removeListener(observe);
+        chrome.webRequest.onErrorOccurred.removeListener(observe);
+      };
+    }
     this.report('Installing Beeper connection headers');
     await chrome.declarativeNetRequest.updateSessionRules({
       removeRuleIds: [RULE_ID],
@@ -72,8 +111,9 @@ export class BeeperSocket {
           }),
         );
       };
+      this.beat = ping;
       ping();
-      this.timer = setInterval(ping, 20000);
+      if (!this.externalHeartbeat) this.timer = setInterval(ping, 20000);
     };
     socket.onmessage = ({ data }) => {
       if (typeof data !== 'string' || data.length > 1024 * 1024) {
@@ -149,7 +189,13 @@ export class BeeperSocket {
         );
     };
   }
+  pulse() {
+    if (!this.stopped && this.socket?.readyState === WebSocket.OPEN)
+      this.beat?.();
+  }
   async stop() {
+    this.cleanupObservation?.();
+    this.cleanupObservation = undefined;
     this.stopped = true;
     if (this.handshake) clearTimeout(this.handshake);
     if (this.timer) clearInterval(this.timer);

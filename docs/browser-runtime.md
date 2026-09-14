@@ -22,12 +22,17 @@ flowchart LR
     Muse[Signed-in Muse tab] <--> Adapter[Muse adapter]
     Adapter <--> Sync[Typed source sync]
     Sync <--> Worker[Extension service worker]
-    Worker <--> Beeper[Beeper appservice connection]
+    Worker <--> Socket[Extension connection tab]
+    Socket <--> Beeper[Beeper appservice connection]
     Worker --- DB[IndexedDB queue and crypto state]
 ```
 
 The popup manages connection and diagnostics. The service worker owns Beeper
-credentials, encrypted transport, and recovery. The content script only sees the
+credentials, crypto, durable transaction intake, and recovery. A dedicated
+extension document holds the WebSocket, using the same tab-scoped header rules
+as the verified probe. The worker authenticates the document port by extension
+ID, exact URL, tab and frame. The document forwards frames and only sends ACKs
+provided by the worker after durable storage. The content script only sees the
 source contract and commands for the selected Muse tab. Neither the popup nor a
 content script creates its own Matrix crypto client. Closing Chrome stops the
 bridge; opening Chrome must resume from persisted state.

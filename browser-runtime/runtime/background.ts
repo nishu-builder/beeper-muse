@@ -1,10 +1,14 @@
 import { BrowserBridge } from './bridge.js';
 import { configuration, type Configuration } from './matrix.js';
 import { startupFailure } from './diagnostics.js';
-import { BeeperSocket } from './socket.js';
+import {
+  DocumentSocket,
+  CONNECTION_PAGE,
+  CONNECTION_PORT,
+} from './document-socket.js';
 import { StartupProgress } from './startup.js';
 let bridge: BrowserBridge | undefined;
-let socket: BeeperSocket | undefined;
+let socket: DocumentSocket | undefined;
 let starting: Promise<void> | undefined;
 let phase = 'disconnected';
 let failure = '';
@@ -68,7 +72,7 @@ async function start() {
         return;
       }
       bridge.resume();
-      socket = new BeeperSocket(
+      socket = new DocumentSocket(
         config,
         (frame, send) => bridge!.receive(frame, send),
         (state, reason) => {
@@ -381,3 +385,24 @@ chrome.tabs.onRemoved.addListener((tabID) => {
 void secure.then(() => start()).catch(() => {});
 // Kept as a type check for the credential boundary; never exported to Muse.
 export type { Configuration };
+
+// Connections are accepted only from our own top-level extension document.
+chrome.runtime.onConnect.addListener((port) => {
+  const sender = port.sender;
+  if (
+    port.name !== CONNECTION_PORT ||
+    sender?.id !== chrome.runtime.id ||
+    sender.url !== chrome.runtime.getURL(CONNECTION_PAGE) ||
+    sender.frameId !== 0 ||
+    !Number.isInteger(sender.tab?.id)
+  ) {
+    port.disconnect();
+    return;
+  }
+  void start()
+    .then(() => {
+      if (socket) socket.accept(port);
+      else port.disconnect();
+    })
+    .catch(() => port.disconnect());
+});
