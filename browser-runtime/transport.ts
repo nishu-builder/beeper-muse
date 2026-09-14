@@ -92,6 +92,7 @@ export interface Socket {
   onmessage: ((event: { data: unknown }) => void) | null;
   onerror: (() => void) | null;
   onclose: ((event: { code: number }) => void) | null;
+  send(data: string): void;
   close(): void;
 }
 // A bounded handshake probe, not a message bridge. It never acknowledges a
@@ -103,6 +104,7 @@ export async function probe(
   makeSocket: (url: string) => Socket,
   signal: AbortSignal,
   timeoutMs = 15000,
+  report: (stage: string) => void = () => {},
 ): Promise<ProbeResult> {
   const rule = authenticationRule(
     registration,
@@ -114,10 +116,12 @@ export async function probe(
   let stop: (() => void) | undefined;
   try {
     if (signal.aborted) return 'cancelled';
+    report('Installing authentication rule');
     await rules.updateSessionRules({
       removeRuleIds: [RULE_ID],
       addRules: [rule],
     });
+    report('Authentication rule installed');
     if (signal.aborted) return 'cancelled';
     return await new Promise<ProbeResult>((resolve, reject) => {
       let settled = false;
@@ -131,15 +135,39 @@ export async function probe(
       signal.addEventListener('abort', stop, { once: true });
       timer = setTimeout(() => finish('timeout'), timeoutMs);
       try {
+        report('Opening WebSocket');
         socket = makeSocket(endpoint(registration));
       } catch {
         reject(new Error('Could not open connection.'));
         return;
       }
-      socket.onopen = () => {}; // HTTP upgrade alone does not confirm the protocol.
-      socket.onerror = () => finish('failed');
-      socket.onclose = ({ code }) =>
+      socket.onopen = () => {
+        report('WebSocket upgraded; sending protocol ping');
+        try {
+          socket!.send(
+            JSON.stringify({
+              id: 1,
+              command: 'ping',
+              data: { timestamp: Date.now() },
+            }),
+          );
+        } catch {
+          report('Could not send protocol ping');
+          finish('failed');
+        }
+      };
+      socket.onerror = () => {
+        report('WebSocket connection error');
+        finish('failed');
+      };
+      socket.onclose = ({ code }) => {
+        report(
+          'WebSocket closed (' +
+            (Number.isInteger(code) ? code : 'unknown') +
+            ')',
+        );
         finish(code === 4001 ? 'conflict' : 'failed');
+      };
       socket.onmessage = ({ data }) => {
         if (typeof data !== 'string' || data.length > 1024 * 1024) {
           finish('failed');
@@ -152,12 +180,18 @@ export async function probe(
             typeof message !== 'object' ||
             Array.isArray(message)
           ) {
+            report('Invalid protocol message');
             finish('failed');
             return;
           }
           const m = message as Record<string, unknown>;
-          if (m.command === 'connect') finish('confirmed');
-          else if (m.command === 'disconnect')
+          if (
+            m.command === 'connect' ||
+            (m.command === 'response' && m.id === 1)
+          ) {
+            report('Beeper protocol confirmed');
+            finish('confirmed');
+          } else if (m.command === 'disconnect')
             finish(m.status === 'conn_replaced' ? 'conflict' : 'failed');
           else if (
             (m.command === 'transaction' || m.command === undefined) &&
@@ -166,7 +200,10 @@ export async function probe(
             // This also proves authentication. Leave it unacknowledged for a
             // future bridge to process; never silently consume account events.
             finish('confirmed');
-          } else finish('failed');
+          } else {
+            report('Unexpected protocol command');
+            finish('failed');
+          }
         } catch {
           finish('failed');
         }
@@ -176,7 +213,13 @@ export async function probe(
     if (timer !== undefined) clearTimeout(timer);
     if (stop) signal.removeEventListener('abort', stop);
     try {
-      socket?.close();
+      if (socket) {
+        socket.onopen = null;
+        socket.onmessage = null;
+        socket.onclose = null;
+        socket.onerror = null;
+        socket.close();
+      }
     } finally {
       await rules.updateSessionRules({ removeRuleIds: [RULE_ID] });
     }

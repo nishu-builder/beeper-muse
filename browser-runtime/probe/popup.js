@@ -8,13 +8,15 @@ const labels = {
   timeout: 'Connection timed out.',
   cancelled: 'Test stopped.',
 };
-const show = (result) => {
+const show = (result, diagnostics = []) => {
+  document.getElementById('details').textContent = diagnostics.join('\n');
   status.textContent = labels[result] || 'Could not read test status.';
 };
 const run = async () => {
   show('connecting');
   try {
-    show((await chrome.runtime.sendMessage({ type: 'probe' })).result);
+    const response = await chrome.runtime.sendMessage({ type: 'probe' });
+    show(response.result, response.diagnostics);
   } catch {
     show('failed');
   }
@@ -30,6 +32,6 @@ chrome.runtime
       r.result === 'idle'
     )
       void run();
-    else show(r.result);
+    else show(r.result, r.diagnostics);
   })
   .catch(() => show('failed'));

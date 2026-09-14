@@ -18,3 +18,9 @@ button {
   background: #e7edf4;
   border-radius: 6px;
 }
+
+#details {
+  white-space: pre-line;
+  font-size: 12px;
+  color: #42566b;
+}

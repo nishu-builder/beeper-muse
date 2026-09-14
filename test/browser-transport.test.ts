@@ -16,11 +16,15 @@ const extensionID = 'a'.repeat(32);
 function harness() {
   const changes: Parameters<Rules['updateSessionRules']>[0][] = [];
   let closed = false;
+  const sent: string[] = [];
   const socket: Socket = {
     onopen: null,
     onmessage: null,
     onerror: null,
     onclose: null,
+    send(data) {
+      sent.push(data);
+    },
     close() {
       closed = true;
     },
@@ -36,6 +40,7 @@ function harness() {
   });
   return {
     socket,
+    sent,
     changes,
     rules,
     opening,
@@ -113,7 +118,10 @@ test('transactions prove authentication without acknowledging or consuming them'
   });
   assert.equal(await result, 'confirmed');
   assert.equal(h.closed, true);
-  // Socket intentionally has no send operation: this probe cannot acknowledge.
+  assert.equal(
+    h.sent.some((raw) => JSON.parse(raw).command === 'response'),
+    false,
+  );
 });
 test('connection conflicts stop without reconnecting and cancellation cleans up', async () => {
   for (const cancelled of [false, true]) {
@@ -181,4 +189,31 @@ test('cancellation while installing the header rule does not open a connection',
   );
   assert.equal(result, 'cancelled');
   assert.equal(cleanup, true);
+});
+
+test('an idle bridge is verified with a correlated protocol ping', async () => {
+  const h = harness();
+  const result = probe(
+    registration,
+    extensionID,
+    h.rules,
+    h.makeSocket,
+    new AbortController().signal,
+  );
+  await h.opening;
+  h.socket.onopen!();
+  assert.equal(h.sent.length, 1);
+  const ping = JSON.parse(h.sent[0]!);
+  assert.equal(ping.command, 'ping');
+  assert.equal(ping.id, 1);
+  assert.ok(Number.isSafeInteger(ping.data.timestamp));
+  h.socket.onmessage!({
+    data: JSON.stringify({
+      id: 1,
+      command: 'response',
+      data: { timestamp: Date.now() },
+    }),
+  });
+  assert.equal(await result, 'confirmed');
+  assert.equal(h.sent.length, 1);
 });

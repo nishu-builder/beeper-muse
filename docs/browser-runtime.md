@@ -79,7 +79,8 @@ room before changing the live chat's history strategy.
 ## Running the isolated Chrome connection test
 
 This development extension tests only the authenticated appservice handshake.
-It does not capture Muse, send messages, acknowledge transactions, or reconnect.
+It does not capture Muse, send chat messages, acknowledge transactions, or reconnect.
+It sends one protocol ping to verify an otherwise idle authenticated connection.
 It closes after confirmation, failure, cancellation, or a 15-second timeout.
 A successful test is one prerequisite for the browser runtime, not a working
 Chrome-only bridge.
@@ -97,7 +98,7 @@ keys, or chat history. Load that directory using **Load unpacked** at
 automatically. To retry, open **Beeper Muse Chrome connection test** and click
 **Test connection**. The target result is **Authenticated Beeper connection
 confirmed.** A WebSocket upgrade alone does not count: the probe waits for a
-Beeper protocol message. Report only the displayed status, not registration files.
+Beeper protocol message or a correlated ping response. Report only the displayed status, not registration files.
 
 The extension has no content scripts or localhost permission. A temporary
 [Chrome request-header rule](https://developer.chrome.com/docs/extensions/reference/api/declarativeNetRequest)
@@ -112,3 +113,15 @@ its isolated registration. Never upload `.local/chrome-probe` as a public ZIP.
 The ordinary extension and its store package are unchanged by this experiment.
 The registration is retained for further development; removing the unpacked test
 stops browser access but does not delete the remote registration.
+
+Probe 0.1.1 adds explicit `wss://matrix.beeper.com/*` host access; HTTPS host
+access alone does not cover header modification on the WebSocket handshake.
+The popup checks that permission and reports bounded diagnostic stages without
+printing tokens, source URLs, or raw server frames. An independent native API
+control confirmed HTTP 101 and a correlated Beeper ping response for the isolated
+registration. That does not yet establish that the Chrome handshake works.
+
+Explicit WebSocket host permissions have historically had different Chrome Web
+Store validation behavior; see the [Chromium report](https://groups.google.com/a/chromium.org/g/chromium-extensions/c/P1PbbBGvydo).
+This remains an unpacked experiment. The production runtime must validate its
+permission flow and store packaging before release.
