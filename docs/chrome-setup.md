@@ -1,6 +1,6 @@
 # Chrome-only setup
 
-Beeper Muse 0.6.0 is a preview that runs in Chrome. A service worker connects
+Beeper Muse 0.6.1 is a preview that runs in Chrome. A service worker connects
 to Beeper; the selected Muse tab supplies the conversation. No companion,
 localhost server, native messaging host, or background terminal is needed while
 it runs. Registration is a one-time setup using Beeper's `bbctl` tool.
@@ -37,7 +37,7 @@ stops this runtime until you explicitly reconnect.
 3. Open and sign in to `https://muse.ai/`. Refresh the webpage after loading or
    reloading the extension; reloading the extension does not replace an existing
    page's content script.
-4. Open Beeper Muse from the toolbar. Wait for **Beeper connected**, then choose
+4. Open **Beeper Muse — Chrome-only** from the toolbar. Wait for **Beeper connected**, then choose
    **Connect this Muse tab**. A new **Muse** chat appears in Beeper.
 5. Send a short message in that Beeper chat and verify the reply returns.
 
@@ -46,6 +46,22 @@ its popup once if no tab is connected. Keep the connected tab open with its
 composer empty. Chrome can show its standard leave-page confirmation after
 interaction with the Muse page; the extension cannot choose that dialog's text.
 Use **Disconnect tab** before closing if you do not want that confirmation.
+
+## Seeing “Start the local bridge”?
+
+That message belongs to the older companion-based extension. The Chrome-only
+build never asks you to start a local bridge.
+
+In `chrome://extensions`, disable the older **Beeper Muse** extension and any
+**Chrome connection test** copy. Keep **Beeper Muse — Chrome-only** enabled.
+If it is missing, use **Load unpacked** and select `.local/chrome-extension`,
+not `.local/extension` or `.local/chrome-probe`.
+
+Refresh the Muse webpage, then open **Beeper Muse — Chrome-only** from Chrome's
+extensions menu. The new panel says **Chrome-only v0.6.1** under its title and
+shows separate **Beeper** and **Muse tab** connection states. Reloading the old
+extension does not switch it to the new folder. You do not need to restart the
+retired companion.
 
 ## What syncs
 

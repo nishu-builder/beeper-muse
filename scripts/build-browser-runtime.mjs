@@ -17,18 +17,12 @@ await build({
   sourcemap: false,
   legalComments: 'eof',
 });
-for (const name of ['manifest.json', 'popup.html'])
+for (const name of ['manifest.json', 'popup.html', 'popup.css'])
   await copyFile(
     new URL('browser-runtime/runtime/' + name, root),
     new URL(name, output),
   );
-for (const name of [
-  'popup.css',
-  'adapter.js',
-  'sync.js',
-  'activity.js',
-  'content.js',
-])
+for (const name of ['adapter.js', 'sync.js', 'activity.js', 'content.js'])
   await copyFile(new URL('extension/' + name, root), new URL(name, output));
 await cp(new URL('extension/icons/', root), new URL('icons/', output), {
   recursive: true,
