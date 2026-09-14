@@ -1,6 +1,6 @@
 {
   "name": "beeper-muse",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "description": "Your Muse conversation in Beeper, connected directly from Chrome.",
   "type": "module",
   "private": true,

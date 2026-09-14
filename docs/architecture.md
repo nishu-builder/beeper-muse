@@ -175,3 +175,23 @@ It uses ordinary page-origin fetches and retains fallback links when bytes are
 unavailable. The worker encrypts available bytes as native `m.image` events.
 See the [validation limits](validation.md#image-support-acceptance) before treating
 the incoming adapter as compatible with the current Muse website.
+
+## Diagnostics and delivery confirmation
+
+`diagnostic-log.ts` validates a closed event vocabulary and field schema at both
+collection and export. The worker serializes writes to a 200-entry local ring;
+logging failures do not interrupt message handling. Only the socket-lock owner
+starts `log-controls.ts`. A user-selected File System Access handle lives in a
+separate state scope. `log-file.ts` serializes file writes, skips unchanged
+snapshots and aborts failed writes; it does not request permission in background.
+The connection heartbeat and a timer flush changes. No remote logging endpoint,
+raw DOM dump or arbitrary file-reading facility is added.
+
+Incoming jobs publish `com.beeper.message_send_status` using `m.reference` to the
+original event. `PENDING` has an empty `delivered_to_users`; `SUCCESS` names the
+Muse bridge actor only after the adapter observes a matching prompt echo and new
+reply. Interrupted or skipped unconfirmed jobs report `FAIL_PERMANENT`. A failed
+reply export does not reverse already confirmed delivery. Deterministic status
+transaction IDs and saved fingerprints allow retries without resending prompts.
+Legacy completed jobs are not relabeled. Native status display still needs client
+verification; source confirmation is a website observation rather than an API receipt.

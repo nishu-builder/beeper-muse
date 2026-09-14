@@ -430,3 +430,23 @@ test('photo attribution requires an image echo and rejects interleaved user mess
   );
   f.dom.window.close();
 });
+
+test('image readiness reports only control counts and diagnoses a missing form before staging a photo', async () => {
+  const f = fixture();
+  f.document.querySelector('textarea')!.value = 'PRIVATE draft';
+  const adapter = f.adapter.create(f.document);
+  const facts = adapter.imageReadiness();
+  assert.equal(facts.hasForm, false);
+  assert.equal(facts.composers, 1);
+  assert.ok(!JSON.stringify(facts).includes('PRIVATE'));
+  f.document.querySelector('textarea')!.value = '';
+  await assert.rejects(
+    adapter.submitImage(
+      '',
+      { name: 'photo.png', mime: 'image/png', data: 'iVBORw0KGgo=' },
+      async () => {},
+    ),
+    (e: unknown) => (e as { code: string }).code === 'image-composer-missing',
+  );
+  f.dom.window.close();
+});

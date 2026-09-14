@@ -27,6 +27,8 @@ async function harness(beforeEncrypt: () => Promise<void> = async () => {}) {
     state = await StateStore.open('test', factory),
     inbox = await IndexedDBInbox.open(config, factory);
   const batches: Record<string, any>[] = [];
+  const statuses: Record<string, any>[] = [];
+  let statusFailure = false;
   let fail = false;
   let outsider = false;
   let imageFailure = false;
@@ -38,6 +40,11 @@ async function harness(beforeEncrypt: () => Promise<void> = async () => {}) {
       new Headers(init?.headers).get('authorization'),
       'Bearer synthetic-test-token',
     );
+    if (url.pathname.includes('/send/com.beeper.message_send_status/')) {
+      if (statusFailure) throw Error('Synthetic status failure');
+      statuses.push(JSON.parse(String(init?.body)));
+      return Response.json({ event_id: '$status' });
+    }
     if (url.pathname.endsWith('/members'))
       return Response.json({
         chunk: [
@@ -89,6 +96,10 @@ async function harness(beforeEncrypt: () => Promise<void> = async () => {}) {
     bridge,
     state,
     batches,
+    statuses,
+    set statusFailure(value: boolean) {
+      statusFailure = value;
+    },
     close: () => bridge.close(),
     set fail(value: boolean) {
       fail = value;
@@ -639,5 +650,65 @@ test('inaccessible images have visible fallbacks but a previously delivered imag
       .filter((e) => e.content?.content?.msgtype === 'm.image').length,
     1,
   );
+  h.close();
+});
+
+test('native status stays pending until Muse confirms, and interrupted sends fail without claiming success', async () => {
+  const h = await harness();
+  await receivePhoto(h);
+  assert.equal(h.statuses.at(-1)?.status, 'PENDING');
+  assert.deepEqual(h.statuses.at(-1)?.delivered_to_users, []);
+  await h.bridge.claim();
+  assert.equal(h.statuses.at(-1)?.status, 'PENDING');
+  await h.bridge.block('$photo', 'image-input-missing');
+  assert.equal(h.statuses.at(-1)?.status, 'FAIL_PERMANENT');
+  assert.equal(h.statuses.at(-1)?.['m.relates_to'].event_id, '$photo');
+  assert.ok(
+    !(await h.bridge.status()).blockedJobs[0]?.error?.includes('PRIVATE'),
+  );
+  await h.bridge.resolve('$photo');
+  assert.equal(h.statuses.at(-1)?.status, 'FAIL_PERMANENT');
+  h.close();
+});
+test('Muse image confirmation requires an image echo, publishes delivered users, and survives reply capture failure', async () => {
+  const h = await harness();
+  await receivePhoto(h);
+  await h.bridge.claim();
+  await assert.rejects(
+    h.bridge.confirm('$photo', {
+      id: 'echo',
+      role: 'user',
+      text: 'Describe this',
+    }),
+  );
+  assert.equal(h.statuses.at(-1)?.status, 'PENDING');
+  await h.bridge.confirm('$photo', {
+    id: 'echo',
+    role: 'user',
+    text: 'Describe this',
+    images: [{ url: 'https://muse.ai/photo.png' }],
+  });
+  assert.equal(h.statuses.at(-1)?.status, 'SUCCESS');
+  assert.deepEqual(h.statuses.at(-1)?.delivered_to_users, [config.bot]);
+  const count = h.statuses.length;
+  await h.bridge.block('$photo', 'result-delivery-failed');
+  await h.bridge.tick();
+  assert.equal(
+    h.statuses.length,
+    count,
+    'confirmed delivery is not reversed by failure returning the reply',
+  );
+  h.close();
+});
+test('failed status requests retry independently without resubmitting the prompt', async () => {
+  const h = await harness();
+  h.statusFailure = true;
+  await receivePhoto(h);
+  assert.equal(h.statuses.length, 0);
+  await h.bridge.claim();
+  h.statusFailure = false;
+  await h.bridge.tick();
+  assert.equal(h.statuses.at(-1)?.status, 'PENDING');
+  assert.equal((await h.bridge.claim()).job, null);
   h.close();
 });

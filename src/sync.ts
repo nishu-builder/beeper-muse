@@ -5,7 +5,7 @@
   const matchesPrompt = (text: string, prompt: string) =>
     normalize(text) === normalize(prompt) ||
     normalize(text.replace(/^You:\s*/, '')) === normalize(prompt);
-  function responseAfter(
+  function promptEcho(
     beforeIDs: Set<string>,
     prompt: string,
     snapshot: Muse.Snapshot,
@@ -23,6 +23,15 @@
     if (users.some((m) => !matches(m)) || users.length > 1)
       throw new Error('Another message was entered in the Muse tab.');
     const echo = users.find(matches);
+    return echo;
+  }
+  function responseAfter(
+    beforeIDs: Set<string>,
+    prompt: string,
+    snapshot: Muse.Snapshot,
+    imageName?: string,
+  ) {
+    const echo = promptEcho(beforeIDs, prompt, snapshot, imageName);
     if (!echo) return null;
     const after = snapshot.messages.slice(snapshot.messages.indexOf(echo) + 1);
     const responses = after.filter(
@@ -255,6 +264,7 @@
     messages,
     fingerprint,
     responseAfter,
+    promptEcho,
     prepareBatch,
   };
 })();

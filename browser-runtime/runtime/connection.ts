@@ -1,7 +1,9 @@
+import { startLogControls } from './log-controls.js';
 import type { BridgeState } from './bridge-metadata.js';
 import { BeeperSocket } from './socket.js';
 import { endpoint, type Registration } from '../transport.js';
 import { CONNECTION_PORT } from './document-socket.js';
+let flushLog: ReturnType<typeof startLogControls>;
 const status = document.getElementById('connection-status')!;
 const stage = document.getElementById('connection-stage')!;
 const pending = new Map<
@@ -67,6 +69,7 @@ function connect() {
         disconnect();
       }
     } else if (m.type === 'pulse') {
+      void flushLog?.();
       try {
         socket?.pulse();
         current.postMessage({ type: 'alive' });
@@ -148,6 +151,7 @@ void navigator.locks.request(
         'Another connection tab is already running. You can close this duplicate.';
       return;
     }
+    flushLog = startLogControls();
     connect();
     window.addEventListener(
       'pagehide',

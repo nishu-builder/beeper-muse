@@ -11,6 +11,15 @@ declare namespace Muse {
     data?: string;
     mime?: string;
   }
+  interface UploadReadiness {
+    composers: number;
+    hasForm: boolean;
+    fileInputs: number;
+    imageInputs: number;
+    existingFiles: number;
+    previews: number;
+    sendButtons: number;
+  }
   interface Upload {
     name: string;
     mime: string;
@@ -61,6 +70,7 @@ declare namespace Muse {
       wait: (ms: number) => Promise<void>,
       active?: () => boolean,
     ): Promise<Set<string>>;
+    imageReadiness?(): UploadReadiness;
     submitImage?(
       prompt: string,
       image: Upload,
@@ -106,6 +116,12 @@ declare namespace Muse {
       messages: Message[],
       prepare: (message: Message) => Promise<Message>,
     ): Promise<Message[]>;
+    promptEcho(
+      beforeIDs: Set<string>,
+      prompt: string,
+      snapshot: Snapshot,
+      imageName?: string,
+    ): Message | undefined;
     responseAfter(
       before: Set<string>,
       prompt: string,

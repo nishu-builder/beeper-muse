@@ -118,3 +118,25 @@ Remaining installed-extension checks:
 - Verify Muse's reply and image echo without duplicate imports or text replacement.
 - Check a native Muse image and a local preview reach Beeper as actual images.
 - Interrupt an upload, inspect the staged attachment and recover without resending it.
+
+## Follow-up diagnostics and native status
+
+The user confirmed that Muse images appeared in Beeper, while an incoming photo
+produced an interrupted job and held a later text message in the outgoing queue.
+The 0.8.0 popup indicated that photo download/decryption had completed but did not
+identify the failing adapter step. This is evidence of a failed live incoming
+photo attempt, not a passed image round trip.
+
+Version 0.8.1 passed 155 JS/TS tests, type checks, Go tests, both builds and
+formatting locally. It records bounded readiness facts and specific failure codes. Synthetic
+checks cover filtering private/unknown fields, ring limits, serial file writes,
+revoked permissions, failed writes, file selection/stop controls, prompt echo
+validation, pending/failed/success status payloads and status retry without a
+second send. The native status schema follows mautrix v0.30.0's `event/beeper.go`
+and `bridgev2/messagestatus.go`.
+
+Remaining live checks: choose the actual diagnostic file in Chrome, confirm it
+updates and survives reload, inspect readiness without another photo send, fix
+and test the identified upload control behavior, and confirm message-status
+rendering in Beeper Desktop and mobile. A pending/failure protocol payload alone
+does not prove the client changed its “Sent” label.

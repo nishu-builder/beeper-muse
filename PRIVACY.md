@@ -92,3 +92,19 @@ During a planned update, a reconnect ticket containing the selected tab ID, Chro
 a two-minute expiry is saved locally and removed on restoration or expiry.
 Unpacked development builds read a local build marker; they do not contact an
 update server or download executable code. Store updates are delivered by Chrome.
+
+## Optional diagnostic file
+
+The extension keeps a bounded local ring of 200 diagnostic entries using a closed
+schema: timestamps, versions, fixed event codes and bounded upload-control counts.
+It does not record message text, image bytes, filenames, credentials, account or
+message identifiers, raw exceptions, or page URLs. A read-only upload readiness
+check counts controls without submitting anything.
+
+You can choose one normal file in Chrome's save dialog for an automatically
+updated copy of that ring. The file handle and write grant stay in this Chrome
+profile; no new host permission, relay or companion is involved. The connection
+tab writes only while permission is granted. You may need to renew permission
+after a restart. Stopping file logging forgets the handle and stops updates,
+but does not delete the exported file or the internal diagnostic ring. File
+backups can retain copies. Share the file only with people you want to inspect it.

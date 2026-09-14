@@ -1,4 +1,5 @@
 /// <reference path="../../src/muse.d.ts" />
+import { explanations, failureCode } from './diagnostic-log.js';
 import { incomingImage, type IncomingImage } from './media.js';
 import { IndexedDBInbox, receiveTransaction } from '../inbox.js';
 import {
@@ -17,6 +18,10 @@ export interface Job {
   phase: 'queued' | 'claimed' | 'done' | 'blocked';
   image?: IncomingImage;
   error?: string;
+  failureCode?: string;
+  confirmed?: boolean;
+  skipped?: boolean;
+  statusFingerprint?: string;
 }
 interface SourceRecord {
   eventID: string;
@@ -207,7 +212,9 @@ export class BrowserBridge {
       await state.put(
         'jobs',
         jobs.map((j) =>
-          j.phase === 'claimed' ? { ...j, phase: 'blocked' } : j,
+          j.phase === 'claimed'
+            ? { ...j, phase: 'blocked', failureCode: 'source-interrupted' }
+            : j,
         ),
       );
       report('Recovering saved messages');
@@ -317,6 +324,7 @@ export class BrowserBridge {
               id: event.event_id,
               prompt: body || 'Image',
               phase: 'blocked',
+              failureCode: 'image-unavailable',
               error:
                 'Image unavailable. Use PNG, JPEG, GIF or WebP up to 5 MB.',
             });
@@ -326,6 +334,7 @@ export class BrowserBridge {
       }
       if (!waiting) await this.inbox.complete(tx.transactionID);
     }
+    await this.flushStatuses();
   }
   tick() {
     return this.serial(async () => {
@@ -345,6 +354,9 @@ export class BrowserBridge {
   async status() {
     const jobs = (await this.state.get<Job[]>('jobs')) || [];
     return {
+      diagnosticFailures: jobs
+        .filter((j) => j.phase === 'blocked')
+        .map((j) => failureCode(j.failureCode)),
       blockedJobs: jobs
         .filter((j) => j.phase === 'blocked')
         .map((j) => ({
@@ -378,9 +390,11 @@ export class BrowserBridge {
           image = await this.crypto.downloadImage(job.image);
         } catch {
           job.phase = 'blocked';
+          job.failureCode = 'image-download-failed';
           job.error =
             'Image download or decryption failed. Check the original photo, dismiss this job, then send it again.';
           await this.state.put('jobs', jobs);
+          await this.flushStatuses();
           return { job: null };
         }
       }
@@ -391,16 +405,16 @@ export class BrowserBridge {
       };
     });
   }
-  block(id: string) {
+  block(id: string, code: unknown = 'source-interrupted') {
     return this.serial(async () => {
       const jobs = (await this.state.get<Job[]>('jobs')) || [];
       const job = jobs.find((j) => j.id === id);
       if (job && job.phase !== 'done') {
         job.phase = 'blocked';
-        if (job.image)
-          job.error =
-            'Image submission was interrupted or Muse could not confirm its preview. Check Muse before sending it again.';
+        job.failureCode = failureCode(code);
+        job.error = explanations[failureCode(code)];
         await this.state.put('jobs', jobs);
+        await this.flushStatuses();
       }
     });
   }
@@ -410,12 +424,90 @@ export class BrowserBridge {
       const job = jobs.find((j) => j.id === id && j.phase === 'blocked');
       if (job) {
         job.phase = 'done';
+        job.skipped = true;
         job.prompt = '';
         delete job.image;
         delete job.error;
         await this.state.put('jobs', jobs);
+        await this.flushStatuses();
       }
     });
+  }
+  private validateEcho(
+    job: Job,
+    echo: Muse.Message | undefined,
+  ): asserts echo is Muse.Message {
+    if (
+      !echo ||
+      echo.role !== 'user' ||
+      typeof echo.id !== 'string' ||
+      !echo.id ||
+      echo.id.length > 1024 ||
+      typeof echo.text !== 'string' ||
+      (job.image
+        ? !echo.images?.length ||
+          (echo.text.trim() !== job.prompt.trim() &&
+            (!!job.prompt || echo.text.trim() !== job.image.name))
+        : echo.text.trim() !== job.prompt.trim())
+    )
+      throw Error('Muse prompt attribution failed.');
+  }
+  confirm(id: string, echo: Muse.Message) {
+    return this.serial(async () => {
+      const jobs = (await this.state.get<Job[]>('jobs')) || [];
+      const job = jobs.find((j) => j.id === id);
+      if (!job || !['claimed', 'blocked'].includes(job.phase))
+        throw Error('Unknown Muse job.');
+      this.validateEcho(job, echo);
+      job.confirmed = true;
+      await this.state.put('jobs', jobs);
+      await this.flushStatuses();
+    });
+  }
+  private async flushStatuses(currentJobs?: Job[]) {
+    const jobs = currentJobs || (await this.state.get<Job[]>('jobs')) || [];
+    // Old completed jobs predate native status tracking; do not relabel history.
+    for (const job of jobs) {
+      if (job.phase === 'done' && !job.confirmed && !job.skipped) continue;
+      const status = job.confirmed
+        ? 'SUCCESS'
+        : job.phase === 'blocked' || job.skipped
+          ? 'FAIL_PERMANENT'
+          : 'PENDING';
+      const message = job.confirmed
+        ? 'Confirmed in Muse.'
+        : status === 'PENDING'
+          ? 'Waiting for confirmation from Muse.'
+          : job.skipped
+            ? 'Skipped. Delivery to Muse was not confirmed.'
+            : 'Delivery to Muse was not confirmed. Check the interrupted message in Beeper Muse.';
+      const content = {
+        status,
+        message,
+        'm.relates_to': { rel_type: 'm.reference', event_id: job.id },
+        delivered_to_users: job.confirmed ? [this.api.config.bot] : [],
+        ...(status === 'FAIL_PERMANENT'
+          ? { reason: 'm.foreign_network_error' }
+          : {}),
+      };
+      const fingerprint = await eventID(this.room, JSON.stringify(content));
+      if (job.statusFingerprint === fingerprint) continue;
+      try {
+        await this.api.members(this.room);
+        await this.api.request(
+          'PUT',
+          '/_matrix/client/v3/rooms/' +
+            enc(this.room) +
+            '/send/com.beeper.message_send_status/' +
+            enc(fingerprint),
+          content,
+        );
+        job.statusFingerprint = fingerprint;
+        await this.state.put('jobs', jobs);
+      } catch {
+        return;
+      } // Retry status on the next tick, never resend the prompt.
+    }
   }
   complete(result: { id: string; messages: Muse.Message[] }) {
     return this.serial(async () => {
@@ -425,15 +517,10 @@ export class BrowserBridge {
         throw Error('Unknown Muse job.');
       if (job.phase === 'done') return;
       const echo = result.messages.find((m) => m.role === 'user');
-      if (
-        !echo ||
-        (job.image
-          ? !echo.images?.length ||
-            (echo.text.trim() !== job.prompt.trim() &&
-              (job.prompt || echo.text.trim() !== job.image.name))
-          : echo.text.trim() !== job.prompt.trim())
-      )
-        throw Error('Muse prompt attribution failed.');
+      this.validateEcho(job, echo);
+      job.confirmed = true;
+      await this.state.put('jobs', jobs);
+      await this.flushStatuses(jobs);
       // Associate the observed prompt with its existing Beeper event.
       await this.state.put('source:' + echo.id, {
         eventID: job.id,

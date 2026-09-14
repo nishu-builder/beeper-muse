@@ -2,7 +2,7 @@
 
 Item: **Beeper Muse** (`bchjpmhhlhpcokhlmbpbiibehfjdgnme`).
 Category: Productivity / Communication. Language: English. Free, public.
-Target package: **0.8.0**, Chrome-only. Verify the actual dashboard status before
+Target package: **0.8.1**, Chrome-only. Verify the actual dashboard status before
 claiming the update is submitted or published.
 
 ## Description

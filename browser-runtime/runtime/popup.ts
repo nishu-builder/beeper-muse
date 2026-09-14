@@ -94,6 +94,9 @@ async function refresh() {
     if (s.connected && beeperReady && s.health === 'draft')
       el('status').textContent =
         'Send or clear your draft in Muse to resume sending from Beeper.';
+    if (s.blocked && beeperReady)
+      el('status').textContent =
+        'Sending to Muse paused. An interrupted message is holding the queue. Check it below, then dismiss it to continue.';
     if (s.update) el('status').textContent = s.update;
     if (actionError) el('status').textContent = actionError;
     el('blocked').replaceChildren();
@@ -152,3 +155,7 @@ for (const [id, type] of Object.entries({
 };
 void refresh();
 setInterval(() => void refresh(), 2000);
+
+el('diagnostics').onclick = () => {
+  void action('open-diagnostics');
+};

@@ -140,6 +140,7 @@
       },
       snapshot: () => snapshot(document),
       activity: () => activity(document),
+      imageReadiness: () => imageReadiness(document),
       submitImage: (prompt, image, wait, active) =>
         submitImage(document, prompt, image, wait, active),
       submit: (prompt, wait, active) => submit(document, prompt, wait, active),
@@ -274,6 +275,38 @@
       }),
     };
   }
+  function imageReadiness(document: Document): Muse.UploadReadiness {
+    const fields = [
+      ...document.querySelectorAll<HTMLTextAreaElement>(
+        'textarea[aria-label="Message"]',
+      ),
+    ].filter(visible);
+    const form = fields.length === 1 ? fields[0]!.closest('form') : null;
+    const inputs = [
+      ...(form?.querySelectorAll<HTMLInputElement>('input[type="file"]') || []),
+    ];
+    return {
+      composers: Math.min(fields.length, 100),
+      hasForm: !!form,
+      fileInputs: Math.min(inputs.length, 100),
+      imageInputs: Math.min(
+        inputs.filter((e) => !e.disabled && /image\//i.test(e.accept)).length,
+        100,
+      ),
+      existingFiles: Math.min(
+        inputs.reduce((n, e) => n + (e.files?.length || 0), 0),
+        100,
+      ),
+      previews: Math.min(form?.querySelectorAll('img[src]').length || 0, 100),
+      sendButtons: Math.min(
+        form?.querySelectorAll('button[aria-label="Send"]').length || 0,
+        100,
+      ),
+    };
+  }
+  function uploadError(code: string, message: string) {
+    return Object.assign(new Error(message), { code });
+  }
   async function submitImage(
     document: Document,
     prompt: string,
@@ -285,19 +318,28 @@
       field = composer(document),
       form = field.closest('form');
     if (!active() || initial.busy || initial.draft.trim())
-      throw Error('Muse is busy or has a draft.');
+      throw uploadError('image-draft', 'Muse is busy or has a draft.');
     // A profile/avatar picker elsewhere in the page must never receive a photo.
     if (!form || form.querySelector('[role="log"]'))
-      throw Error('Muse image composer unavailable.');
+      throw uploadError(
+        'image-composer-missing',
+        'Muse image composer unavailable.',
+      );
     const inputs = [
       ...form.querySelectorAll<HTMLInputElement>('input[type="file"]'),
     ].filter((e) => !e.disabled && /image\//i.test(e.accept));
+    if (!inputs.length)
+      throw uploadError(
+        'image-input-missing',
+        'Muse image file input unavailable.',
+      );
     if (
       inputs.length !== 1 ||
       inputs[0]!.files?.length ||
       form.querySelector('img[src]')
     )
-      throw Error(
+      throw uploadError(
+        'image-composer-ambiguous',
         'Muse image composer is ambiguous or already has an attachment.',
       );
     if (
@@ -305,10 +347,10 @@
       image.data.length > 7 * 1024 * 1024 ||
       !/^[a-zA-Z0-9+/]+={0,2}$/.test(image.data)
     )
-      throw Error('Unsupported image.');
+      throw uploadError('image-unavailable', 'Unsupported image.');
     const raw = atob(image.data);
     if (!raw.length || raw.length > 5 * 1024 * 1024)
-      throw Error('Image exceeds 5 MB.');
+      throw uploadError('image-unavailable', 'Image exceeds 5 MB.');
     const win = document.defaultView as Window & typeof globalThis;
     const file = new win.File(
       [Uint8Array.from(raw, (c) => c.charCodeAt(0))],
@@ -333,7 +375,7 @@
         composer(document) !== field ||
         field.value.trim()
       )
-        throw Error('The image composer changed.');
+        throw uploadError('image-input-changed', 'The image composer changed.');
       const send = [
         ...form.querySelectorAll<HTMLButtonElement>(
           'button[aria-label="Send"]',
@@ -366,12 +408,16 @@
           !send[0]!.isConnected ||
           send[0]!.disabled
         )
-          throw Error('Image submission changed.');
+          throw uploadError(
+            'image-submit-changed',
+            'Image submission changed.',
+          );
         send[0]!.click();
         return new Set(initial.messages.map((m) => m.id));
       }
     }
-    throw Error(
+    throw uploadError(
+      'image-preview-timeout',
       'Image preview did not become ready. Check Muse before retrying.',
     );
   }

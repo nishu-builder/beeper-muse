@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.1
+
+- Add a bounded, content-free diagnostic log with specific upload failure codes
+  and read-only upload-control counts. Choose one file from the connection tab
+  to keep a readable copy updated without a daemon or copying popup errors.
+- Show “Sending to Muse paused” when an interrupted message holds later sends;
+  dismissing the interrupted job skips it and releases the queue.
+- Publish native Beeper pending, failed and confirmed delivery statuses. The
+  bridge waits for a matching Muse echo and new reply before success, and retries
+  status updates independently without resending prompts. Client rendering still
+  needs live confirmation.
+- Keep typed upload diagnostics separate from message contents. The underlying
+  Muse image-upload compatibility issue is still under investigation.
+
 ## 0.8.0
 
 - Add preview Beeper-to-Muse photo jobs with captions, authenticated media

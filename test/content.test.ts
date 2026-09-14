@@ -46,6 +46,7 @@ function harness(
   let submits = 0;
   let draft = '';
   let busy = false;
+  let reply = true;
   let unavailable = false;
   let visibility = 'hidden';
   const events = new Map<
@@ -115,6 +116,7 @@ function harness(
               ok: true,
               connected: true,
               activitySync: activityEnabled,
+              deliveryStatus: true,
               sourceProtocol: structured ? 2 : undefined,
             };
           if (message.type === 'claim')
@@ -162,7 +164,9 @@ function harness(
                     ? { images: [{ url: 'https://muse.ai/photo.png' }] }
                     : {}),
                 },
-                { id: 'a', role: 'assistant', text: 'Synthetic answer' },
+                ...(reply
+                  ? [{ id: 'a', role: 'assistant', text: 'Synthetic answer' }]
+                  : []),
               ]
             : [],
         };
@@ -202,7 +206,13 @@ function harness(
       return JSON.parse(JSON.stringify(result ?? null));
     },
     claim: () => resolveClaim({ ok: true, job }),
-    view(value: { busy?: boolean; draft?: string; unavailable?: boolean }) {
+    view(value: {
+      busy?: boolean;
+      draft?: string;
+      unavailable?: boolean;
+      reply?: boolean;
+    }) {
+      reply = value.reply ?? true;
       busy = value.busy ?? false;
       draft = value.draft ?? '';
       unavailable = value.unavailable ?? false;
@@ -295,7 +305,10 @@ test('the normal content flow submits once and forwards a settled reply once', a
   await h.executed;
   assert.equal(h.submits, 1);
   assert.equal(h.messages.filter((m) => m.type === 'result').length, 1);
-  assert.equal(h.messages.at(-1)?.text, 'Synthetic answer');
+  assert.equal(
+    h.messages.find((m) => m.type === 'result')?.text,
+    'Synthetic answer',
+  );
 });
 
 test('readiness probes expose no draft or chat text', () => {
@@ -308,7 +321,7 @@ test('readiness probes expose no draft or chat text', () => {
   ] as const) {
     h.view(view);
     const probe = h.signal('probe');
-    assert.equal(probe.protocol, 8);
+    assert.equal(probe.protocol, 9);
     assert.equal(probe.health, health);
     assert.deepEqual(Object.keys(probe).sort(), [
       'health',
@@ -446,4 +459,21 @@ test('a missing upload adapter blocks a photo instead of sending its caption alo
   assert.equal(h.submits, 0);
   assert.equal(h.photoSubmits, 0);
   assert.equal(h.messages.filter((m) => m.type === 'block').length, 1);
+});
+
+test('delivery confirmation waits for the matching source echo and a new Muse reply', async () => {
+  const h = harness();
+  h.view({ reply: false });
+  h.signal('start');
+  await flush();
+  await h.advance(10000);
+  assert.equal(h.messages.filter((m) => m.type === 'delivered').length, 0);
+  h.view({ reply: true });
+  await h.advance(10000);
+  await h.executed;
+  assert.equal(h.messages.filter((m) => m.type === 'delivered').length, 1);
+  assert.ok(
+    h.messages.findIndex((m) => m.type === 'delivered') <
+      h.messages.findIndex((m) => m.type === 'result'),
+  );
 });

@@ -80,6 +80,11 @@ current Muse website has **not** been verified: browser inspection was unavailab
 See [image validation](docs/validation.md#image-support-acceptance). The new storage
 permission may require accepting an extension update in Chrome.
 
+If sending stalls, the popup identifies the interrupted job. Inspect Muse and
+choose **Dismiss this job** to skip it and release later sends. For troubleshooting,
+use **Diagnostic log** to choose a file that updates automatically without
+including your conversations. See [logging and recovery](docs/operations.md#save-a-diagnostic-log).
+
 ## How it works
 
 ```mermaid
