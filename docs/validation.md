@@ -370,3 +370,9 @@ exact byte match against the sole loaded local preview. Regressions cover change
 bytes, truncated/oversized streams, remote URLs, newly selected files, user drafts
 and preview changes during caption entry. Full photo delivery and post-photo text
 remain unverified until the staged test is inspected and a new test can run.
+
+The automatic 0.8.10 → 0.8.11 update successfully restored the same selected Muse
+source and continued writing fresh diagnostics. Both connections report ready;
+the held photo job remains held. New upload readiness finds no existing files or
+previews. No manual reconnect was required for this update, and no held job was
+replayed. Another photo test awaits dismissal of the synthetic failed job.

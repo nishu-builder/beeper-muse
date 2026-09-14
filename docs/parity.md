@@ -13,8 +13,8 @@ The product remains Chrome-only. Maintainer test tools are optional.
 1. Complete the live iteration loop. Beeper Desktop's API recovered after restart.
    Fresh 0.8.9 diagnostics allowed a new text test; its round trip passed. After
    the 0.8.10 status fix, that same test also reports native delivery. Automatic
-   reload and diagnostic-file retention were observed; selected-tab recovery
-   exposed a document-token validation bug, now fixed and awaiting live retest.
+   reload, diagnostic-file retention and selected-tab recovery were verified
+   during the 0.8.10 → 0.8.11 update; the held photo job stayed held.
 2. Verify incoming photo delivery. A fresh 0.8.10 photo test staged an attachment
    but stopped at image-input-changed before Send; native failure was verified.
    The test remains held. 0.8.11 supports reset pickers with byte-identical local
@@ -315,3 +315,12 @@ work the same composer, preview URL/node, caption, file selection and Send state
 are rechecked. Tests reject wrong/truncated/oversized bytes, foreign remote
 previews, new files, user drafts and preview changes while entering a caption.
 This is synthetic coverage; successful live photo delivery remains open.
+
+The 0.8.10 → 0.8.11 local update completed automatically. Fresh export fingerprint
+38783b35a3a456931d82ed2498e18357e18a15cb6ca23eeeb16aeab63eefbe18
+shows Beeper and Muse connected, ready composer, zero queued/claimed/pending jobs
+and one held job. The new source reports zero existing files and previews. This
+verifies selected-document recovery and continuing file logging for this update;
+it does not establish why the first upload changed its picker or prove a photo
+was submitted. The user has been asked to dismiss only the synthetic test job
+before another test; no dismissal or resend was automated.
