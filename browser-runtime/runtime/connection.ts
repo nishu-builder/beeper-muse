@@ -1,3 +1,4 @@
+import type { BridgeState } from './bridge-metadata.js';
 import { BeeperSocket } from './socket.js';
 import { endpoint, type Registration } from '../transport.js';
 import { CONNECTION_PORT } from './document-socket.js';
@@ -59,7 +60,13 @@ function connect() {
   current.onMessage.addListener((value: unknown) => {
     if (port !== current || !value || typeof value !== 'object') return;
     const m = value as Record<string, unknown>;
-    if (m.type === 'pulse') {
+    if (m.type === 'bridge-state' && m.state && typeof m.state === 'object') {
+      try {
+        socket?.publishBridgeState(m.state as BridgeState);
+      } catch {
+        disconnect();
+      }
+    } else if (m.type === 'pulse') {
       try {
         socket?.pulse();
         current.postMessage({ type: 'alive' });

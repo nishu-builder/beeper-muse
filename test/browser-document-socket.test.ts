@@ -53,6 +53,7 @@ function harness(t: import('node:test').TestContext, contexts: unknown[] = []) {
         getContexts: async () => contexts,
       },
       tabs: {
+        reload: async () => {},
         create: async (input: unknown) => {
           created.push(input);
           return { id: 3 };

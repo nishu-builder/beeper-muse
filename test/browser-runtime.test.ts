@@ -431,3 +431,16 @@ test('startup diagnostics expose categories without raw account or credential te
   );
   assert.match(startupFailure(new MatrixError(401, 'M_UNKNOWN_TOKEN')), /401/);
 });
+
+test('Muse room metadata identifies a DM and the same login advertised in bridge status', async () => {
+  const { museBridgeInfo, connectedBridgeState } =
+    await import('../browser-runtime/runtime/bridge-metadata.ts');
+  const info = museBridgeInfo(config);
+  const state = connectedBridgeState(config.owner);
+  assert.equal(info['com.beeper.room_type'], 'dm');
+  assert.equal(info['com.beeper.room_type.v2'], 'dm');
+  assert.equal(info.channel['fi.mau.receiver'], state.remote_id);
+  assert.equal(state.user_id, config.owner);
+  assert.equal(info.bridgebot, config.bot);
+  assert(!JSON.stringify({ info, state }).includes(config.appserviceToken));
+});

@@ -8,6 +8,7 @@ import {
 } from './matrix.js';
 import { MatrixCrypto, type Event } from './crypto.js';
 import { StateStore } from './state.js';
+import { museBridgeInfo } from './bridge-metadata.js';
 export interface Job {
   id: string;
   prompt: string;
@@ -103,16 +104,7 @@ export class BrowserBridge {
         } catch (error) {
           if (!(error instanceof MatrixError) || error.code !== 'M_NOT_FOUND')
             throw error;
-          const bridge = {
-            bridgebot: config.bot,
-            creator: config.bot,
-            protocol: {
-              id: 'muse',
-              displayname: 'Muse',
-              external_url: 'https://muse.ai',
-            },
-            channel: { id: 'muse', displayname: 'Muse' },
-          };
+          const bridge = museBridgeInfo(config);
           room = (
             await api.request<{ room_id: string }>(
               'POST',
@@ -170,6 +162,39 @@ export class BrowserBridge {
       if (encryption.algorithm !== 'm.megolm.v1.aes-sha2')
         throw Error('Muse chat encryption is not enabled.');
       await api.members(room);
+      // Migrate only this bridge's known state keys; preserve unrelated metadata.
+      const metadata = museBridgeInfo(config);
+      for (const type of ['m.bridge', 'uk.half-shot.bridge']) {
+        const path =
+          '/_matrix/client/v3/rooms/' +
+          enc(room) +
+          '/state/' +
+          type +
+          '/' +
+          enc('muse://muse');
+        const existing = await api.request<Record<string, unknown>>(
+          'GET',
+          path,
+        );
+        if (existing.bridgebot !== config.bot)
+          throw Error('Muse room bridge identity changed.');
+        const channel = existing.channel as Record<string, unknown> | undefined;
+        if (
+          existing['com.beeper.room_type.v2'] !== 'dm' ||
+          existing['com.beeper.room_type'] !== 'dm' ||
+          channel?.['fi.mau.receiver'] !== metadata.channel['fi.mau.receiver']
+        ) {
+          await api.request('PUT', path, {
+            ...existing,
+            'com.beeper.room_type': 'dm',
+            'com.beeper.room_type.v2': 'dm',
+            channel: {
+              ...channel,
+              'fi.mau.receiver': metadata.channel['fi.mau.receiver'],
+            },
+          });
+        }
+      }
       inbox = await IndexedDBInbox.open(config, factory);
       const bridge = new BrowserBridge(api, state, inbox, crypto, room);
       // Claims are uncertain after a worker restart; never submit them twice.

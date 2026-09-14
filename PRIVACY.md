@@ -10,7 +10,7 @@ service for this extension.
 
 ## Chrome-only preview
 
-Version 0.6.4 connects directly from Chrome to `matrix.beeper.com` over HTTPS
+Version 0.6.5 connects directly from Chrome to `matrix.beeper.com` over HTTPS
 and WebSocket. It does not contact a localhost service. Its one-time registration
 setup uses Beeper's official bridge manager. The imported application-service
 credential stays in trusted extension storage and is never sent to the Muse

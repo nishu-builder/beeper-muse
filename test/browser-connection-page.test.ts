@@ -1,3 +1,4 @@
+import { connectedBridgeState } from '../browser-runtime/runtime/bridge-metadata.ts';
 /// <reference types="chrome" />
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -103,6 +104,7 @@ test('bundled connection page uses tab-scoped socket headers and relays only wor
         return client;
       },
     },
+    tabs: { reload: async () => {} },
     declarativeNetRequest: {
       updateSessionRules: async (change: unknown) => {
         rules.push(change);
@@ -165,14 +167,30 @@ test('bundled connection page uses tab-scoped socket headers and relays only wor
   network.onmessage!({ data: '{"command":"response","id":1}' });
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(states.at(-1), 'connected');
+  adapter.publishBridgeState(
+    connectedBridgeState('@test:beeper.com', 1700000000000),
+  );
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.deepEqual(JSON.parse(network.sent[1]!), {
+    command: 'bridge_status',
+    data: {
+      state_event: 'CONNECTED',
+      source: 'bridge',
+      timestamp: 1700000000,
+      ttl: 21600,
+      user_id: '@test:beeper.com',
+      remote_id: 'browser',
+      remote_name: 'Muse browser',
+    },
+  });
   network.onmessage!({
     data: '{"command":"transaction","id":9,"txn_id":"tx","events":[]}',
   });
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(network.sent.length, 1); // Only ping, no acknowledgement yet.
+  assert.equal(network.sent.length, 2); // Ping and bridge status; no transaction ACK yet.
   commit();
   await new Promise((resolve) => setImmediate(resolve));
-  assert.equal(JSON.parse(network.sent[1]!).data.txn_id, 'tx');
+  assert.equal(JSON.parse(network.sent[2]!).data.txn_id, 'tx');
   await adapter.stop();
   await new Promise((resolve) => setImmediate(resolve));
   assert.equal(network.closed, true);

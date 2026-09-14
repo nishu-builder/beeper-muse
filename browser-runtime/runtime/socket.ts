@@ -1,3 +1,4 @@
+import type { BridgeState } from './bridge-metadata.js';
 import {
   describeRequest,
   type RequestObservation,
@@ -145,9 +146,10 @@ export class BeeperSocket {
         m.command === 'connect'
       ) {
         this.lastReply = Date.now();
+        const firstConfirmation = !this.confirmed;
         this.confirmed = true;
         if (this.handshake) clearTimeout(this.handshake);
-        this.status('connected');
+        if (firstConfirmation) this.status('connected');
         return;
       }
       if (m.command === 'disconnect') {
@@ -188,6 +190,16 @@ export class BeeperSocket {
           'Beeper disconnected. Retrying automatically.',
         );
     };
+  }
+  publishBridgeState(state: BridgeState) {
+    if (
+      !this.confirmed ||
+      this.stopped ||
+      this.socket?.readyState !== WebSocket.OPEN
+    )
+      throw Error('Beeper connection is not ready for bridge status.');
+    // Fire-and-forget, matching mautrix SendBridgeStatus; no ping/transaction ID.
+    this.socket.send(JSON.stringify({ command: 'bridge_status', data: state }));
   }
   pulse() {
     if (!this.stopped && this.socket?.readyState === WebSocket.OPEN)

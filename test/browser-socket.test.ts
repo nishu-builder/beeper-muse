@@ -94,6 +94,8 @@ test('worker handshake uses scoped headers and sends heartbeats under the idle t
   t.mock.timers.tick(20000);
   assert.equal(h.network.sent.length, 2);
   assert.equal(JSON.parse(h.network.sent[1]!).command, 'ping');
+  h.network.reply({ command: 'response', id: 2 });
+  assert.equal(h.states.filter((state) => state === 'connected').length, 1);
   assert.deepEqual(h.changes[0]!.addRules![0]!.condition.initiatorDomains, [
     'a'.repeat(32),
   ]);

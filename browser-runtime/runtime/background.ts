@@ -1,3 +1,4 @@
+import { connectedBridgeState } from './bridge-metadata.js';
 import { BrowserBridge } from './bridge.js';
 import { configuration, type Configuration } from './matrix.js';
 import { startupFailure } from './diagnostics.js';
@@ -80,6 +81,7 @@ async function start() {
           if (reason) failure = reason;
           phase = state;
           if (state === 'connected') {
+            socket?.publishBridgeState(connectedBridgeState(config.owner));
             failure = '';
             failures = 0;
             retryAt = 0;

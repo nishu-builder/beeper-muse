@@ -1,3 +1,4 @@
+import type { BridgeState } from './bridge-metadata.js';
 import type { Registration } from '../transport.js';
 export const CONNECTION_PAGE = 'connection.html';
 export const CONNECTION_PORT = 'beeper-muse-connection';
@@ -8,6 +9,8 @@ type State = 'connected' | 'disconnected' | 'conflict' | 'error';
 export class DocumentSocket {
   private port?: chrome.runtime.Port;
   private stopped = false;
+  private bridgeState?: BridgeState;
+  private stateSentAt = 0;
   private heartbeat?: ReturnType<typeof setInterval>;
   private timer?: ReturnType<typeof setTimeout>;
   constructor(
@@ -25,6 +28,11 @@ export class DocumentSocket {
     this.heartbeat = setInterval(() => {
       try {
         this.port?.postMessage({ type: 'pulse' });
+        if (this.bridgeState && Date.now() - this.stateSentAt >= 3600000)
+          this.publishBridgeState({
+            ...this.bridgeState,
+            timestamp: Math.floor(Date.now() / 1000),
+          });
       } catch {
         this.port?.disconnect();
       }
@@ -40,7 +48,12 @@ export class DocumentSocket {
       documentUrls: [chrome.runtime.getURL(CONNECTION_PAGE)],
     });
     if (this.stopped) return;
-    if (!contexts.length)
+    const existingTab = contexts.find((context) => context.tabId >= 0);
+    if (existingTab) {
+      // Updating an unpacked extension can leave an old document alive. Reload
+      // only our exact connection page so both ends use the current protocol.
+      await chrome.tabs.reload(existingTab.tabId);
+    } else if (!contexts.length)
       await chrome.tabs.create({
         url: chrome.runtime.getURL(CONNECTION_PAGE),
         active: false,
@@ -62,6 +75,7 @@ export class DocumentSocket {
     if (this.timer) clearTimeout(this.timer);
     this.port?.disconnect();
     this.port = port;
+    this.bridgeState = undefined;
     const send = (message: unknown) => {
       if (this.port !== port || this.stopped)
         throw Error('Connection tab closed.');
@@ -129,6 +143,12 @@ export class DocumentSocket {
       registration: this.registration,
       tabId: sender.tab!.id,
     });
+  }
+  publishBridgeState(state: BridgeState) {
+    if (!this.port || this.stopped) return;
+    this.port.postMessage({ type: 'bridge-state', state });
+    this.bridgeState = state;
+    this.stateSentAt = Date.now();
   }
   async stop() {
     this.stopped = true;
