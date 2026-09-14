@@ -91,3 +91,61 @@ mobile differ, the popup's startup step/error, and reproducible steps with a
 synthetic prompt. Redact messages, room/user IDs, registration JSON, tokens,
 private files and browser profiles. Do not attach raw diagnostic logs publicly.
 Use [private vulnerability reporting](../SECURITY.md) for security issues.
+
+## A photo did not arrive
+
+Open the extension popup and check interrupted jobs. Unsupported files or failed
+media downloads block the queue rather than silently sending a text placeholder.
+PNG, JPEG, GIF and WebP are accepted up to 5 MB from Beeper; Muse uploads remain
+in preview pending live website verification. Check for a staged attachment or
+existing draft in Muse before dismissing the job and sending it again. Do not
+clear extension storage or recreate the registration to retry a photo.
+
+After updating from 0.7, check whether Chrome is waiting for the added Beeper
+storage permission. Muse-to-Beeper image fetching still follows the webpage's
+access rules and lower size limits; a fallback link means the image bytes could
+not be retrieved, not that the Beeper connection failed.
+
+## Save a diagnostic log
+
+From the popup choose **Diagnostic log**, then **Choose diagnostic log file** in
+the connection tab. Save the suggested `beeper-muse-diagnostics.json` in Downloads
+(or another location you choose). Chrome requires this file selection. The
+extension remembers the file handle and updates the same file with a heartbeat
+about every five seconds; background throttling can delay writes.
+Keep the connection tab open. If Chrome revokes the grant, choose **Allow file
+updates**; the extension never prompts for file access in the background.
+
+This file contains the latest 200 diagnostic events: timestamps, extension
+versions, fixed stage/failure codes and bounded counts of upload controls. A
+heartbeat adds the source build fingerprint, readiness flags and queue counts. It
+contains no message text, photos, filenames, account/room/event IDs, credentials,
+raw exceptions or page addresses. An assistant with permission to read your files
+can inspect this selected file directly. No browser-profile access, local server
+or companion process is required. The maintainer receives nothing automatically.
+
+Opening diagnostics also checks the connected Muse upload controls without
+clicking them, attaching a file or sending a prompt. This helps diagnose a photo
+that already failed; it does not retry that photo or reconstruct its past error.
+Choose **Stop file logging** to stop updates and forget the selected handle.
+The exported file remains until you delete it.
+
+## Sending is paused even though Beeper is connected
+
+An interrupted job holds later Beeper-to-Muse sends to avoid an uncertain resend
+or accidental submission of a staged attachment. Inspect Muse, then choose
+**Dismiss this job** to skip that job and release the queue. The skipped message
+is not resent. Muse-to-Beeper observation is separate from this sending queue.
+
+Native Beeper message-status events distinguish pending, failed and confirmed
+delivery. Success requires a matching source echo and a new Muse reply, not just
+a successful WebSocket or Send click. These remain website observations, not an
+official Muse server receipt. Beeper controls how its clients display the status;
+“Sent” can appear briefly for server acceptance before the bridge updates it.
+
+Known failures before the photo is attached (unsupported media, failed download,
+or a missing upload form/input) remain visible but do not hold later messages.
+A changed input, unfinished preview or interrupted submission is still uncertain
+and holds the queue. The bridge never automatically retries either category.
+For maintainer-driven checks and automatic updates, see the
+[development loop](development-loop.md).

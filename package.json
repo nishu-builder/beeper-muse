@@ -1,6 +1,6 @@
 {
   "name": "beeper-muse",
-  "version": "0.7.2",
+  "version": "0.8.4",
   "description": "Your Muse conversation in Beeper, connected directly from Chrome.",
   "type": "module",
   "private": true,
@@ -26,7 +26,12 @@
     "build:browser-runtime": "npm run build:extension && node scripts/build-browser-runtime.mjs",
     "prepare:browser-runtime": "npm run build:browser-runtime && node scripts/prepare-browser-runtime.mjs",
     "build:legacy": "npm run build:extension && npm run build:native",
-    "prepare:registration": "node scripts/registration.mjs"
+    "prepare:registration": "node scripts/registration.mjs",
+    "dev:doctor": "tsx scripts/dev/cli.ts doctor",
+    "dev:test": "tsx scripts/dev/cli.ts run",
+    "dev:observe": "tsx scripts/dev/cli.ts observe",
+    "dev:close": "tsx scripts/dev/cli.ts close",
+    "dev:cycle": "tsx scripts/dev/cycle.ts"
   },
   "devDependencies": {
     "@types/chrome": "0.2.9",

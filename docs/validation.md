@@ -85,3 +85,126 @@ outcomes without committing credentials, identifiers or private screenshots.
 Do not mark an item passed based only on synthetic tests or a successful socket.
 Store upload, review submission and publication are separate states. See
 [release process](RELEASING.md) and [troubleshooting](operations.md).
+
+## Image support acceptance
+
+For 0.8.0, 145 JavaScript/TypeScript tests, all type checks, Go tests and race
+tests, both builds, formatting, public packaging and the production dependency
+audit passed locally (zero reported vulnerabilities).
+
+The 0.8 image work adds synthetic coverage for encrypted/plain image descriptors,
+stream limits, MIME signatures, caption handling, single claims, failed-job
+recovery, prompt attribution, existing-draft preservation, loaded previews,
+local image extraction and native-photo deduplication during catch-up. A local
+HTTP redirect test verifies that native fetch removes Authorization before
+requesting a different origin. These are not Chrome permission or live DOM tests.
+
+On September 14, 2026, a synthetic 68-byte PNG was encrypted, uploaded to the
+configured Beeper media API, downloaded through its storage redirect, decrypted
+and byte-compared successfully. No conversation messages were sent by that probe.
+The authenticated download returned a 307 redirect even with `allow_redirect=false`;
+rejecting redirects prevented media downloads.
+
+Browser inspection of the signed-in Muse page repeatedly returned “Debugger
+unattached,” including after the user confirmed DevTools was closed. The current
+upload adapter therefore has only synthetic form/input/preview coverage. Its
+compatibility with Muse's current upload controls is **not verified**. Do not
+claim complete image support from the media API test alone.
+
+Remaining installed-extension checks:
+
+- Accept the new storage permission and download/decrypt a Beeper photo in Chrome.
+- Upload a real photo, with and without a caption, into the selected Muse chat.
+- Verify Muse's reply and image echo without duplicate imports or text replacement.
+- Check a native Muse image and a local preview reach Beeper as actual images.
+- Interrupt an upload, inspect the staged attachment and recover without resending it.
+
+## Follow-up diagnostics and native status
+
+The user confirmed that Muse images appeared in Beeper, while an incoming photo
+produced an interrupted job and held a later text message in the outgoing queue.
+The 0.8.0 popup indicated that photo download/decryption had completed but did not
+identify the failing adapter step. This is evidence of a failed live incoming
+photo attempt, not a passed image round trip.
+
+Version 0.8.1 passed 155 JS/TS tests, type checks, Go tests, both builds and
+formatting locally. It records bounded readiness facts and specific failure codes. Synthetic
+checks cover filtering private/unknown fields, ring limits, serial file writes,
+revoked permissions, failed writes, file selection/stop controls, prompt echo
+validation, pending/failed/success status payloads and status retry without a
+second send. The native status schema follows mautrix v0.30.0's `event/beeper.go`
+and `bridgev2/messagestatus.go`.
+
+Remaining live checks: choose the actual diagnostic file in Chrome, confirm it
+updates and survives reload, inspect readiness without another photo send, fix
+and test the identified upload control behavior, and confirm message-status
+rendering in Beeper Desktop and mobile. A pending/failure protocol payload alone
+does not prove the client changed its “Sent” label.
+
+## Development loop (0.8.2)
+
+On September 14, 2026, the local repository checks passed with 165 JS/TS tests,
+all TypeScript checks, Go tests, both builds and formatting. Go race tests passed.
+New regressions cover target pinning, response validation, redirect refusal,
+failed send journals, uncertain-send replay prevention, stale build/log rejection,
+image-content verification, delivery versus reply evidence and queue continuation
+only after known pre-upload failures.
+
+Live Beeper Desktop observations:
+
+- The pinned Muse chat and its expected owner/bot participants were found.
+- Chat-detail and ordinary message-list routes still returned HTTP 500.
+- Chat-scoped message search succeeded. A live validation error established its
+  20-result limit; the driver was corrected to respect that limit and to reject
+  incomplete results.
+- The Desktop image-upload API accepted a synthetic 168-byte PNG and returned an
+  upload ID. This uploaded a test asset; it sent no conversation message.
+- `dev:doctor` verified the target and search, then correctly stopped because the
+  diagnostic file had not been selected. No text/photo round trip was initiated.
+- Supported browser inspection still returned `Debugger unattached`. Actual Muse
+  file-input compatibility remains unresolved.
+
+The cycle, automatic-reload heartbeat, live send path, native status rendering
+and both-direction image round trip are **not yet live-verified**. The next
+prerequisite is the one-time diagnostic file grant. Existing uncertain uploads
+must still be inspected before dismissing them; this version does not silently
+release or resend the user's previously interrupted photo.
+
+## First diagnostic-file observation (0.8.3 work)
+
+The selected diagnostic file updated successfully and reported the exact 0.8.2
+build, both connections ready, one interrupted image and one queued text message.
+The upload-readiness event showed one composer and `hasForm: false`. Previous
+file/preview counts were scoped to that absent form; zero counts therefore did
+not establish that the page had no upload input or staged image.
+
+The adapter now considers the smallest composer ancestor with upload controls,
+rejecting page roots and regions containing transcript messages or multiple
+textareas. Synthetic tests cover both native forms and form-free containers,
+while preserving existing drafts and requiring a loaded preview. Additional
+content-free counts distinguish a missing region from a missing page file input.
+The older interrupted attempt remains held because current readiness cannot
+prove whether that historical attempt reached Muse.
+
+## Avatar, activity and persistent parity tracking (0.8.4)
+
+All 175 JavaScript/TypeScript tests pass, together with the TypeScript checks,
+Go tests, builds and formatting checks. New synthetic cases cover avatar
+selection outside history/navigation, ambiguous names, byte limits, concurrent
+refreshes, native state preservation, retry after partial failure and nonblocking
+source reads. Activity cases distinguish current controls from historical
+widgets and leave unknown source activity to expire instead of inventing idle.
+
+Live read-only Matrix checks found no avatar on either the selected room or the
+Muse bot. A short typing request and its explicit clearing request were accepted;
+no conversation message was sent, and this does not verify visible client typing.
+The corresponding Desktop account exists, connected, under self-hosted `bridgev2`
+without a friendly network name. Its Account-screen rendering remains unverified.
+
+Supported browser inspection still returns `Debugger unattached`. The selected
+diagnostic file is stale; its last runtime is 0.8.2 with one held photo and one
+queued text. The development driver correctly refuses to send a test in this
+state. The new source selectors are synthetic hypotheses until inspected against
+the live header and upload controls. Track all remaining work in the
+[parity ledger](parity.md); neither avatar display nor full message parity is
+claimed from passing tests.

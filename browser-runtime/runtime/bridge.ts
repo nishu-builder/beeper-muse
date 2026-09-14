@@ -1,4 +1,7 @@
 /// <reference path="../../src/muse.d.ts" />
+import { AvatarSync } from './avatar.js';
+import { explanations, failureCode } from './diagnostic-log.js';
+import { incomingImage, type IncomingImage } from './media.js';
 import { IndexedDBInbox, receiveTransaction } from '../inbox.js';
 import {
   MatrixAPI,
@@ -14,11 +17,20 @@ export interface Job {
   id: string;
   prompt: string;
   phase: 'queued' | 'claimed' | 'done' | 'blocked';
+  // Only set for failures known to happen before touching Muse's composer.
+  safeToContinue?: boolean;
+  image?: IncomingImage;
+  error?: string;
+  failureCode?: string;
+  confirmed?: boolean;
+  skipped?: boolean;
+  statusFingerprint?: string;
 }
 interface SourceRecord {
   eventID: string;
   fingerprint: string;
   contentFingerprint?: string;
+  originalImage?: boolean;
   role: Muse.Role;
   timestamp: number;
   reactions: Record<string, string>;
@@ -38,6 +50,11 @@ export class BrowserBridge {
   private chain: Promise<unknown> = Promise.resolve();
   private intake: Promise<unknown> = Promise.resolve();
   private paused = false;
+  private avatarSync?: AvatarSync;
+  profile(avatar: unknown) {
+    this.avatarSync ??= new AvatarSync(this.api, this.state, this.room);
+    return this.avatarSync.update(avatar);
+  }
   pause() {
     this.paused = true;
   }
@@ -203,7 +220,9 @@ export class BrowserBridge {
       await state.put(
         'jobs',
         jobs.map((j) =>
-          j.phase === 'claimed' ? { ...j, phase: 'blocked' } : j,
+          j.phase === 'claimed'
+            ? { ...j, phase: 'blocked', failureCode: 'source-interrupted' }
+            : j,
         ),
       );
       report('Recovering saved messages');
@@ -273,7 +292,7 @@ export class BrowserBridge {
         )
           continue;
         if (
-          event.content.msgtype !== 'm.text' ||
+          !['m.text', 'm.image'].includes(String(event.content.msgtype)) ||
           typeof event.content.body !== 'string'
         )
           continue;
@@ -287,14 +306,44 @@ export class BrowserBridge {
         const jobs = (await this.state.get<Job[]>('jobs')) || [];
         if (jobs.some((j) => j.id === event.event_id)) continue;
         const body = event.content.body.trim();
-        if (!body || body.length > 16000) continue;
+        if (
+          (!body && event.content.msgtype !== 'm.image') ||
+          body.length > 16000
+        )
+          continue;
         if (jobs.filter((j) => j.phase !== 'done').length >= 128)
           throw Error('Muse prompt queue is full.');
-        jobs.push({ id: event.event_id, prompt: body, phase: 'queued' });
+        if (event.content.msgtype === 'm.image') {
+          try {
+            const image = incomingImage(event.content);
+            const caption =
+              typeof event.content.filename === 'string' &&
+              body !== event.content.filename
+                ? body
+                : '';
+            jobs.push({
+              id: event.event_id,
+              prompt: caption,
+              image,
+              phase: 'queued',
+            });
+          } catch {
+            jobs.push({
+              id: event.event_id,
+              prompt: body || 'Image',
+              phase: 'blocked',
+              safeToContinue: true,
+              failureCode: 'image-unavailable',
+              error:
+                'Image unavailable. Use PNG, JPEG, GIF or WebP up to 5 MB.',
+            });
+          }
+        } else jobs.push({ id: event.event_id, prompt: body, phase: 'queued' });
         await this.state.put('jobs', jobs);
       }
       if (!waiting) await this.inbox.complete(tx.transactionID);
     }
+    await this.flushStatuses();
   }
   tick() {
     return this.serial(async () => {
@@ -314,12 +363,21 @@ export class BrowserBridge {
   async status() {
     const jobs = (await this.state.get<Job[]>('jobs')) || [];
     return {
+      diagnosticFailures: jobs
+        .filter((j) => j.phase === 'blocked')
+        .map((j) => failureCode(j.failureCode)),
       blockedJobs: jobs
         .filter((j) => j.phase === 'blocked')
-        .map((j) => ({ id: j.id, prompt: j.prompt })),
+        .map((j) => ({
+          id: j.id,
+          prompt: j.prompt || j.image?.name || 'Image',
+          error: j.error,
+        })),
       claimed: jobs.filter((j) => j.phase === 'claimed').length,
       queued: jobs.filter((j) => j.phase === 'queued').length,
       blocked: jobs.filter((j) => j.phase === 'blocked').length,
+      held: jobs.filter((j) => j.phase === 'blocked' && !j.safeToContinue)
+        .length,
       pending: (await this.inbox.pending(128)).length,
       room: this.room,
     };
@@ -333,22 +391,55 @@ export class BrowserBridge {
       if (this.paused) return { job: null };
       await this.api.members(this.room);
       const jobs = (await this.state.get<Job[]>('jobs')) || [];
-      if (jobs.some((j) => j.phase === 'claimed' || j.phase === 'blocked'))
+      if (
+        jobs.some(
+          (j) =>
+            j.phase === 'claimed' ||
+            (j.phase === 'blocked' && !j.safeToContinue),
+        )
+      )
         return { job: null };
       const job = jobs.find((j) => j.phase === 'queued');
       if (!job) return { job: null };
+      let image: Muse.Upload | undefined;
+      if (job.image) {
+        try {
+          image = await this.crypto.downloadImage(job.image);
+        } catch {
+          job.phase = 'blocked';
+          job.failureCode = 'image-download-failed';
+          job.safeToContinue = true;
+          job.error =
+            'Image download or decryption failed. Check the original photo, dismiss this job, then send it again.';
+          await this.state.put('jobs', jobs);
+          await this.flushStatuses();
+          return { job: null };
+        }
+      }
       job.phase = 'claimed';
       await this.state.put('jobs', jobs);
-      return { job: { id: job.id, prompt: job.prompt } };
+      return {
+        job: { id: job.id, prompt: job.prompt, ...(image ? { image } : {}) },
+      };
     });
   }
-  block(id: string) {
+  block(id: string, code: unknown = 'source-interrupted') {
     return this.serial(async () => {
       const jobs = (await this.state.get<Job[]>('jobs')) || [];
       const job = jobs.find((j) => j.id === id);
       if (job && job.phase !== 'done') {
         job.phase = 'blocked';
+        job.failureCode = failureCode(code);
+        job.safeToContinue = [
+          'image-composer-missing',
+          'image-input-missing',
+          'image-unavailable',
+          'image-download-failed',
+          'image-adapter-unavailable',
+        ].includes(job.failureCode);
+        job.error = explanations[failureCode(code)];
         await this.state.put('jobs', jobs);
+        await this.flushStatuses();
       }
     });
   }
@@ -358,10 +449,90 @@ export class BrowserBridge {
       const job = jobs.find((j) => j.id === id && j.phase === 'blocked');
       if (job) {
         job.phase = 'done';
+        job.skipped = true;
         job.prompt = '';
+        delete job.image;
+        delete job.error;
         await this.state.put('jobs', jobs);
+        await this.flushStatuses();
       }
     });
+  }
+  private validateEcho(
+    job: Job,
+    echo: Muse.Message | undefined,
+  ): asserts echo is Muse.Message {
+    if (
+      !echo ||
+      echo.role !== 'user' ||
+      typeof echo.id !== 'string' ||
+      !echo.id ||
+      echo.id.length > 1024 ||
+      typeof echo.text !== 'string' ||
+      (job.image
+        ? !echo.images?.length ||
+          (echo.text.trim() !== job.prompt.trim() &&
+            (!!job.prompt || echo.text.trim() !== job.image.name))
+        : echo.text.trim() !== job.prompt.trim())
+    )
+      throw Error('Muse prompt attribution failed.');
+  }
+  confirm(id: string, echo: Muse.Message) {
+    return this.serial(async () => {
+      const jobs = (await this.state.get<Job[]>('jobs')) || [];
+      const job = jobs.find((j) => j.id === id);
+      if (!job || !['claimed', 'blocked'].includes(job.phase))
+        throw Error('Unknown Muse job.');
+      this.validateEcho(job, echo);
+      job.confirmed = true;
+      await this.state.put('jobs', jobs);
+      await this.flushStatuses();
+    });
+  }
+  private async flushStatuses(currentJobs?: Job[]) {
+    const jobs = currentJobs || (await this.state.get<Job[]>('jobs')) || [];
+    // Old completed jobs predate native status tracking; do not relabel history.
+    for (const job of jobs) {
+      if (job.phase === 'done' && !job.confirmed && !job.skipped) continue;
+      const status = job.confirmed
+        ? 'SUCCESS'
+        : job.phase === 'blocked' || job.skipped
+          ? 'FAIL_PERMANENT'
+          : 'PENDING';
+      const message = job.confirmed
+        ? 'Confirmed in Muse.'
+        : status === 'PENDING'
+          ? 'Waiting for confirmation from Muse.'
+          : job.skipped
+            ? 'Skipped. Delivery to Muse was not confirmed.'
+            : 'Delivery to Muse was not confirmed. Check the interrupted message in Beeper Muse.';
+      const content = {
+        status,
+        message,
+        'm.relates_to': { rel_type: 'm.reference', event_id: job.id },
+        delivered_to_users: job.confirmed ? [this.api.config.bot] : [],
+        ...(status === 'FAIL_PERMANENT'
+          ? { reason: 'm.foreign_network_error' }
+          : {}),
+      };
+      const fingerprint = await eventID(this.room, JSON.stringify(content));
+      if (job.statusFingerprint === fingerprint) continue;
+      try {
+        await this.api.members(this.room);
+        await this.api.request(
+          'PUT',
+          '/_matrix/client/v3/rooms/' +
+            enc(this.room) +
+            '/send/com.beeper.message_send_status/' +
+            enc(fingerprint),
+          content,
+        );
+        job.statusFingerprint = fingerprint;
+        await this.state.put('jobs', jobs);
+      } catch {
+        return;
+      } // Retry status on the next tick, never resend the prompt.
+    }
   }
   complete(result: { id: string; messages: Muse.Message[] }) {
     return this.serial(async () => {
@@ -371,11 +542,14 @@ export class BrowserBridge {
         throw Error('Unknown Muse job.');
       if (job.phase === 'done') return;
       const echo = result.messages.find((m) => m.role === 'user');
-      if (!echo || echo.text.trim() !== job.prompt.trim())
-        throw Error('Muse prompt attribution failed.');
+      this.validateEcho(job, echo);
+      job.confirmed = true;
+      await this.state.put('jobs', jobs);
+      await this.flushStatuses(jobs);
       // Associate the observed prompt with its existing Beeper event.
       await this.state.put('source:' + echo.id, {
         eventID: job.id,
+        originalImage: !!job.image,
         fingerprint: '',
         role: 'user',
         timestamp: echo.timestampMs || Date.now(),
@@ -394,6 +568,8 @@ export class BrowserBridge {
       );
       job.phase = 'done';
       job.prompt = '';
+      delete job.image;
+      delete job.error;
       await this.state.put('jobs', jobs);
     });
   }
@@ -460,9 +636,24 @@ export class BrowserBridge {
       saved?.eventID || (await eventID(this.room, 'source:' + message.id));
     const sender =
       message.role === 'user' ? this.api.config.owner : this.api.config.bot;
+    const missingImages = (message.images || [])
+      .filter((image, index) => !image.data && !saved?.images?.[String(index)])
+      .map((image) => {
+        try {
+          const url = new URL(image.url);
+          return ['https:', 'http:'].includes(url.protocol) &&
+            !url.username &&
+            !url.password
+            ? (image.alt || 'Image') + ': ' + url.href
+            : 'Image unavailable. Open Muse to view it.';
+        } catch {
+          return 'Image unavailable. Open Muse to view it.';
+        }
+      });
+    const fallback = missingImages.join('\n');
     const content: Record<string, unknown> = {
       msgtype: 'm.text',
-      body: message.text || 'Image',
+      body: [message.text, fallback].filter(Boolean).join('\n\n') || 'Image',
       'fi.mau.double_puppet_source': SOURCE,
       'com.beeper.muse.timestamp_source': message.timestampMs
         ? 'source'
@@ -470,7 +661,7 @@ export class BrowserBridge {
     };
     // The adapter supplies a small allowed HTML vocabulary. Strip any attributes
     // beyond safe link URLs at the source boundary (see validateSourceHTML).
-    if (message.html) {
+    if (message.html && !fallback) {
       content.format = 'org.matrix.custom.html';
       content.formatted_body = validateSourceHTML(message.html);
     }
@@ -480,7 +671,10 @@ export class BrowserBridge {
       content['m.relates_to'] = { rel_type: 'm.replace', event_id: baseID };
     }
     const events: Event[] = [];
-    if (!saved || saved.contentFingerprint !== contentFingerprint) {
+    if (
+      !saved?.originalImage &&
+      (!saved || saved.contentFingerprint !== contentFingerprint)
+    ) {
       const encrypted = await this.crypto.encrypt(
         this.room,
         'm.room.message',
@@ -500,6 +694,7 @@ export class BrowserBridge {
     }
     const imageRecords = { ...(saved?.images || {}) };
     for (const [index, image] of (message.images || []).slice(0, 8).entries()) {
+      if (saved?.originalImage) break;
       if (!image.data || !/^image\/(png|jpeg|webp|gif)$/.test(image.mime || ''))
         continue;
       const encoded = image.data.replace(/^data:[^,]+,/, '');
@@ -612,6 +807,7 @@ export class BrowserBridge {
         eventID: baseID,
         fingerprint,
         contentFingerprint,
+        originalImage: saved?.originalImage,
         role: message.role,
         timestamp,
         reactions,

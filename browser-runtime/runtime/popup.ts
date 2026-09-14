@@ -94,16 +94,23 @@ async function refresh() {
     if (s.connected && beeperReady && s.health === 'draft')
       el('status').textContent =
         'Send or clear your draft in Muse to resume sending from Beeper.';
+    if (s.blocked && !s.held && beeperReady)
+      el('status').textContent =
+        'An earlier photo could not be attached. Later messages can continue; review the failed photo below.';
+    if (s.held && beeperReady)
+      el('status').textContent =
+        'Sending to Muse paused. An interrupted message is holding the queue. Check it below, then dismiss it to continue.';
     if (s.update) el('status').textContent = s.update;
     if (actionError) el('status').textContent = actionError;
     el('blocked').replaceChildren();
     for (const job of s.blockedJobs || []) {
       const p = document.createElement('p');
       p.textContent =
-        'This prompt was interrupted. Check Muse before sending it again: ' +
-        job.prompt;
+        'This message needs attention. Check Muse before sending it again: ' +
+        job.prompt +
+        (job.error ? '\n' + job.error : '');
       const button = document.createElement('button');
-      button.textContent = 'I handled this in Muse';
+      button.textContent = 'Dismiss this job';
       button.onclick = () => {
         void action('resolve-blocked', { id: job.id });
       };
@@ -151,3 +158,7 @@ for (const [id, type] of Object.entries({
 };
 void refresh();
 setInterval(() => void refresh(), 2000);
+
+el('diagnostics').onclick = () => {
+  void action('open-diagnostics');
+};

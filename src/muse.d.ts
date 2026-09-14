@@ -11,6 +11,31 @@ declare namespace Muse {
     data?: string;
     mime?: string;
   }
+  interface Profile {
+    avatar: Image;
+  }
+  interface ActivityReadiness {
+    stopButtons: number;
+    composerBusy: boolean;
+    assistantBusy: boolean;
+  }
+  interface UploadReadiness {
+    composers: number;
+    hasForm: boolean;
+    hasUploadRegion: boolean;
+    pageFileInputs: number;
+    pageImageInputs: number;
+    fileInputs: number;
+    imageInputs: number;
+    existingFiles: number;
+    previews: number;
+    sendButtons: number;
+  }
+  interface Upload {
+    name: string;
+    mime: string;
+    data: string;
+  }
   interface Reaction {
     actor: Role;
     key: string;
@@ -51,8 +76,17 @@ declare namespace Muse {
     snapshot(): Snapshot | Promise<Snapshot>;
     /** Lightweight observation that does not require a usable composer or transcript. */
     activity?(): Activity | Promise<Activity>;
+    activityReadiness?(): ActivityReadiness;
+    profile?(): Promise<Profile | undefined>;
     submit(
       prompt: string,
+      wait: (ms: number) => Promise<void>,
+      active?: () => boolean,
+    ): Promise<Set<string>>;
+    imageReadiness?(): UploadReadiness;
+    submitImage?(
+      prompt: string,
+      image: Upload,
       wait: (ms: number) => Promise<void>,
       active?: () => boolean,
     ): Promise<Set<string>>;
@@ -95,10 +129,17 @@ declare namespace Muse {
       messages: Message[],
       prepare: (message: Message) => Promise<Message>,
     ): Promise<Message[]>;
+    promptEcho(
+      beforeIDs: Set<string>,
+      prompt: string,
+      snapshot: Snapshot,
+      imageName?: string,
+    ): Message | undefined;
     responseAfter(
       before: Set<string>,
       prompt: string,
       snapshot: Snapshot,
+      imageName?: string,
     ): string | null;
     messages(view: Snapshot): Message[];
     fingerprint(message: Message): Promise<Source>;

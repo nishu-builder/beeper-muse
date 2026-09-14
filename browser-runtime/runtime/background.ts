@@ -1,3 +1,4 @@
+import { DiagnosticLog, failureCode } from './diagnostic-log.js';
 import { Updates, localUpdate } from './updates.js';
 import { ensureMuseTab, isMuseURL, resumeTicket } from './muse-tab.js';
 declare const __BEEPER_MUSE_BUILD_ID__: string;
@@ -42,7 +43,17 @@ const secure = Promise.all([
   chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' }),
   chrome.storage.session.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' }),
 ]);
+const log = new DiagnosticLog(
+  {
+    get: async () =>
+      (await chrome.storage.local.get('diagnosticEvents')).diagnosticEvents,
+    set: async (entries) =>
+      chrome.storage.local.set({ diagnosticEvents: entries }),
+  },
+  chrome.runtime.getManifest().version,
+);
 const museURL = isMuseURL;
+let lastTyping: { activity: Muse.Activity; at: number } | undefined;
 async function start() {
   await secure;
   if (applyingUpdate) return;
@@ -91,6 +102,7 @@ async function start() {
           startup.stop();
           if (reason) failure = reason;
           phase = state;
+          void log.record('beeper-' + state);
           if (state === 'connected') {
             socket?.publishBridgeState(connectedBridgeState(config.owner));
             failure = '';
@@ -110,6 +122,7 @@ async function start() {
       );
       await socket.start();
     } catch (error) {
+      void log.record('startup-failed');
       startup.stop();
       phase = 'error';
       failure =
@@ -151,6 +164,7 @@ async function setConfig(value: unknown) {
   retryAt = 0;
   await start();
 }
+let reportedFailures = '';
 async function report() {
   const { tabID } = await chrome.storage.session.get('tabID');
   const {
@@ -173,7 +187,20 @@ async function report() {
     }
   const progress = bridge
     ? await bridge.status()
-    : { queued: 0, blocked: 0, pending: 0 };
+    : {
+        queued: 0,
+        claimed: 0,
+        blocked: 0,
+        held: 0,
+        pending: 0,
+        diagnosticFailures: [],
+      };
+  const failureSignature = JSON.stringify(progress.diagnosticFailures);
+  if (failureSignature !== reportedFailures) {
+    reportedFailures = failureSignature;
+    for (const code of new Set(progress.diagnosticFailures))
+      void log.record(code);
+  }
   return {
     ok: true,
     configured: !!config,
@@ -198,6 +225,24 @@ async function handle(
 ) {
   await secure;
   if (sender.id !== chrome.runtime.id) throw Error('Invalid sender.');
+  if (
+    message.type === 'diagnostic-health' &&
+    sender.url === chrome.runtime.getURL(CONNECTION_PAGE)
+  ) {
+    const s = await report();
+    return {
+      at: Math.floor(Date.now() / 5000) * 5000,
+      version: chrome.runtime.getManifest().version,
+      build: __BEEPER_MUSE_BUILD_ID__,
+      beeperConnected: s.phase === 'connected',
+      museConnected: s.connected,
+      ready: s.health === 'ready',
+      queued: s.queued,
+      claimed: s.claimed || 0,
+      blocked: s.blocked,
+      pending: s.pending,
+    };
+  }
   if (applyingUpdate && message.type !== 'status')
     throw Error('Update in progress.');
   const popup =
@@ -206,6 +251,23 @@ async function handle(
     if (message.type === 'status') {
       void start();
       return report();
+    }
+    if (message.type === 'open-diagnostics') {
+      const url = chrome.runtime.getURL(CONNECTION_PAGE);
+      const contexts = await chrome.runtime.getContexts({
+        contextTypes: ['TAB' as chrome.runtime.ContextType],
+      });
+      const existing = contexts.find(
+        (c) => c.documentUrl === url && c.tabId >= 0,
+      );
+      if (existing) await chrome.tabs.update(existing.tabId, { active: true });
+      else await chrome.tabs.create({ url });
+      const { tabID } = await chrome.storage.session.get('tabID');
+      if (typeof tabID === 'number')
+        await chrome.tabs
+          .sendMessage(tabID, { type: 'check-upload' })
+          .catch(() => {});
+      return { ok: true };
     }
     if (message.type === 'configure') {
       await setConfig(message.configuration);
@@ -265,6 +327,7 @@ async function handle(
       if (typeof message.id !== 'string')
         throw Error('Choose an interrupted prompt.');
       await bridge?.resolve(message.id);
+      void log.record('job-dismissed');
       return { ok: true };
     }
     throw Error('Unknown setup action.');
@@ -307,6 +370,10 @@ async function handle(
     if (message.type === 'connected') return { ok: true, connected: false };
     throw Error('This Muse tab is not connected.');
   }
+  if (message.type === 'diagnostic') {
+    await log.record(message.code, message.facts);
+    return { ok: true };
+  }
   await start();
   if (!bridge || phase !== 'connected') throw Error('Beeper is reconnecting.');
   if (message.type === 'connected') {
@@ -316,7 +383,9 @@ async function handle(
       connected: true,
       museSync: true,
       sourceProtocol: 2,
+      deliveryStatus: true,
       activitySync: true,
+      profileSync: true,
       partialSync: true,
       historyMode: historyMode || 'recent',
     };
@@ -330,7 +399,31 @@ async function handle(
     message.type === 'activity' &&
     (message.activity === 'idle' || message.activity === 'working')
   ) {
-    await bridge.activity(message.activity);
+    try {
+      await bridge.activity(message.activity);
+      if (
+        lastTyping?.activity !== message.activity ||
+        Date.now() - lastTyping.at >= 30000
+      ) {
+        await log.record(
+          message.activity === 'working' ? 'typing-accepted' : 'typing-cleared',
+        );
+        lastTyping = { activity: message.activity, at: Date.now() };
+      }
+    } catch (error) {
+      await log.record('typing-failed');
+      throw error;
+    }
+    return { ok: true };
+  }
+  if (message.type === 'profile') {
+    try {
+      if (await bridge.profile(message.avatar))
+        await log.record('avatar-updated');
+    } catch (error) {
+      await log.record('avatar-failed');
+      throw error;
+    }
     return { ok: true };
   }
   if (message.type === 'claim')
@@ -348,8 +441,17 @@ async function handle(
     });
     return { ok: true };
   }
+  if (
+    message.type === 'delivered' &&
+    typeof message.id === 'string' &&
+    message.echo &&
+    typeof message.echo === 'object'
+  ) {
+    await bridge.confirm(message.id, message.echo as Muse.Message);
+    return { ok: true };
+  }
   if (message.type === 'block' && typeof message.id === 'string') {
-    await bridge.block(message.id);
+    await bridge.block(message.id, failureCode(message.code));
     return { ok: true };
   }
   throw Error('Unknown Muse action.');

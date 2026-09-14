@@ -3,7 +3,7 @@
 Report vulnerabilities through
 [GitHub private vulnerability reporting](https://github.com/nishu-builder/beeper-muse/security/advisories/new).
 Do not post credentials, private messages, raw logs, profiles or registration files
-in public issues. The current Chrome-only 0.7 series is experimental; there is
+in public issues. The current Chrome-only 0.8 series is experimental; there is
 no guaranteed support SLA or claim of an independent security audit.
 
 ## Trust boundaries
@@ -18,7 +18,13 @@ The worker owns crypto and storage. Its connection document is authenticated by
 extension ID, exact URL, tab, top-level frame and port name. Request-header rules
 apply only to the exact Beeper WebSocket URL and document. Credentials never
 appear in URL parameters. Matrix requests use a fixed validated HTTPS endpoint,
-omit browser cookies and reject redirects.
+omit browser cookies and reject redirects, except authenticated media downloads.
+Those follow signed storage redirects using native fetch, which removes
+Authorization on cross-origin redirects. The extension CSP limits network
+connections to itself, Beeper and HTTPS Cloudflare R2 storage. Downloads reject
+non-Matrix source URLs, cap streamed bytes at 5 MB, authenticate encrypted files
+and check raster image signatures before handing bytes to Muse. No arbitrary
+media proxy or general file upload is exposed.
 
 The read-only provisioning handler answers public capability metadata and
 owner-authenticated account discovery. It does not expose a general URL proxy,

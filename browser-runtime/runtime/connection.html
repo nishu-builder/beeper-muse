@@ -27,6 +27,21 @@
         You can pin this tab to keep it out of the way. Closing it interrupts
         syncing.
       </p>
+      <section aria-labelledby="log-heading">
+        <h2 id="log-heading">Diagnostic log</h2>
+        <p>
+          Save a log that updates automatically in a file you choose. It
+          contains timestamps, versions, failure stages and upload-control
+          counts. No messages, photos, credentials, account IDs or page
+          addresses.
+        </p>
+        <button id="choose-log">Choose diagnostic log file</button>
+        <button id="allow-log">Allow file updates</button>
+        <button id="stop-log">Stop file logging</button>
+        <p id="log-status" role="status">
+          File logging is off until you choose a file.
+        </p>
+      </section>
     </main>
     <script type="module" src="connection.js"></script>
   </body>

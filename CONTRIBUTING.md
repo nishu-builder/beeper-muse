@@ -1,6 +1,9 @@
 # Contributing
 
 Start with [architecture](docs/architecture.md) and [runtime protocol](docs/browser-runtime.md).
+Read the [parity ledger](docs/parity.md) before choosing work. Keep reported bugs,
+implemented changes and live verification separate, and update it when findings
+or priorities change. An interrupted investigation stays open across handoffs.
 The current product is the Chrome-only extension. Legacy Go code is retained
 for existing installations and protocol reference, not bundled into releases.
 
@@ -52,3 +55,12 @@ Use `npm run update:local` to build and install into `.local/chrome-extension`.
 After the one-time manual installation of 0.7.2+, local builds reload when idle
 and reconnect the selected Muse tab. The command exits; no watcher or companion
 is needed. Do not run concurrent builds against the same `dist` directory.
+
+## Live development loop
+
+Use [the development loop](docs/development-loop.md) to configure a pinned test
+chat and diagnostic file once. `npm run dev:doctor` checks readiness without
+sending; `npm run dev:cycle` checks, updates and tests the installed extension.
+The typed driver uses Beeper Desktop's API and records each send before making
+it. `dev:observe` resumes an unfinished observation without resending. This is
+optional maintainer tooling, not part of the shipped extension.

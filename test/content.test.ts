@@ -33,6 +33,9 @@ function harness(
   deferred = false,
   structured = false,
   activityEnabled = false,
+  photo = false,
+  uploadSupported = true,
+  profile?: () => Promise<unknown>,
 ) {
   let listener!: Listener;
   let resolveClaim!: (value: unknown) => void;
@@ -44,7 +47,9 @@ function harness(
   let submits = 0;
   let draft = '';
   let busy = false;
+  let reply = true;
   let unavailable = false;
+  let activityUnavailable = false;
   let visibility = 'hidden';
   const events = new Map<
     string,
@@ -56,7 +61,13 @@ function harness(
   const claim = new Promise((resolve) => {
     resolveClaim = resolve;
   });
-  const job = { id: 'job', prompt: 'Synthetic prompt' };
+  const image = { name: 'photo.png', mime: 'image/png', data: 'iVBORw0KGgo=' };
+  const job = {
+    id: 'job',
+    prompt: 'Synthetic prompt',
+    ...(photo ? { image } : {}),
+  };
+  let photoSubmits = 0;
   let disposedTimers = 0;
   const context = {
     crypto: webcrypto,
@@ -107,6 +118,8 @@ function harness(
               ok: true,
               connected: true,
               activitySync: activityEnabled,
+              profileSync: !!profile,
+              deliveryStatus: true,
               sourceProtocol: structured ? 2 : undefined,
             };
           if (message.type === 'claim')
@@ -120,9 +133,23 @@ function harness(
     BeeperMuseDOM: {
       create() {
         return {
-          activity: () => (busy ? 'working' : 'idle'),
+          profile,
+          activity: () => {
+            if (activityUnavailable)
+              throw Error('Synthetic unreadable activity');
+            return busy ? 'working' : 'idle';
+          },
           snapshot: this.snapshot,
           submit: this.submit,
+          submitImage: uploadSupported
+            ? async (prompt: string, upload: unknown) => {
+                assert.equal(prompt, job.prompt);
+                assert.deepEqual(upload, image);
+                photoSubmits++;
+                submits++;
+                return new Set();
+              }
+            : undefined,
           prepare: async (m: unknown) => m,
         };
       },
@@ -137,8 +164,17 @@ function harness(
           busy,
           messages: submits
             ? [
-                { id: 'u', role: 'user', text: 'Synthetic prompt' },
-                { id: 'a', role: 'assistant', text: 'Synthetic answer' },
+                {
+                  id: 'u',
+                  role: 'user',
+                  text: 'Synthetic prompt',
+                  ...(photo
+                    ? { images: [{ url: 'https://muse.ai/photo.png' }] }
+                    : {}),
+                },
+                ...(reply
+                  ? [{ id: 'a', role: 'assistant', text: 'Synthetic answer' }]
+                  : []),
               ]
             : [],
         };
@@ -164,6 +200,9 @@ function harness(
       events.get('focus')?.({ preventDefault() {} });
       await flush();
     },
+    get photoSubmits() {
+      return photoSubmits;
+    },
     get submits() {
       return submits;
     },
@@ -175,10 +214,18 @@ function harness(
       return JSON.parse(JSON.stringify(result ?? null));
     },
     claim: () => resolveClaim({ ok: true, job }),
-    view(value: { busy?: boolean; draft?: string; unavailable?: boolean }) {
+    view(value: {
+      busy?: boolean;
+      draft?: string;
+      unavailable?: boolean;
+      activityUnavailable?: boolean;
+      reply?: boolean;
+    }) {
+      reply = value.reply ?? true;
       busy = value.busy ?? false;
       draft = value.draft ?? '';
       unavailable = value.unavailable ?? false;
+      activityUnavailable = value.activityUnavailable ?? false;
     },
     async advance(ms: number) {
       const target = now + ms;
@@ -194,6 +241,29 @@ function harness(
     },
   };
 }
+test('slow or failed avatar reads do not block message delivery and stale results are discarded', async () => {
+  let resolveProfile!: (value: unknown) => void;
+  const pending = new Promise((resolve) => {
+    resolveProfile = resolve;
+  });
+  const h = harness(false, true, false, false, true, () => pending);
+  h.signal('start');
+  await flush();
+  assert.equal(h.submits, 1);
+  h.signal('stop');
+  resolveProfile({ avatar: { mime: 'image/png', data: 'synthetic' } });
+  await flush();
+  assert.equal(
+    h.messages.some((m) => m.type === 'profile'),
+    false,
+  );
+  const failed = harness(false, true, false, false, true, async () => {
+    throw Error('Synthetic source failure');
+  });
+  failed.signal('start');
+  await flush();
+  assert.equal(failed.submits, 1);
+});
 
 test('disconnect during a pending claim cannot submit the returned prompt', async () => {
   const h = harness(true);
@@ -268,7 +338,10 @@ test('the normal content flow submits once and forwards a settled reply once', a
   await h.executed;
   assert.equal(h.submits, 1);
   assert.equal(h.messages.filter((m) => m.type === 'result').length, 1);
-  assert.equal(h.messages.at(-1)?.text, 'Synthetic answer');
+  assert.equal(
+    h.messages.find((m) => m.type === 'result')?.text,
+    'Synthetic answer',
+  );
 });
 
 test('readiness probes expose no draft or chat text', () => {
@@ -281,7 +354,7 @@ test('readiness probes expose no draft or chat text', () => {
   ] as const) {
     h.view(view);
     const probe = h.signal('probe');
-    assert.equal(probe.protocol, 7);
+    assert.equal(probe.protocol, 10);
     assert.equal(probe.health, health);
     assert.deepEqual(Object.keys(probe).sort(), [
       'health',
@@ -332,6 +405,26 @@ test('Muse working activity renews independently and clears when the tab disconn
   assert.deepEqual(
     h.messages.filter((m) => m.type === 'activity').map((m) => m.activity),
     ['working', 'working', 'idle'],
+  );
+});
+
+test('an activity read failure does not invent an idle transition', async () => {
+  const h = harness(false, false, true);
+  h.view({ busy: true });
+  h.signal('start');
+  await flush();
+  h.view({ busy: true, activityUnavailable: true });
+  await h.advance(6000);
+  await h.pulse();
+  assert.deepEqual(
+    h.messages.filter((m) => m.type === 'activity').map((m) => m.activity),
+    ['working'],
+  );
+  h.signal('stop');
+  await flush();
+  assert.deepEqual(
+    h.messages.filter((m) => m.type === 'activity').map((m) => m.activity),
+    ['working', 'idle'],
   );
 });
 
@@ -398,4 +491,42 @@ test('reinjecting the content script disposes old timers and cannot revive its p
   h.claim();
   await flush();
   assert.equal(h.submits, 0);
+});
+
+test('a photo claim uses the upload adapter and delivers its image-attributed reply once', async () => {
+  const h = harness(false, true, false, true);
+  h.signal('start');
+  await flush();
+  await h.advance(10000);
+  await h.executed;
+  assert.equal(h.photoSubmits, 1);
+  assert.equal(h.submits, 1);
+  assert.equal(h.messages.filter((m) => m.type === 'result').length, 1);
+  assert.equal(h.messages.filter((m) => m.type === 'block').length, 0);
+});
+test('a missing upload adapter blocks a photo instead of sending its caption alone', async () => {
+  const h = harness(false, true, false, true, false);
+  h.signal('start');
+  await flush();
+  await h.executed;
+  assert.equal(h.submits, 0);
+  assert.equal(h.photoSubmits, 0);
+  assert.equal(h.messages.filter((m) => m.type === 'block').length, 1);
+});
+
+test('delivery confirmation waits for the matching source echo and a new Muse reply', async () => {
+  const h = harness();
+  h.view({ reply: false });
+  h.signal('start');
+  await flush();
+  await h.advance(10000);
+  assert.equal(h.messages.filter((m) => m.type === 'delivered').length, 0);
+  h.view({ reply: true });
+  await h.advance(10000);
+  await h.executed;
+  assert.equal(h.messages.filter((m) => m.type === 'delivered').length, 1);
+  assert.ok(
+    h.messages.findIndex((m) => m.type === 'delivered') <
+      h.messages.findIndex((m) => m.type === 'result'),
+  );
 });

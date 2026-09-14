@@ -1,5 +1,72 @@
 # Changelog
 
+## 0.8.4
+
+- Add a persistent parity ledger covering reported reliability issues, native
+  state, identity and Muse message/rendering types. Keep live verification open
+  separately from implementation and synthetic regression coverage.
+- Add typed assistant-avatar synchronization to native profile, room and bridge
+  metadata, with bounded retrieval, ambiguity checks and resumable updates.
+- Recognize additional explicit Muse activity signals and log source readiness
+  separately from accepted or failed Matrix typing requests. Unknown source
+  failures let the typing lease expire instead of claiming Muse became idle.
+- Refresh older content scripts when reconnecting. Avatar and typing display
+  remain unverified in the installed apps; the earlier interrupted photo is not
+  retried or dismissed by this update.
+
+## 0.8.3
+
+- Support a bounded message composer container without requiring a native HTML
+  form. Diagnostic evidence showed the live Muse composer has no enclosing form.
+- Keep upload discovery out of the transcript and page root; unrelated file
+  pickers must remain untouched. Add regression coverage for form-free uploads.
+- Include bounded page/file-input counts and recognized-container presence in
+  the optional diagnostic log. These counts contain no page content.
+- Preserve existing interrupted jobs for inspection. This update does not retry
+  the previous photo or establish that the live photo round trip now succeeds.
+
+## 0.8.2
+
+- Add a typed development driver with pinned-chat checks, synthetic text/photo
+  tests, persisted send records, read-only resume and sanitized result reports.
+- Add `dev:cycle` to run checks, stage the extension, wait for the exact running
+  build and test text, a photo and subsequent text. Unverified work stops the
+  cycle; it never automatically resends an uncertain prompt.
+- Include a content-free diagnostic heartbeat with the build fingerprint,
+  connection readiness and queue counts. File selection remains a one-time
+  Chrome grant; the product still needs no companion process.
+- Keep known pre-upload failures visible without holding subsequent messages.
+  Interrupted uploads still hold the queue until inspected and dismissed.
+- Incoming photo compatibility and client status rendering remain unverified.
+
+## 0.8.1
+
+- Add a bounded, content-free diagnostic log with specific upload failure codes
+  and read-only upload-control counts. Choose one file from the connection tab
+  to keep a readable copy updated without a daemon or copying popup errors.
+- Show “Sending to Muse paused” when an interrupted message holds later sends;
+  dismissing the interrupted job skips it and releases the queue.
+- Publish native Beeper pending, failed and confirmed delivery statuses. The
+  bridge waits for a matching Muse echo and new reply before success, and retries
+  status updates independently without resending prompts. Client rendering still
+  needs live confirmation.
+- Keep typed upload diagnostics separate from message contents. The underlying
+  Muse image-upload compatibility issue is still under investigation.
+
+## 0.8.0
+
+- Add preview Beeper-to-Muse photo jobs with captions, authenticated media
+  downloads, Matrix attachment decryption, bounded image validation and a typed
+  upload adapter. The current Muse upload controls still need live verification.
+- Require an unambiguous composer and loaded preview before Send; blocked photos
+  are visible and never automatically submitted again after an uncertain result.
+- Preserve original Beeper image events during catch-up instead of replacing
+  them with text or importing a duplicate. Reactions target the original photo.
+- Capture responsive, local blob and embedded raster images from Muse. Show
+  fallback links or explanations when image bytes cannot be retrieved.
+- Add HTTPS Cloudflare R2 storage permission for Beeper's media redirects and
+  constrain extension network destinations. Chrome may require permission approval.
+
 ## 0.7.2
 
 - Add `update:local`: stage complete builds, preserve private configuration and

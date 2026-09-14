@@ -5,6 +5,9 @@
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   let polling = false;
   let activityEnabled = false;
+  let profiling = false;
+  let profileCheckedAt = -Infinity;
+  let activityCheckedAt = -Infinity;
   let rescanPending = false;
   let stopped = false;
   let generation = 0;
@@ -71,11 +74,45 @@
       offeringPopup = false;
     }
   }
-  async function execute(job, current, sourceProtocol) {
+  function diagnostic(code, facts) {
+    void send({ type: 'diagnostic', code, facts }).catch(() => {});
+  }
+  function checkUpload() {
+    try {
+      diagnostic('image-readiness', muse.imageReadiness?.());
+    } catch {}
+  }
+  async function syncProfile(current) {
+    if (profiling || !muse.profile || Date.now() - profileCheckedAt < 30000)
+      return;
+    profiling = true;
+    profileCheckedAt = Date.now();
+    try {
+      const profile = await muse.profile();
+      if (stopped || current !== generation || !closeGuard) return;
+      if (profile) await send({ type: 'profile', avatar: profile.avatar });
+      else diagnostic('avatar-source-missing');
+    } catch {
+      diagnostic('avatar-failed');
+    } finally {
+      profiling = false;
+    }
+  }
+  async function execute(job, current, sourceProtocol, deliveryStatus) {
     const active = () => !stopped && generation === current;
     try {
       if (!active()) throw new Error('Tab disconnected.');
-      const before = await muse.submit(job.prompt, wait, active);
+      if (job.image && !muse.submitImage)
+        throw Object.assign(Error('Muse image uploads are unavailable.'), {
+          code: 'image-adapter-unavailable',
+        });
+      if (job.image) checkUpload();
+      diagnostic(job.image ? 'image-upload-start' : 'text-submit-start');
+      const before = job.image
+        ? await muse.submitImage(job.prompt, job.image, wait, active)
+        : await muse.submit(job.prompt, wait, active);
+      diagnostic(job.image ? 'image-submitted' : 'reply-wait');
+      let confirmed = false;
       let stableSince = Date.now();
       let previous = '';
       const deadline = Date.now() + 25 * 60 * 1000;
@@ -87,13 +124,29 @@
         await reportActivity(view);
         if (!active()) throw new Error('Tab disconnected.');
         if (view.draft.trim()) throw new Error('A new draft was entered.');
-        const answer = BeeperMuseSync.responseAfter(before, job.prompt, view);
+        const echo = BeeperMuseSync.promptEcho(
+          before,
+          job.prompt,
+          view,
+          job.image?.name,
+        );
+        const answer = BeeperMuseSync.responseAfter(
+          before,
+          job.prompt,
+          view,
+          job.image?.name,
+        );
+        if (deliveryStatus && answer && echo && !confirmed) {
+          await send({ type: 'delivered', id: job.id, echo });
+          confirmed = true;
+        }
         if (view.busy || !answer || answer !== previous) {
           previous = answer || '';
           stableSince = Date.now();
           continue;
         }
         if (Date.now() - stableSince >= 4000) {
+          diagnostic('reply-captured');
           const candidates = BeeperMuseSync.messages(view).filter(
             (message) => !before.has(message.id),
           );
@@ -128,18 +181,30 @@
                 sources,
                 messages,
               });
+              diagnostic('reply-delivered');
               tracker.remember(sources);
               return;
             } catch {
-              if (attempt === 2) throw new Error('Result delivery failed.');
+              if (attempt === 2)
+                throw Object.assign(new Error('Result delivery failed.'), {
+                  code: 'result-delivery-failed',
+                });
               await wait(2000);
             }
           }
         }
       }
-      throw new Error('Response timed out or the tab was disconnected.');
-    } catch {
-      await send({ type: 'block', id: job.id }).catch(() => {});
+      throw Object.assign(
+        new Error('Response timed out or the tab was disconnected.'),
+        { code: 'reply-timeout' },
+      );
+    } catch (error) {
+      const code =
+        error?.message === 'Another message was entered in the Muse tab.'
+          ? 'reply-attribution'
+          : error?.code || 'source-interrupted';
+      diagnostic(code);
+      await send({ type: 'block', id: job.id, code }).catch(() => {});
     } finally {
       await reportActivity(null);
     }
@@ -160,6 +225,7 @@
       activityEnabled = connected.activitySync === true;
       guardClosing(connected.connected);
       if (!connected.connected) return;
+      if (connected.profileSync === true) void syncProfile(current);
       if (rescanPending) {
         tracker = new BeeperMuseSync.Tracker(send, undefined, muse.prepare);
         rescanPending = false;
@@ -183,7 +249,12 @@
       if (view.busy || view.draft.trim()) return;
       const result = await send({ type: 'claim' });
       if (result.job)
-        await execute(result.job, current, connected.sourceProtocol);
+        await execute(
+          result.job,
+          current,
+          connected.sourceProtocol,
+          connected.deliveryStatus === true,
+        );
     } catch {
       await pulseActivity();
       /* Keep private data and server failures out of page logs. */
@@ -198,6 +269,7 @@
         ready =
           !polling &&
           !pulsing &&
+          !profiling &&
           health() !== 'busy' &&
           health() !== 'unavailable';
       } catch {}
@@ -214,9 +286,14 @@
       void pulseActivity();
       return;
     }
+    if (message.type === 'check-upload') {
+      checkUpload();
+      respond({ ok: true });
+      return;
+    }
     if (message.type === 'probe') {
       respond({
-        protocol: 7,
+        protocol: 10,
         health: health(),
         progress: tracker.progress,
         rescanning: rescanPending,
@@ -234,14 +311,15 @@
       generation++;
       void reportActivity(null);
       guardClosing(false);
-      respond({ protocol: 7 });
+      respond({ protocol: 10 });
     }
     if (message.type === 'start') {
       stopped = false;
       tracker = new BeeperMuseSync.Tracker(send, undefined, muse.prepare);
       const state = health();
       guardClosing(state !== 'unavailable');
-      respond({ protocol: 7, health: state });
+      respond({ protocol: 10, health: state });
+      checkUpload();
       void poll();
     }
   };
@@ -252,6 +330,12 @@
     pulsing = true;
     const current = generation;
     try {
+      if (Date.now() - activityCheckedAt >= 30000 && muse.activityReadiness) {
+        try {
+          diagnostic('activity-readiness', muse.activityReadiness());
+        } catch {}
+        activityCheckedAt = Date.now();
+      }
       const value = muse.activity
         ? await muse.activity()
         : ((view) => view.activity || (view.busy ? 'working' : 'idle'))(
@@ -260,7 +344,9 @@
       if (stopped || current !== generation || !closeGuard) return;
       await reportActivity({ activity: value });
     } catch {
-      await reportActivity(null);
+      // An unreadable source is unknown, not evidence that Muse stopped working.
+      // The server's short typing lease expires if observations cannot resume.
+      diagnostic('activity-unavailable');
     } finally {
       pulsing = false;
     }

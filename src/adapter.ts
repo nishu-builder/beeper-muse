@@ -29,8 +29,25 @@
       return false;
     }
   };
+  const safeImageURL = (raw: string) =>
+    safeURL(raw) ||
+    (raw.length <= 3 * 1024 * 1024 &&
+      /^data:image\/(png|jpeg|gif|webp);base64,[a-zA-Z0-9+/=]+$/.test(raw)) ||
+    (raw.startsWith('blob:') &&
+      (() => {
+        try {
+          return new URL(raw).origin === 'https://muse.ai';
+        } catch {
+          return false;
+        }
+      })());
   function cleanContent(element: Element, role: Muse.Role): Element {
     const clone = element.cloneNode(true) as Element;
+    const sourceImages = [...element.querySelectorAll<HTMLImageElement>('img')];
+    clone.querySelectorAll('img').forEach((image, index) => {
+      const selected = sourceImages[index]?.currentSrc;
+      if (selected) image.setAttribute('src', selected);
+    });
     clone.querySelectorAll('button').forEach((button) => {
       if (
         button.querySelector('img') ||
@@ -47,7 +64,7 @@
       clone.querySelectorAll('.sr-only').forEach((n) => {
         if (n.textContent?.trim() === 'You:') n.remove();
       });
-    // Keep only formatting attributes. The daemon sanitizes again before Matrix.
+    // Keep only formatting attributes. The worker sanitizes again before Matrix.
     clone.querySelectorAll('*').forEach((n) => {
       for (const a of [...n.attributes]) {
         if (!['href', 'src', 'alt'].includes(a.name)) n.removeAttribute(a.name);
@@ -55,11 +72,14 @@
     });
     return clone;
   }
-  async function prepare(message: Muse.Message): Promise<Muse.Message> {
+  async function prepare(
+    message: Muse.Message,
+    imageLimit = 2 * 1024 * 1024,
+  ): Promise<Muse.Message> {
     const images: Muse.Image[] = [];
     let remaining = 4 * 1024 * 1024;
     for (const image of message.images || []) {
-      if (!safeURL(image.url)) continue;
+      if (!safeImageURL(image.url)) continue;
       try {
         // Ordinary page-origin fetch: no added host permissions or CORS bypass.
         const response = await fetch(image.url, {
@@ -86,7 +106,7 @@
             const chunk = await reader.read();
             if (chunk.done) break;
             size += chunk.value.length;
-            if (size > Math.min(remaining, 2 * 1024 * 1024))
+            if (size > Math.min(remaining, imageLimit))
               throw Error('Image too large');
             chunks.push(chunk.value);
           }
@@ -112,6 +132,7 @@
     return { ...message, images };
   }
   function create(document: Document): Muse.Adapter {
+    let cached: { url: string; at: number; profile: Muse.Profile } | undefined;
     return {
       capabilities: {
         activity: true,
@@ -123,6 +144,27 @@
       },
       snapshot: () => snapshot(document),
       activity: () => activity(document),
+      activityReadiness: () => activityReadiness(document),
+      profile: async () => {
+        const image = assistantAvatar(document);
+        if (!image) return;
+        const url = image.currentSrc || image.src;
+        if (!safeImageURL(url)) return;
+        if (cached?.url === url && Date.now() - cached.at < 300000)
+          return cached.profile;
+        const prepared = await prepare(
+          { id: 'avatar', role: 'assistant', text: '', images: [{ url }] },
+          512 * 1024,
+        );
+        const avatar = prepared.images?.[0];
+        if (!avatar?.data || !avatar.mime) return;
+        const profile = { avatar };
+        cached = { url, at: Date.now(), profile };
+        return profile;
+      },
+      imageReadiness: () => imageReadiness(document),
+      submitImage: (prompt, image, wait, active) =>
+        submitImage(document, prompt, image, wait, active),
       submit: (prompt, wait, active) => submit(document, prompt, wait, active),
       prepare,
     };
@@ -167,10 +209,55 @@
       (a.actor + a.key).localeCompare(b.actor + b.key),
     );
   }
+  function assistantAvatar(document: Document): HTMLImageElement | undefined {
+    const name = /^Chat\s+[–—-]\s+(.+)$/.exec(document.title)?.[1]?.trim();
+    if (!name || name.length > 100) return;
+    const labels = new Set(
+      [name, `${name}'s avatar`, `${name} avatar`, `Avatar of ${name}`].map(
+        (s) => s.toLowerCase(),
+      ),
+    );
+    const images = [
+      ...document.querySelectorAll<HTMLImageElement>('img[alt]'),
+    ].filter(
+      (image) =>
+        visible(image) &&
+        !image.closest(
+          '[role="log"],[data-message-item],nav,[role="navigation"]',
+        ) &&
+        labels.has(image.alt.trim().toLowerCase()),
+    );
+    return images.length === 1 ? images[0] : undefined;
+  }
+  function activityReadiness(document: Document): Muse.ActivityReadiness {
+    const stopButtons = [
+      ...document.querySelectorAll('button[aria-label]'),
+    ].filter(
+      (button) =>
+        visible(button) &&
+        !button.closest('[role="log"],[data-message-item]') &&
+        /^stop(?: generating(?: response)?| response)?$/i.test(
+          button.getAttribute('aria-label')!.trim(),
+        ),
+    ).length;
+    const field = [
+      ...document.querySelectorAll('textarea[aria-label="Message"]'),
+    ].find(visible);
+    const busy = field?.closest('[aria-busy="true"]');
+    const header = assistantAvatar(document)?.closest('header,[role="banner"]');
+    return {
+      stopButtons: Math.min(stopButtons, 100),
+      composerBusy:
+        !!busy && !busy.querySelector('[role="log"],[data-message-item]'),
+      assistantBusy:
+        !!header &&
+        (header.getAttribute('aria-busy') === 'true' ||
+          [...header.querySelectorAll('[aria-busy="true"]')].some(visible)),
+    };
+  }
   function activity(document: Document): Muse.Activity {
-    return [...document.querySelectorAll('button[aria-label="Stop"]')].some(
-      visible,
-    )
+    const signals = activityReadiness(document);
+    return signals.stopButtons || signals.composerBusy || signals.assistantBusy
       ? 'working'
       : 'idle';
   }
@@ -220,7 +307,7 @@
             } catch {
               return [];
             }
-            if (!safeURL(url)) return [];
+            if (!safeImageURL(url)) return [];
             return [
               { url, alt: (img.getAttribute('alt') || '').slice(0, 1000) },
             ];
@@ -254,6 +341,183 @@
         ];
       }),
     };
+  }
+  // Muse's current composer is not a native form. Stay within the smallest
+  // ancestor containing its own file input, never the transcript or page root.
+  function uploadRegion(field: HTMLTextAreaElement): HTMLElement | null {
+    for (
+      let region = field.parentElement;
+      region;
+      region = region.parentElement
+    ) {
+      if (
+        region === field.ownerDocument.body ||
+        region === field.ownerDocument.documentElement ||
+        region.matches('[role="log"],[data-message-item]') ||
+        region.querySelector('[role="log"],[data-message-item]') ||
+        region.querySelectorAll('textarea').length !== 1
+      )
+        return null;
+      if (region.matches('form') || region.querySelector('input[type="file"]'))
+        return region;
+    }
+    return null;
+  }
+  function imageReadiness(document: Document): Muse.UploadReadiness {
+    const fields = [
+      ...document.querySelectorAll<HTMLTextAreaElement>(
+        'textarea[aria-label="Message"]',
+      ),
+    ].filter(visible);
+    const field = fields.length === 1 ? fields[0]! : null;
+    const form = field ? uploadRegion(field) : null;
+    const pageInputs = [
+      ...document.querySelectorAll<HTMLInputElement>('input[type="file"]'),
+    ];
+    const inputs = [
+      ...(form?.querySelectorAll<HTMLInputElement>('input[type="file"]') || []),
+    ];
+    return {
+      composers: Math.min(fields.length, 100),
+      hasForm: !!field?.closest('form'),
+      hasUploadRegion: !!form,
+      pageFileInputs: Math.min(pageInputs.length, 100),
+      pageImageInputs: Math.min(
+        pageInputs.filter((e) => /image\//i.test(e.accept)).length,
+        100,
+      ),
+      fileInputs: Math.min(inputs.length, 100),
+      imageInputs: Math.min(
+        inputs.filter((e) => !e.disabled && /image\//i.test(e.accept)).length,
+        100,
+      ),
+      existingFiles: Math.min(
+        inputs.reduce((n, e) => n + (e.files?.length || 0), 0),
+        100,
+      ),
+      previews: Math.min(form?.querySelectorAll('img[src]').length || 0, 100),
+      sendButtons: Math.min(
+        form?.querySelectorAll('button[aria-label="Send"]').length || 0,
+        100,
+      ),
+    };
+  }
+  function uploadError(code: string, message: string) {
+    return Object.assign(new Error(message), { code });
+  }
+  async function submitImage(
+    document: Document,
+    prompt: string,
+    image: Muse.Upload,
+    wait: (ms: number) => Promise<void>,
+    active = () => true,
+  ) {
+    const initial = snapshot(document),
+      field = composer(document),
+      form = uploadRegion(field);
+    if (!active() || initial.busy || initial.draft.trim())
+      throw uploadError('image-draft', 'Muse is busy or has a draft.');
+    // A profile/avatar picker elsewhere in the page must never receive a photo.
+    if (!form || form.querySelector('[role="log"]'))
+      throw uploadError(
+        'image-composer-missing',
+        'Muse image composer unavailable.',
+      );
+    const inputs = [
+      ...form.querySelectorAll<HTMLInputElement>('input[type="file"]'),
+    ].filter((e) => !e.disabled && /image\//i.test(e.accept));
+    if (!inputs.length)
+      throw uploadError(
+        'image-input-missing',
+        'Muse image file input unavailable.',
+      );
+    if (
+      inputs.length !== 1 ||
+      inputs[0]!.files?.length ||
+      form.querySelector('img[src]')
+    )
+      throw uploadError(
+        'image-composer-ambiguous',
+        'Muse image composer is ambiguous or already has an attachment.',
+      );
+    if (
+      !/^image\/(png|jpeg|gif|webp)$/.test(image.mime) ||
+      image.data.length > 7 * 1024 * 1024 ||
+      !/^[a-zA-Z0-9+/]+={0,2}$/.test(image.data)
+    )
+      throw uploadError('image-unavailable', 'Unsupported image.');
+    const raw = atob(image.data);
+    if (!raw.length || raw.length > 5 * 1024 * 1024)
+      throw uploadError('image-unavailable', 'Image exceeds 5 MB.');
+    const win = document.defaultView as Window & typeof globalThis;
+    const file = new win.File(
+      [Uint8Array.from(raw, (c) => c.charCodeAt(0))],
+      image.name,
+      { type: image.mime },
+    );
+    const transfer = new win.DataTransfer();
+    transfer.items.add(file);
+    const input = inputs[0]!;
+    input.files = transfer.files;
+    input.dispatchEvent(new win.Event('change', { bubbles: true }));
+    const deadline = Date.now() + 60000;
+    while (Date.now() < deadline) {
+      await wait(250);
+      if (!active())
+        throw Error(
+          'Image submission interrupted. Check Muse before retrying.',
+        );
+      if (
+        !input.isConnected ||
+        input.files?.[0] !== file ||
+        composer(document) !== field ||
+        field.value.trim()
+      )
+        throw uploadError('image-input-changed', 'The image composer changed.');
+      const send = [
+        ...form.querySelectorAll<HTMLButtonElement>(
+          'button[aria-label="Send"]',
+        ),
+      ].filter(visible);
+      const previews = [
+        ...form.querySelectorAll<HTMLImageElement>('img[src]'),
+      ].filter(visible);
+      if (
+        previews.length === 1 &&
+        previews[0]!.complete &&
+        previews[0]!.naturalWidth > 0 &&
+        send.length === 1 &&
+        !send[0]!.disabled &&
+        !form.querySelector('[aria-busy="true"],[role="progressbar"]')
+      ) {
+        if (prompt) {
+          const setter = Object.getOwnPropertyDescriptor(
+            win.HTMLTextAreaElement.prototype,
+            'value',
+          )!.set!;
+          setter.call(field, prompt);
+          field.dispatchEvent(new win.Event('input', { bubbles: true }));
+          await wait(150);
+        }
+        if (
+          !active() ||
+          input.files?.[0] !== file ||
+          field.value !== prompt ||
+          !send[0]!.isConnected ||
+          send[0]!.disabled
+        )
+          throw uploadError(
+            'image-submit-changed',
+            'Image submission changed.',
+          );
+        send[0]!.click();
+        return new Set(initial.messages.map((m) => m.id));
+      }
+    }
+    throw uploadError(
+      'image-preview-timeout',
+      'Image preview did not become ready. Check Muse before retrying.',
+    );
   }
   async function submit(
     document: Document,

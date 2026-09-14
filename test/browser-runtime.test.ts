@@ -27,8 +27,12 @@ async function harness(beforeEncrypt: () => Promise<void> = async () => {}) {
     state = await StateStore.open('test', factory),
     inbox = await IndexedDBInbox.open(config, factory);
   const batches: Record<string, any>[] = [];
+  const statuses: Record<string, any>[] = [];
+  let statusFailure = false;
   let fail = false;
   let outsider = false;
+  let imageFailure = false;
+  let downloads = 0;
   let encryptions = 0;
   const api = new MatrixAPI(config, async (input, init) => {
     const url = new URL(String(input));
@@ -36,6 +40,11 @@ async function harness(beforeEncrypt: () => Promise<void> = async () => {}) {
       new Headers(init?.headers).get('authorization'),
       'Bearer synthetic-test-token',
     );
+    if (url.pathname.includes('/send/com.beeper.message_send_status/')) {
+      if (statusFailure) throw Error('Synthetic status failure');
+      statuses.push(JSON.parse(String(init?.body)));
+      return Response.json({ event_id: '$status' });
+    }
     if (url.pathname.endsWith('/members'))
       return Response.json({
         chunk: [
@@ -52,6 +61,7 @@ async function harness(beforeEncrypt: () => Promise<void> = async () => {}) {
         event_ids: batch.events.map((e: { event_id: string }) => e.event_id),
       });
     }
+    if (url.pathname.includes('/receipt/')) return Response.json({});
     if (url.pathname.includes('/redact/'))
       return Response.json({ event_id: '$redaction' });
     throw Error('Unexpected request in test');
@@ -68,6 +78,11 @@ async function harness(beforeEncrypt: () => Promise<void> = async () => {}) {
       url: 'mxc://example/encrypted',
       key: { k: 'synthetic' },
     }),
+    downloadImage: async (image: { name: string; mime: string }) => {
+      downloads++;
+      if (imageFailure) throw Error('Synthetic failure');
+      return { ...image, data: 'iVBORw0KGgo=' };
+    },
     close() {},
   };
   const bridge = Reflect.construct(BrowserBridge, [
@@ -81,12 +96,22 @@ async function harness(beforeEncrypt: () => Promise<void> = async () => {}) {
     bridge,
     state,
     batches,
+    statuses,
+    set statusFailure(value: boolean) {
+      statusFailure = value;
+    },
     close: () => bridge.close(),
     set fail(value: boolean) {
       fail = value;
     },
     set outsider(value: boolean) {
       outsider = value;
+    },
+    set imageFailure(value: boolean) {
+      imageFailure = value;
+    },
+    get downloads() {
+      return downloads;
     },
     get encryptions() {
       return encryptions;
@@ -489,4 +514,259 @@ test('update checkpoint waits for durable delivery and preserves saved state', a
   assert.equal(await h.state.get('test-saved-key'), 'synthetic-key');
   assert.equal((await h.bridge.status()).claimed, 0);
   h.close();
+});
+
+async function receivePhoto(
+  h: Awaited<ReturnType<typeof harness>>,
+  content = {},
+) {
+  await h.bridge.receive(
+    JSON.stringify({
+      command: 'transaction',
+      txn_id: 'photo-tx',
+      id: 77,
+      events: [
+        {
+          type: 'm.room.message',
+          event_id: '$photo',
+          room_id: room,
+          sender: config.owner,
+          origin_server_ts: 100,
+          content: {
+            msgtype: 'm.image',
+            body: 'Describe this',
+            filename: 'photo.png',
+            info: { mimetype: 'image/png', size: 8 },
+            url: 'mxc://example.org/photo',
+            ...content,
+          },
+        },
+      ],
+    }),
+    () => {},
+  );
+}
+test('incoming photos retain captions, claim once, and keep their original Beeper event', async () => {
+  const h = await harness();
+  await receivePhoto(h);
+  await receivePhoto(h);
+  assert.equal((await h.bridge.status()).queued, 1);
+  const result = await h.bridge.claim();
+  assert.equal(result.job?.prompt, 'Describe this');
+  assert.equal(result.job?.image?.name, 'photo.png');
+  assert.equal(h.downloads, 1);
+  assert.equal((await h.bridge.claim()).job, null);
+  await assert.rejects(
+    h.bridge.complete({
+      id: '$photo',
+      messages: [{ id: 'echo', role: 'user', text: 'Describe this' }],
+    }),
+  );
+  const echo = {
+    id: 'echo',
+    role: 'user' as const,
+    text: 'Describe this',
+    images: [
+      {
+        url: 'https://muse.ai/photo.png',
+        data: 'iVBORw0KGgo=',
+        mime: 'image/png',
+      },
+    ],
+  };
+  await h.bridge.complete({ id: '$photo', messages: [echo] });
+  assert.equal(h.batches.length, 0);
+  await h.bridge.importMessages([echo]);
+  assert.equal(
+    h.batches.length,
+    0,
+    'echo must not replace a native image with text or duplicate the image',
+  );
+  await h.bridge.importMessages([
+    { ...echo, reactions: [{ actor: 'assistant', key: 'ack' }] },
+  ]);
+  assert.equal(
+    h.batches.at(-1)?.events[0].content['m.relates_to'].event_id,
+    '$photo',
+  );
+  const jobs =
+    await h.state.get<Array<{ image?: unknown; prompt: string }>>('jobs');
+  assert.equal(jobs?.[0]?.image, undefined);
+  assert.equal(jobs?.[0]?.prompt, '');
+  h.close();
+});
+test('unsupported and failed photos block visibly without falling back to an empty text prompt', async () => {
+  const h = await harness();
+  await receivePhoto(h, { info: { mimetype: 'image/svg+xml' } });
+  assert.equal((await h.bridge.status()).blocked, 1);
+  assert.equal((await h.bridge.claim()).job, null);
+  assert.equal(h.downloads, 0);
+  h.close();
+  const other = await harness();
+  other.imageFailure = true;
+  await receivePhoto(other);
+  assert.equal((await other.bridge.claim()).job, null);
+  assert.equal((await other.bridge.status()).blocked, 1);
+  assert.equal((await other.bridge.claim()).job, null);
+  assert.equal(
+    other.downloads,
+    1,
+    'uncertain jobs are never retried automatically',
+  );
+  other.close();
+});
+test('inaccessible images have visible fallbacks but a previously delivered image stays native', async () => {
+  const h = await harness();
+  const source = {
+    id: 'fallback',
+    role: 'assistant' as const,
+    text: 'Picture',
+    html: '<p>Picture</p>',
+    images: [{ url: 'https://example.org/photo.png' }],
+  };
+  await h.bridge.importMessages([source]);
+  assert.match(
+    h.batches[0]!.events[0].content.content.body,
+    /https:\/\/example.org\/photo.png/,
+  );
+  assert.equal(
+    h.batches[0]!.events[0].content.content.formatted_body,
+    undefined,
+  );
+  await h.bridge.importMessages([
+    {
+      ...source,
+      images: [
+        { ...source.images[0]!, mime: 'image/png', data: 'iVBORw0KGgo=' },
+      ],
+    },
+  ]);
+  await h.bridge.importMessages([source]);
+  const edit = h.batches.at(-1)!.events[0].content.content;
+  assert.equal(edit['m.new_content'].body, 'Picture');
+  assert.equal(
+    h.batches
+      .flatMap((b) => b.events)
+      .filter((e) => e.content?.content?.msgtype === 'm.image').length,
+    1,
+  );
+  h.close();
+});
+
+test('native status stays pending until Muse confirms, and interrupted sends fail without claiming success', async () => {
+  const h = await harness();
+  await receivePhoto(h);
+  assert.equal(h.statuses.at(-1)?.status, 'PENDING');
+  assert.deepEqual(h.statuses.at(-1)?.delivered_to_users, []);
+  await h.bridge.claim();
+  assert.equal(h.statuses.at(-1)?.status, 'PENDING');
+  await h.bridge.block('$photo', 'image-input-missing');
+  assert.equal(h.statuses.at(-1)?.status, 'FAIL_PERMANENT');
+  assert.equal(h.statuses.at(-1)?.['m.relates_to'].event_id, '$photo');
+  assert.ok(
+    !(await h.bridge.status()).blockedJobs[0]?.error?.includes('PRIVATE'),
+  );
+  await h.bridge.resolve('$photo');
+  assert.equal(h.statuses.at(-1)?.status, 'FAIL_PERMANENT');
+  h.close();
+});
+test('Muse image confirmation requires an image echo, publishes delivered users, and survives reply capture failure', async () => {
+  const h = await harness();
+  await receivePhoto(h);
+  await h.bridge.claim();
+  await assert.rejects(
+    h.bridge.confirm('$photo', {
+      id: 'echo',
+      role: 'user',
+      text: 'Describe this',
+    }),
+  );
+  assert.equal(h.statuses.at(-1)?.status, 'PENDING');
+  await h.bridge.confirm('$photo', {
+    id: 'echo',
+    role: 'user',
+    text: 'Describe this',
+    images: [{ url: 'https://muse.ai/photo.png' }],
+  });
+  assert.equal(h.statuses.at(-1)?.status, 'SUCCESS');
+  assert.deepEqual(h.statuses.at(-1)?.delivered_to_users, [config.bot]);
+  const count = h.statuses.length;
+  await h.bridge.block('$photo', 'result-delivery-failed');
+  await h.bridge.tick();
+  assert.equal(
+    h.statuses.length,
+    count,
+    'confirmed delivery is not reversed by failure returning the reply',
+  );
+  h.close();
+});
+test('failed status requests retry independently without resubmitting the prompt', async () => {
+  const h = await harness();
+  h.statusFailure = true;
+  await receivePhoto(h);
+  assert.equal(h.statuses.length, 0);
+  await h.bridge.claim();
+  h.statusFailure = false;
+  await h.bridge.tick();
+  assert.equal(h.statuses.at(-1)?.status, 'PENDING');
+  assert.equal((await h.bridge.claim()).job, null);
+  h.close();
+});
+
+test('known pre-upload failures keep the photo failed but do not hold later text; uncertain uploads still hold', async () => {
+  for (const code of [
+    'image-input-missing',
+    'image-composer-missing',
+    'image-unavailable',
+    'image-download-failed',
+    'image-preview-timeout',
+    'image-input-changed',
+    'source-interrupted',
+  ]) {
+    const h = await harness();
+    try {
+      await receivePhoto(h);
+      await h.bridge.claim();
+      await h.bridge.block('$photo', code);
+      await h.bridge.receive(
+        JSON.stringify({
+          command: 'transaction',
+          txn_id: 'following-text',
+          id: 78,
+          events: [
+            {
+              type: 'm.room.message',
+              event_id: '$following',
+              room_id: room,
+              sender: config.owner,
+              origin_server_ts: 200,
+              content: { msgtype: 'm.text', body: 'Following text' },
+            },
+          ],
+        }),
+        () => {},
+      );
+      const safe = [
+        'image-input-missing',
+        'image-composer-missing',
+        'image-unavailable',
+        'image-download-failed',
+      ].includes(code);
+      assert.equal((await h.bridge.status()).held, safe ? 0 : 1);
+      assert.equal((await h.bridge.status()).blocked, 1);
+      const claimed = await h.bridge.claim();
+      assert.equal(claimed.job?.id, safe ? '$following' : undefined);
+      assert.equal(
+        h.statuses.find(
+          (s) =>
+            s['m.relates_to'].event_id === '$photo' &&
+            s.status === 'FAIL_PERMANENT',
+        )?.status,
+        'FAIL_PERMANENT',
+      );
+      assert.equal(h.downloads, 1, 'failed photo was never downloaded again');
+    } finally {
+      h.close();
+    }
+  }
 });

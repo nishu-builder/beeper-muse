@@ -77,10 +77,33 @@ checkmarks, tab focus, or reaction icons.
 Typing uses a lightweight activity observation, independent of transcript reads
 and composer availability. Every four seconds the connected worker asks the
 selected Muse tab for a fresh observation, so renewal does not rely on the page's
-background timers. The source reports a visible Stop control as working. Working
+background timers. The source recognizes visible Stop/Stop generating controls
+outside the transcript and explicit busy state scoped to the composer or named
+assistant header. Historical tool cards and whole-page loading are excluded. Working
 state renews at most once every five seconds with a twelve-second Matrix expiry;
 idle clears it. The worker does not replay cached activity when the source tab
 stops responding. Chrome suspension and page freezing can still interrupt updates.
+
+Source-readiness counts and accepted/failed typing requests are recorded separately
+in the optional diagnostic log. An accepted request is not proof that either
+client rendered an indicator. `com.beeper.room_features` is not yet advertised;
+its effect on this custom bridge's client controls remains under investigation.
+
+## Assistant profile
+
+The optional typed adapter `profile()` supplies avatar bytes independently of
+message snapshots. The DOM implementation requires one visible image matching the
+assistant named in the chat title, outside navigation and transcript content.
+An absent or ambiguous match does not erase an existing avatar. Reads are bounded,
+cached briefly, and cannot block the message queue.
+
+`AvatarSync` validates image type, signature and size, verifies room membership,
+uploads ordinary Matrix avatar media, and updates the bot profile, joined member,
+room avatar, and channel avatar in both bridge-info state events. Other state
+fields are preserved. A durable hash/media record avoids uploading the same
+picture on each scan or retrying an upload after a partial metadata failure.
+These profile/state images are not encrypted message attachments. No image data,
+assistant name or media address is added to diagnostics.
 
 Catch-up covers loaded messages only and does not reposition older events among
 messages already in Beeper. Virtualized text-only observations are marked
@@ -92,7 +115,9 @@ message. A rendered observation can upgrade a partial one.
 `Muse.Adapter` exposes `snapshot()`, `submit()`, `prepare()`, optional `activity()`,
 and `capabilities`.
 The contract contains source IDs and data, not DOM nodes, Matrix identifiers,
-credentials, or database handles. `snapshot()` may be asynchronous, so a future
+credentials, or database handles. `submitImage(prompt, upload, wait, active)` is an optional typed operation for
+photo submissions. `Upload` contains only a filename, MIME type and base64 bytes;
+it contains no Matrix credentials or encryption metadata. `snapshot()` may be asynchronous, so a future
 API adapter can supply observations without forcing synchronous network access.
 
 A future official API implementation would own its authentication, pagination,
@@ -147,3 +172,49 @@ remove their timers/listeners when their extension context is invalidated.
 Chrome may delay store updates while the connection page and worker stay active;
 explicit safe reloads apply an already-downloaded update. This mechanism cannot
 bypass store review, permission prompts, browser shutdown or frozen pages.
+
+## Images in both directions
+
+For incoming `m.image` events, `media.ts` validates the Matrix address, declared
+format and size. `MatrixAPI.downloadImage` uses the authenticated media endpoint;
+native fetch follows Beeper's signed storage redirect and strips Authorization
+when crossing origins. The extension's network policy permits only itself,
+Beeper and HTTPS Cloudflare R2 storage. It sends no browser cookies or referrer.
+The stream is capped at 5 MB regardless of Content-Length. Rust/WASM authenticates
+and decrypts encrypted attachments; MIME signatures are checked before the
+worker passes a source-neutral `Upload` to the selected Muse adapter.
+
+Queued jobs retain the media reference, not downloaded plaintext image bytes.
+Claimed jobs are persisted before the adapter runs. The adapter refuses drafts,
+ambiguous file inputs, missing previews and changed composers. A failure blocks
+the job for user inspection, with no automatic resend. Completion associates
+the source echo with the original Beeper image event so later catch-up cannot
+replace it with text or send it a second time. Observed reactions still target
+that original event. Arbitrary files and interactive approvals stay unsupported.
+
+For outgoing images, the adapter resolves responsive image selection and accepts
+ordinary HTTP URLs, same-origin blob previews and bounded embedded raster images.
+It uses ordinary page-origin fetches and retains fallback links when bytes are
+unavailable. The worker encrypts available bytes as native `m.image` events.
+See the [validation limits](validation.md#image-support-acceptance) before treating
+the incoming adapter as compatible with the current Muse website.
+
+## Diagnostics and delivery confirmation
+
+`diagnostic-log.ts` validates a closed event vocabulary and field schema at both
+collection and export. The worker serializes writes to a 200-entry local ring;
+logging failures do not interrupt message handling. Only the socket-lock owner
+starts `log-controls.ts`. A user-selected File System Access handle lives in a
+separate state scope. `log-file.ts` serializes file writes, skips unchanged
+snapshots and aborts failed writes; it does not request permission in background.
+The connection heartbeat and a timer flush changes. No remote logging endpoint,
+raw DOM dump or arbitrary file-reading facility is added.
+
+Incoming jobs publish `com.beeper.message_send_status` using `m.reference` to the
+original event. `PENDING` has an empty `delivered_to_users`; `SUCCESS` names the
+Muse bridge actor only after the adapter observes a matching prompt echo and new
+reply. Interrupted or skipped unconfirmed jobs report `FAIL_PERMANENT`. A failed
+reply export does not reverse already confirmed delivery. Deterministic status
+transaction IDs and saved fingerprints allow retries without resending prompts.
+Legacy completed jobs are not relabeled. Native status display still needs client
+verification; source confirmation is a website observation rather than an API receipt.

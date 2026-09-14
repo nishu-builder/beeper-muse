@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
+import { colorPNG } from '../scripts/dev/fixture.ts';
 const sync = await readFile(
   new URL('../extension/sync.js', import.meta.url),
   'utf8',
@@ -37,6 +38,116 @@ function fixture() {
     },
   };
 }
+test('avatar discovery selects the named assistant outside navigation/history and refuses ambiguity', async () => {
+  const f = fixture();
+  try {
+    f.document.title = 'Chat – Babar';
+    f.document.body.insertAdjacentHTML(
+      'afterbegin',
+      '<header><img alt="Babar" src="https://muse.ai/avatar.png"></header><nav><img alt="Babar" src="/other.png"></nav>',
+    );
+    f.document
+      .querySelector('[role="log"]')!
+      .insertAdjacentHTML('beforeend', '<img alt="Babar" src="/history.png">');
+    let fetches = 0;
+    f.dom.window.fetch = async (input: unknown) => {
+      fetches++;
+      assert.equal(input, 'https://muse.ai/avatar.png');
+      return new Response(new Uint8Array(colorPNG('RED')), {
+        headers: { 'content-type': 'image/png' },
+      }) as any;
+    };
+    const adapter = f.adapter.create(f.document);
+    assert.equal(
+      (await adapter.profile()).avatar.data,
+      colorPNG('RED').toString('base64'),
+    );
+    await adapter.profile();
+    assert.equal(fetches, 1, 'unchanged image is cached briefly');
+    f.document.body.insertAdjacentHTML(
+      'beforeend',
+      '<img alt="Babar" src="/ambiguous.png">',
+    );
+    assert.equal(await adapter.profile(), undefined);
+    f.document.title = 'Different page';
+    assert.equal(await adapter.profile(), undefined);
+    assert.equal(fetches, 1);
+  } finally {
+    f.dom.window.close();
+  }
+});
+test('avatar capture enforces its smaller byte budget without affecting chat image preparation', async () => {
+  const f = fixture();
+  try {
+    f.document.title = 'Chat – Babar';
+    f.document.body.insertAdjacentHTML(
+      'afterbegin',
+      '<header><img alt="Babar" src="/avatar.png"></header>',
+    );
+    f.dom.window.fetch = async () =>
+      new Response(new Uint8Array(512 * 1024 + 1), {
+        headers: { 'content-type': 'image/png' },
+      }) as any;
+    const adapter = f.adapter.create(f.document);
+    assert.equal(await adapter.profile(), undefined);
+    const message = await adapter.prepare({
+      id: 'image',
+      role: 'assistant',
+      text: '',
+      images: [{ url: 'https://muse.ai/image.png' }],
+    });
+    assert.ok(message.images[0].data);
+  } finally {
+    f.dom.window.close();
+  }
+});
+test('typing recognizes current Stop variants and scoped busy regions, excluding historical controls', async () => {
+  const f = fixture();
+  try {
+    const adapter = f.adapter.create(f.document);
+    f.document
+      .querySelector('[role="log"]')!
+      .insertAdjacentHTML(
+        'beforeend',
+        '<button aria-label="Stop generating">Old tool</button><span aria-busy="true">Old activity</span>',
+      );
+    assert.equal(await adapter.activity(), 'idle');
+    for (const label of [
+      'Stop',
+      'Stop generating',
+      'Stop generating response',
+      'Stop response',
+    ]) {
+      f.document
+        .querySelector('body > button')!
+        .setAttribute('aria-label', label);
+      assert.equal(await adapter.activity(), 'working');
+    }
+    f.document
+      .querySelector('body > button')!
+      .setAttribute('aria-label', 'Send');
+    f.document.body.setAttribute('aria-busy', 'true');
+    assert.equal(
+      await adapter.activity(),
+      'idle',
+      'whole-page loading is not assistant typing',
+    );
+    f.document.body.removeAttribute('aria-busy');
+    f.document.querySelector('textarea')!.setAttribute('aria-busy', 'true');
+    assert.equal(await adapter.activity(), 'working');
+    f.document.querySelector('textarea')!.removeAttribute('aria-busy');
+    f.document.title = 'Chat – Babar';
+    f.document.body.insertAdjacentHTML(
+      'afterbegin',
+      '<header aria-busy="true"><img alt="Babar" src="/avatar.png"></header>',
+    );
+    assert.equal(await adapter.activity(), 'working');
+    f.document.querySelector('header')!.removeAttribute('aria-busy');
+    assert.equal(await adapter.activity(), 'idle');
+  } finally {
+    f.dom.window.close();
+  }
+});
 test('browser adapter preserves an existing user draft and never sends it', async () => {
   const f = fixture();
   f.document.querySelector('textarea')!.value = 'My unfinished message';
@@ -299,4 +410,184 @@ test('activity survives a disabled composer and missing transcript, while sendin
   } finally {
     f.dom.window.close();
   }
+});
+
+test('image submission rejects unrelated file pickers without touching them', async () => {
+  const f = fixture();
+  f.document.body.insertAdjacentHTML(
+    'beforeend',
+    '<input type="file" accept="image/*" aria-label="Profile picture">',
+  );
+  await assert.rejects(
+    f.adapter.create(f.document).submitImage!(
+      '',
+      { name: 'photo.png', mime: 'image/png', data: 'iVBORw0KGgo=' },
+      async () => {},
+    ),
+    /composer/,
+  );
+  assert.equal(
+    f.document.querySelector<HTMLInputElement>('input')!.files!.length,
+    0,
+  );
+  f.dom.window.close();
+});
+for (const tag of ['form', 'div'])
+  test(`image upload in a ${tag} waits for a loaded preview and preserves an existing draft`, async () => {
+    const f = fixture(),
+      doc = f.document,
+      form = doc.createElement(tag);
+    const field = doc.querySelector('textarea')!,
+      send = doc.querySelector('button')!;
+    form.append(field, send);
+    doc.body.append(form);
+    const facts = f.adapter.create(doc).imageReadiness!();
+    assert.equal(facts.hasForm, tag === 'form');
+    const input = doc.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    form.append(input);
+    let files: File[] = [];
+    Object.defineProperty(input, 'files', {
+      get: () => files,
+      set: (value: File[]) => {
+        files = value;
+      },
+    });
+    Object.defineProperty(f.dom.window, 'DataTransfer', {
+      value: class {
+        files: File[] = [];
+        items = { add: (file: File) => this.files.push(file) };
+      },
+    });
+    let sends = 0;
+    send.onclick = () => {
+      sends++;
+    };
+    input.onchange = () => {
+      const preview = doc.createElement('img');
+      preview.src = 'blob:https://muse.ai/synthetic';
+      Object.defineProperties(preview, {
+        complete: { value: true },
+        naturalWidth: { value: 10 },
+      });
+      form.append(preview);
+    };
+    field.value = 'private draft';
+    await assert.rejects(
+      f.adapter.create(doc).submitImage!(
+        '',
+        { name: 'photo.png', mime: 'image/png', data: 'iVBORw0KGgo=' },
+        async () => {},
+      ),
+      /draft/,
+    );
+    assert.equal(files.length, 0);
+    field.value = '';
+    await f.adapter.create(doc).submitImage!(
+      'Caption',
+      { name: 'photo.png', mime: 'image/png', data: 'iVBORw0KGgo=' },
+      async () => {},
+    );
+    assert.equal(sends, 1);
+    assert.equal(field.value, 'Caption');
+    assert.equal(files[0]!.name, 'photo.png');
+    f.dom.window.close();
+  });
+test('snapshot retains local and embedded image previews and excludes foreign blobs', () => {
+  const f = fixture();
+  f.document.querySelector('[data-message-id]')!.innerHTML =
+    '<img src="blob:https://muse.ai/photo"><img src="data:image/png;base64,iVBORw0KGgo="><img src="blob:https://other.test/photo">';
+  assert.equal(f.adapter.snapshot(f.document).messages[0]!.images!.length, 2);
+  f.dom.window.close();
+});
+
+test('photo attribution requires an image echo and rejects interleaved user messages', () => {
+  const f = fixture();
+  const user = {
+    id: 'photo',
+    role: 'user',
+    text: '',
+    images: [{ url: 'https://muse.ai/photo.png' }],
+  };
+  const reply = { id: 'reply', role: 'assistant', text: 'A photo' };
+  assert.equal(
+    f.adapter.responseAfter(
+      new Set(),
+      '',
+      { messages: [user, reply] },
+      'photo.png',
+    ),
+    'A photo',
+  );
+  assert.throws(() =>
+    f.adapter.responseAfter(
+      new Set(),
+      '',
+      { messages: [{ ...user, images: [] }, reply] },
+      'photo.png',
+    ),
+  );
+  assert.throws(() =>
+    f.adapter.responseAfter(
+      new Set(),
+      '',
+      {
+        messages: [
+          user,
+          { id: 'other', role: 'user', text: 'unrelated' },
+          reply,
+        ],
+      },
+      'photo.png',
+    ),
+  );
+  f.dom.window.close();
+});
+
+test('image readiness reports only control counts and diagnoses a missing upload region before staging a photo', async () => {
+  const f = fixture();
+  f.document.querySelector('textarea')!.value = 'PRIVATE draft';
+  const adapter = f.adapter.create(f.document);
+  const facts = adapter.imageReadiness();
+  assert.equal(facts.hasForm, false);
+  assert.equal(facts.composers, 1);
+  assert.ok(!JSON.stringify(facts).includes('PRIVATE'));
+  f.document.querySelector('textarea')!.value = '';
+  await assert.rejects(
+    adapter.submitImage(
+      '',
+      { name: 'photo.png', mime: 'image/png', data: 'iVBORw0KGgo=' },
+      async () => {},
+    ),
+    (e: unknown) => (e as { code: string }).code === 'image-composer-missing',
+  );
+  f.dom.window.close();
+});
+
+test('form-free discovery refuses a shared transcript ancestor', async () => {
+  const f = fixture();
+  const region = f.document.createElement('div');
+  region.append(...f.document.body.childNodes);
+  region.insertAdjacentHTML(
+    'beforeend',
+    '<input type="file" accept="image/*">',
+  );
+  f.document.body.append(region);
+  const a = f.adapter.create(f.document);
+  assert.equal(a.imageReadiness().hasUploadRegion, false);
+  assert.equal(a.imageReadiness().pageImageInputs, 1);
+  await assert.rejects(
+    a.submitImage(
+      '',
+      { name: 'test.png', mime: 'image/png', data: 'iVBORw0KGgo=' },
+      async () => {},
+    ),
+    /composer/,
+  );
+  assert.equal(
+    region.querySelector<HTMLInputElement>('input')!.files!.length,
+    0,
+  );
+  f.dom.window.close();
 });
