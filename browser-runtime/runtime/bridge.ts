@@ -34,6 +34,7 @@ const SOURCE = 'beeper-muse-chrome';
 const enc = encodeURIComponent;
 export class BrowserBridge {
   private chain: Promise<unknown> = Promise.resolve();
+  private intake: Promise<unknown> = Promise.resolve();
   private paused = false;
   pause() {
     this.paused = true;
@@ -189,13 +190,17 @@ export class BrowserBridge {
       throw error;
     }
   }
-  receive(frame: unknown, send: (data: string) => void) {
-    return this.serial(async () => {
-      await receiveTransaction(this.inbox, frame, (response) =>
+  async receive(frame: unknown, send: (data: string) => void) {
+    // Persist/acknowledge in arrival order without waiting for image uploads or
+    // outgoing encryption. Crypto processing still has exactly one owner.
+    const received = this.intake.then(() =>
+      receiveTransaction(this.inbox, frame, (response) =>
         send(JSON.stringify(response)),
-      );
-      await this.drain();
-    });
+      ),
+    );
+    this.intake = received.catch(() => {});
+    await received;
+    await this.serial(() => this.drain());
   }
   private async drain() {
     const pending = await this.inbox.pending(128);

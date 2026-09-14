@@ -22,7 +22,7 @@ const config: Configuration = {
   bot: '@sh-muse-chrome-012345abcdefbot:beeper.local',
 };
 const room = '!test:beeper.local';
-async function harness() {
+async function harness(beforeEncrypt: () => Promise<void> = async () => {}) {
   const factory = new IDBFactory(),
     state = await StateStore.open('test', factory),
     inbox = await IndexedDBInbox.open(config, factory);
@@ -58,6 +58,7 @@ async function harness() {
   });
   const crypto = {
     encrypt: async (_room: string, type: string, content: unknown) => {
+      await beforeEncrypt();
       encryptions++;
       return { algorithm: 'synthetic-test-only', type, content };
     },
@@ -356,5 +357,41 @@ test('images which become accessible later are encrypted and imported once', asy
   assert.equal(images.length, 1);
   assert.ok(images[0].content.content.file.key);
   assert.equal((await h.bridge.importMessages([richer])).added, 0);
+  h.close();
+});
+
+test('durable incoming receipt is not delayed by a slow outgoing upload', async () => {
+  let release!: () => void, entered!: () => void;
+  const waiting = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const started = new Promise<void>((resolve) => {
+    entered = resolve;
+  });
+  const h = await harness(async () => {
+    entered();
+    await waiting;
+  });
+  const sending = h.bridge.importMessages([
+    { id: 'slow', role: 'assistant', text: 'Uploading' },
+  ]);
+  await started;
+  let acknowledge!: () => void;
+  const acknowledged = new Promise<void>((resolve) => {
+    acknowledge = resolve;
+  });
+  const receiving = h.bridge.receive(
+    JSON.stringify({
+      command: 'transaction',
+      id: 1,
+      txn_id: 'concurrent',
+      events: [],
+    }),
+    () => acknowledge(),
+  );
+  await acknowledged;
+  assert.equal(h.batches.length, 0);
+  release();
+  await Promise.all([sending, receiving]);
   h.close();
 });
