@@ -6,7 +6,7 @@ remains experimental; the public package is not a claim of production reliabilit
 
 ## Automated coverage
 
-For 0.7.0, local checks passed: 116 JavaScript/TypeScript tests, TypeScript
+For 0.7.1, local checks passed: 120 JavaScript/TypeScript tests, TypeScript
 checks, Go tests and race tests, both builds, formatting, the public ZIP tests,
 and the production npm audit (zero reported vulnerabilities). The release gate
 is `npm run check`, Go race tests, `npm run package`, and the production npm audit. CI runs on Linux and macOS. Tests use synthetic DOM,
@@ -46,6 +46,12 @@ Operating-system notification banners across clients have not been comprehensive
 observed. Original timestamps can only be verified when the source supplies them.
 
 ## Release acceptance checklist
+
+The 0.7.1 typing fix covers activity checks while the composer is disabled,
+transcript reads fail, and the page's interval timers do not fire. Before the fix,
+Desktop SDK logs showed incoming `m.typing` events for the current room, so missing
+visible indicators cannot be attributed solely to transport. Rendering and
+clearing in both Desktop and mobile still need a live check after updating.
 
 Use a consenting test account and synthetic content. Record exact versions and
 outcomes without committing credentials, identifiers or private screenshots.

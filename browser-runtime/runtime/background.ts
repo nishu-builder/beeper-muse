@@ -1,3 +1,4 @@
+import { ActivityPulse } from './activity-pulse.js';
 import { connectedBridgeState } from './bridge-metadata.js';
 import { BrowserBridge } from './bridge.js';
 import { configuration, type Configuration } from './matrix.js';
@@ -408,3 +409,15 @@ chrome.runtime.onConnect.addListener((port) => {
     })
     .catch(() => port.disconnect());
 });
+
+// Ask the selected tab for fresh activity independently of its throttled timers.
+// The content script still checks connection/generation before reporting it.
+const activityPulse = new ActivityPulse(
+  async () => {
+    if (phase !== 'connected' || !bridge) return;
+    const { tabID } = await chrome.storage.session.get('tabID');
+    if (Number.isInteger(tabID)) return tabID as number;
+  },
+  (tabID) => chrome.tabs.sendMessage(tabID, { type: 'activity-pulse' }),
+);
+setInterval(() => void activityPulse.tick(), 4000);

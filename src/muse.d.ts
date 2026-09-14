@@ -49,6 +49,8 @@ declare namespace Muse {
   interface Adapter {
     readonly capabilities: Capabilities;
     snapshot(): Snapshot | Promise<Snapshot>;
+    /** Lightweight observation that does not require a usable composer or transcript. */
+    activity?(): Activity | Promise<Activity>;
     submit(
       prompt: string,
       wait: (ms: number) => Promise<void>,
