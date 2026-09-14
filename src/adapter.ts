@@ -6,13 +6,16 @@
       element.getBoundingClientRect().width &&
       element.getBoundingClientRect().height
     );
-  function composer(document: Document) {
+  function composer(document: Document, writable = true) {
     const fields = [
       ...document.querySelectorAll<HTMLTextAreaElement>(
         'textarea[aria-label="Message"]',
       ),
     ].filter(visible);
-    if (fields.length !== 1 || fields[0]!.disabled || fields[0]!.readOnly)
+    if (
+      fields.length !== 1 ||
+      (writable && (fields[0]!.disabled || fields[0]!.readOnly))
+    )
       throw new Error('Muse composer unavailable.');
     return fields[0]!;
   }
@@ -119,6 +122,7 @@
         readReceipts: false,
       },
       snapshot: () => snapshot(document),
+      activity: () => activity(document),
       submit: (prompt, wait, active) => submit(document, prompt, wait, active),
       prepare,
     };
@@ -163,18 +167,23 @@
       (a.actor + a.key).localeCompare(b.actor + b.key),
     );
   }
+  function activity(document: Document): Muse.Activity {
+    return [...document.querySelectorAll('button[aria-label="Stop"]')].some(
+      visible,
+    )
+      ? 'working'
+      : 'idle';
+  }
   function snapshot(document: Document): Muse.Snapshot {
     const logs = [
       ...document.querySelectorAll('[role="log"][aria-label="Chat messages"]'),
     ].filter(visible);
     if (logs.length !== 1) throw new Error('Open the main Muse chat.');
-    const busy = [
-      ...document.querySelectorAll('button[aria-label="Stop"]'),
-    ].some(visible);
+    const busy = activity(document) === 'working';
     return {
       activity: busy ? 'working' : 'idle',
       busy,
-      draft: composer(document).value,
+      draft: composer(document, false).value,
       messages: [
         ...logs[0]!.querySelectorAll('[data-message-item][data-message-id]'),
       ].flatMap((e): Muse.Observation[] => {

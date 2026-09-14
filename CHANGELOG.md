@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.7.1
+
+- Request fresh Muse activity from the worker so background-tab timer throttling
+  does not prevent typing renewals. Disconnects stop renewal; typing expires if
+  the source becomes unavailable.
+- Observe activity independently of message capture, including when Muse disables
+  its composer or temporarily removes the transcript. Sending still requires a
+  usable, empty composer.
+- Add regression coverage for renewal, clearing, disconnected/discarded tabs and
+  failed transcript reads. Live Desktop and mobile rendering remains to be checked.
+
 ## 0.7.0
 
 First public package of the Chrome-only runtime. One-time bbctl registration is

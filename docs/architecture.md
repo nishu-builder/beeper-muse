@@ -74,6 +74,14 @@ Beeper prompt read after handling it; that is separate from an authoritative
 Muse read receipt. The DOM adapter does not invent read state from acknowledgments,
 checkmarks, tab focus, or reaction icons.
 
+Typing uses a lightweight activity observation, independent of transcript reads
+and composer availability. Every four seconds the connected worker asks the
+selected Muse tab for a fresh observation, so renewal does not rely on the page's
+background timers. The source reports a visible Stop control as working. Working
+state renews at most once every five seconds with a twelve-second Matrix expiry;
+idle clears it. The worker does not replay cached activity when the source tab
+stops responding. Chrome suspension and page freezing can still interrupt updates.
+
 Catch-up covers loaded messages only and does not reposition older events among
 messages already in Beeper. Virtualized text-only observations are marked
 `partial`: they can fill missing history but cannot downgrade a known rich
@@ -81,7 +89,8 @@ message. A rendered observation can upgrade a partial one.
 
 ## Replaceable Muse integration
 
-`Muse.Adapter` exposes `snapshot()`, `submit()`, `prepare()`, and `capabilities`.
+`Muse.Adapter` exposes `snapshot()`, `submit()`, `prepare()`, optional `activity()`,
+and `capabilities`.
 The contract contains source IDs and data, not DOM nodes, Matrix identifiers,
 credentials, or database handles. `snapshot()` may be asynchronous, so a future
 API adapter can supply observations without forcing synchronous network access.

@@ -179,13 +179,18 @@
       if (result.job)
         await execute(result.job, current, connected.sourceProtocol);
     } catch {
-      await reportActivity(null);
+      await pulseActivity();
       /* Keep private data and server failures out of page logs. */
     } finally {
       polling = false;
     }
   }
   chrome.runtime.onMessage.addListener((message, _sender, respond) => {
+    if (message.type === 'activity-pulse') {
+      respond({ ok: true });
+      void pulseActivity();
+      return;
+    }
     if (message.type === 'probe') {
       respond({
         protocol: 6,
@@ -223,9 +228,13 @@
     pulsing = true;
     const current = generation;
     try {
-      const view = await muse.snapshot();
+      const value = muse.activity
+        ? await muse.activity()
+        : ((view) => view.activity || (view.busy ? 'working' : 'idle'))(
+            await muse.snapshot(),
+          );
       if (stopped || current !== generation || !closeGuard) return;
-      await reportActivity(view);
+      await reportActivity({ activity: value });
     } catch {
       await reportActivity(null);
     } finally {

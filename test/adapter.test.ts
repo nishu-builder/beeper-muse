@@ -269,3 +269,34 @@ test('media buttons and inline product names survive while choices remain inert'
   assert.equal(m.images[0].url, 'https://muse.ai/preview.png');
   f.dom.window.close();
 });
+
+test('activity survives a disabled composer and missing transcript, while sending stays blocked', async () => {
+  const f = fixture();
+  try {
+    const field = f.document.querySelector('textarea')!;
+    field.disabled = true;
+    const stop = f.document.createElement('button');
+    stop.setAttribute('aria-label', 'Stop');
+    f.document.body.append(stop);
+    const adapter = f.adapter.create(f.document);
+    assert.equal(await adapter.activity!(), 'working');
+    assert.equal(f.adapter.snapshot(f.document).busy, true);
+    await assert.rejects(
+      adapter.submit('Do not send', async () => {}),
+      /busy/,
+    );
+    stop.remove();
+    await assert.rejects(
+      adapter.submit('Do not send', async () => {}),
+      /composer/,
+    );
+    f.document.body.append(stop);
+    f.document.querySelector('[role="log"]')!.remove();
+    field.remove();
+    assert.equal(await adapter.activity!(), 'working');
+    stop.remove();
+    assert.equal(await adapter.activity!(), 'idle');
+  } finally {
+    f.dom.window.close();
+  }
+});

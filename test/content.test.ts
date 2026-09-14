@@ -113,6 +113,7 @@ function harness(
     BeeperMuseDOM: {
       create() {
         return {
+          activity: () => (busy ? 'working' : 'idle'),
           snapshot: this.snapshot,
           submit: this.submit,
           prepare: async (m: unknown) => m,
@@ -320,4 +321,39 @@ test('Muse working activity renews independently and clears when the tab disconn
     h.messages.filter((m) => m.type === 'activity').map((m) => m.activity),
     ['working', 'working', 'idle'],
   );
+});
+
+test('worker pulses renew and clear typing without tab timers or a readable transcript', async () => {
+  const h = harness(false, false, true);
+  const activities = () =>
+    h.messages.filter((m) => m.type === 'activity').map((m) => m.activity);
+  h.view({ busy: true });
+  h.signal('start');
+  await flush();
+  assert.deepEqual(activities(), ['working']);
+
+  // advance changes the clock but never fires the tab's interval callbacks.
+  h.view({ busy: true, unavailable: true });
+  await h.advance(6000);
+  assert.deepEqual(h.signal('activity-pulse'), { ok: true });
+  await flush();
+  assert.deepEqual(activities(), ['working', 'working']);
+
+  // A failing full snapshot must not clear a valid independent activity signal.
+  h.signal('rescan');
+  await flush();
+  assert.deepEqual(activities(), ['working', 'working']);
+
+  h.view({ unavailable: true });
+  h.signal('activity-pulse');
+  await flush();
+  assert.deepEqual(activities(), ['working', 'working', 'idle']);
+
+  h.signal('stop');
+  h.view({ busy: true });
+  await h.advance(6000);
+  h.signal('activity-pulse');
+  await flush();
+  assert.deepEqual(activities(), ['working', 'working', 'idle']);
+  assert.equal(h.submits, 0);
 });
