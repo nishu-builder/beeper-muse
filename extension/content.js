@@ -203,6 +203,7 @@
         error?.message === 'Another message was entered in the Muse tab.'
           ? 'reply-attribution'
           : error?.code || 'source-interrupted';
+      if (job.image) checkUpload();
       diagnostic(code);
       await send({ type: 'block', id: job.id, code }).catch(() => {});
     } finally {
@@ -293,7 +294,7 @@
     }
     if (message.type === 'probe') {
       respond({
-        protocol: 14,
+        protocol: 15,
         health: health(),
         active: !stopped && closeGuard,
         progress: tracker.progress,
@@ -312,14 +313,14 @@
       generation++;
       void reportActivity(null);
       guardClosing(false);
-      respond({ protocol: 14 });
+      respond({ protocol: 15 });
     }
     if (message.type === 'start') {
       stopped = false;
       tracker = new BeeperMuseSync.Tracker(send, undefined, muse.prepare);
       const state = health();
       guardClosing(state !== 'unavailable');
-      respond({ protocol: 14, health: state });
+      respond({ protocol: 15, health: state });
       checkUpload();
       void poll();
     }
