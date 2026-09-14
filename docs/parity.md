@@ -344,3 +344,10 @@ and rejection of a marked transcript ancestor. This fixes an observed boundary
 error; it does not prove why Muse cleared the upload or establish live delivery.
 Avatar and typing verification, the full rendering inventory and both-direction
 photo acceptance remain open. No held job was dismissed automatically.
+
+The automatic local update is live: fresh 0.8.12 diagnostics confirm the exact
+packaged build, both connections, continued file logging and the held job. The
+corrected region now reports two image elements and one Send control where the
+old region reported zero of each. These counts do not identify the images, but
+they confirm the boundary changed actual observation. Inspect and remove only
+leftover synthetic test attachments before dismissing that test and trying again.

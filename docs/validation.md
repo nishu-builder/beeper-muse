@@ -387,3 +387,10 @@ explicit composer wrapper. The adapter previously watched only the inner region.
 The wrapper fix has synthetic sibling-preview/Send and shared-transcript rejection
 coverage. The new failed test remains held; successful live upload and post-photo
 text remain pending.
+
+The automatic local update is live: fresh 0.8.12 diagnostics confirm the exact
+packaged build, both connections, continued file logging and the held job. The
+corrected region now reports two image elements and one Send control where the
+old region reported zero of each. These counts do not identify the images, but
+they confirm the boundary changed actual observation. Inspect and remove only
+leftover synthetic test attachments before dismissing that test and trying again.
