@@ -331,3 +331,7 @@ chat details. A successful preflight is not delivery confirmation.
 
 The prior text-send journal remains open. No photo or subsequent text test was
 sent, no user job was dismissed and no installed Beeper app code was changed.
+
+After a user-performed Beeper Desktop restart, the same read-only doctor passes
+identity, search and per-chat retrieval. The restart cleared the observed API
+failure. It still refuses a test because the diagnostic file is stale.

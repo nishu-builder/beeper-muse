@@ -131,8 +131,9 @@ The driver uses `/v1/chats`, `/v1/chats/{chatID}`, `/v1/messages/search`,
 `/v1/assets/upload/base64` and
 `/v1/chats/{chatID}/messages`, following the
 [Beeper Desktop SDK](https://github.com/beeper/desktop-api-js). On the development
-installation, the ordinary chat-detail/message-list endpoints return HTTP 500;
-chat-scoped search works and is limited to 20 results per page. A new send
+installation, chat-detail and message-list endpoints have returned HTTP 500
+while chat-scoped search worked; restarting Beeper Desktop restored chat-detail
+retrieval. Search is limited to 20 results per page. A new send
 requires successful per-chat retrieval and matching participants before uploading
 or submitting anything. This catches the known failure without treating listing
 as send readiness. It cannot guarantee that a subsequent send will succeed.

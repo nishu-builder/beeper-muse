@@ -13,9 +13,9 @@ The product remains Chrome-only. Maintainer test tools are optional.
 1. Complete the live iteration loop. The chosen log confirmed 0.8.9 but stopped
    at 22:04:35 UTC. The user subsequently connected Muse; current Desktop account
    status is connected, but source readiness and queue counts need fresh evidence.
-   Desktop get-chat still returns HTTP 500 for canonical and local identifiers.
-   The earlier send record remains open; do not replay it. Resolve that API failure
-   and restore diagnostic updates before the photo cycle.
+   Desktop get-chat recovered after the user restarted Beeper Desktop. The
+   earlier send record remains open; do not replay it. Restore diagnostic updates
+   before the photo cycle.
 2. Verify incoming photo delivery. The last fresh queue had no held or queued
    jobs; current counts and the earlier photo's outcome are unknown. No job was
    dismissed by this agent. Earlier readiness found one composer file input but
@@ -265,3 +265,8 @@ tests cover working listing with failing retrieval, changed participants, wrong
 chat, malformed responses and read-only rooms. The live doctor detects this
 installation's failure without sending. Photo delivery, avatar and typing remain
 open; the earlier uncertain test journal is retained.
+
+After the user quit and reopened Beeper Desktop, the same driver's identity,
+message-search and per-chat retrieval checks all passed. Restarting cleared this
+API failure; the underlying cause is still unknown. The diagnostic file remains
+stale, so current Muse readiness and queue state are not yet established.
