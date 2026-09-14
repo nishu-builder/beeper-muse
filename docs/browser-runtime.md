@@ -1,8 +1,10 @@
 # Browser runtime
 
-Decision: move toward an extension-only bridge. Status: design and typed transport
-boundary implemented; direct Beeper transport and crypto migration are not yet
-implemented or verified in Chrome. The released runtime still needs the companion.
+Decision: move toward an extension-only bridge. Status: typed source boundaries
+and an isolated Chrome authentication probe are implemented. The probe has
+synthetic protocol tests but still needs a successful live Chrome run. Encrypted
+message transport, durable browser state, and migration are not implemented.
+The released runtime still needs the companion.
 
 ## Components
 
@@ -73,3 +75,39 @@ appends missing history. It cannot reposition older messages between existing
 Matrix events. A browser rewrite must not claim that IndexedDB or WebSockets fix
 that behavior automatically. Confirm Beeper's backfill semantics with an isolated
 room before changing the live chat's history strategy.
+
+## Running the isolated Chrome connection test
+
+This development extension tests only the authenticated appservice handshake.
+It does not capture Muse, send messages, acknowledge transactions, or reconnect.
+It closes after confirmation, failure, cancellation, or a 15-second timeout.
+A successful test is one prerequisite for the browser runtime, not a working
+Chrome-only bridge.
+
+With the existing setup signed in and `bbctl` on your PATH:
+
+```sh
+npm run setup:browser-probe
+```
+
+The setup creates a new `sh-muse-probe-…` registration and prepares
+`.local/chrome-probe`. It does not copy the live bridge's registration, encryption
+keys, or chat history. Load that directory using **Load unpacked** at
+`chrome://extensions`. Open **Beeper Muse Chrome connection test** and click
+**Test connection**. The target result is **Authenticated Beeper connection
+confirmed.** A WebSocket upgrade alone does not count: the probe waits for a
+Beeper protocol message. Report only the displayed status, not registration files.
+
+The extension has no content scripts or localhost permission. A temporary
+[Chrome request-header rule](https://developer.chrome.com/docs/extensions/reference/api/declarativeNetRequest)
+sets the three appservice headers only on the exact WebSocket URL initiated by
+this extension ID. Credentials never appear in URLs. The rule is removed when
+the test ends and on worker initialization. Raw server responses and credentials
+are not shown in the popup.
+
+`npm run build:browser-probe` produces public code in `dist/browser-probe` without
+credentials. Setup copies allowlisted files into the private directory and adds
+its isolated registration. Never upload `.local/chrome-probe` as a public ZIP.
+The ordinary extension and its store package are unchanged by this experiment.
+The registration is retained for further development; removing the unpacked test
+stops browser access but does not delete the remote registration.

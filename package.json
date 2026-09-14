@@ -12,13 +12,15 @@
     "build": "npm run build:extension && npm run build:native",
     "start": "node scripts/manage.mjs",
     "test": "npm run build:extension && tsx --test test/*.test.ts && go test -tags goolm ./...",
-    "typecheck": "tsc --noEmit && tsc -p tsconfig.extension.json --noEmit",
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.extension.json --noEmit && tsc -p tsconfig.browser.json --noEmit",
     "format": "prettier --write . && gofmt -w cmd internal",
     "format:check": "prettier --check . && node scripts/check-go-format.mjs",
     "check": "npm run typecheck && npm test && npm run build:native && npm run format:check",
     "package": "npm run build:extension && node scripts/package.mjs",
     "build:extension": "tsc -p tsconfig.extension.json && prettier --write extension/adapter.js extension/sync.js extension/bridge.js extension/activity.js",
-    "build:native": "go build -tags goolm -o bin/beeper-muse ./cmd/beeper-muse"
+    "build:native": "go build -tags goolm -o bin/beeper-muse ./cmd/beeper-muse",
+    "build:browser-probe": "tsc -p tsconfig.browser.json && node scripts/build-browser-probe.mjs",
+    "setup:browser-probe": "npm run build:browser-probe && node scripts/setup-browser-probe.mjs"
   },
   "devDependencies": {
     "@types/jsdom": "30.0.0",
