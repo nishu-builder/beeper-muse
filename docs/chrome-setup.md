@@ -1,6 +1,6 @@
 # Chrome-only setup
 
-Beeper Muse 0.6.1 is a preview that runs in Chrome. A service worker connects
+Beeper Muse 0.6.2 is a preview that runs in Chrome. A service worker connects
 to Beeper; the selected Muse tab supplies the conversation. No companion,
 localhost server, native messaging host, or background terminal is needed while
 it runs. Registration is a one-time setup using Beeper's `bbctl` tool.
@@ -58,7 +58,7 @@ If it is missing, use **Load unpacked** and select `.local/chrome-extension`,
 not `.local/extension` or `.local/chrome-probe`.
 
 Refresh the Muse webpage, then open **Beeper Muse — Chrome-only** from Chrome's
-extensions menu. The new panel says **Chrome-only v0.6.1** under its title and
+extensions menu. The new panel says **Chrome-only v0.6.2** under its title and
 shows separate **Beeper** and **Muse tab** connection states. Reloading the old
 extension does not switch it to the new folder. You do not need to restart the
 retired companion.

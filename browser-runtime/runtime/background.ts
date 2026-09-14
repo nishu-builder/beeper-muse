@@ -1,5 +1,6 @@
 import { BrowserBridge } from './bridge.js';
-import { configuration, MatrixError, type Configuration } from './matrix.js';
+import { configuration, type Configuration } from './matrix.js';
+import { startupFailure } from './diagnostics.js';
 import { BeeperSocket } from './socket.js';
 let bridge: BrowserBridge | undefined;
 let socket: BeeperSocket | undefined;
@@ -84,9 +85,8 @@ async function start() {
         'Beeper could not start at ' +
         stage +
         '. ' +
-        (error instanceof MatrixError
-          ? error.message
-          : 'Your saved messages are retained.');
+        startupFailure(error) +
+        ' Saved data has not been cleared.';
       retryAt =
         Date.now() + Math.min(300000, 10000 * 2 ** Math.min(failures++, 5));
     }

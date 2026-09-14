@@ -395,3 +395,39 @@ test('durable incoming receipt is not delayed by a slow outgoing upload', async 
   await Promise.all([sending, receiving]);
   h.close();
 });
+
+test('default fetch retains the worker global receiver for native browser calls', async () => {
+  const original = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async function (this: unknown, _input, _init) {
+    if (this !== globalThis) throw new TypeError('Illegal invocation');
+    calls++;
+    return Response.json({ ok: true });
+  };
+  try {
+    const api = new MatrixAPI(config);
+    assert.deepEqual(
+      await api.request('GET', '/_matrix/client/v3/account/whoami'),
+      { ok: true },
+    );
+    assert.equal(calls, 1);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('startup diagnostics expose categories without raw account or credential text', async () => {
+  const { startupFailure } =
+    await import('../browser-runtime/runtime/diagnostics.ts');
+  const secret = 'private-account-and-token';
+  assert.match(startupFailure(new TypeError(secret)), /TypeError/);
+  assert(!startupFailure(new TypeError(secret)).includes(secret));
+  const unexpected = new Error(secret);
+  unexpected.name = secret;
+  assert(!startupFailure(unexpected).includes(secret));
+  assert.match(
+    startupFailure(new Error('Browser storage unavailable.')),
+    /saved data/,
+  );
+  assert.match(startupFailure(new MatrixError(401, 'M_UNKNOWN_TOKEN')), /401/);
+});

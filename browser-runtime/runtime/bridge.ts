@@ -70,6 +70,7 @@ export class BrowserBridge {
     let crypto: MatrixCrypto | undefined;
     let inbox: IndexedDBInbox | undefined;
     try {
+      report('Registering the Beeper identity');
       try {
         await api.request('POST', '/_matrix/client/v3/register', {
           type: 'm.login.application_service',
