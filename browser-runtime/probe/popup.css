@@ -1,0 +1,26 @@
+body {
+  width: 330px;
+  margin: 24px;
+  font: 15px/1.5 system-ui;
+  color: #182531;
+  background: #f7f8fa;
+}
+h1 {
+  font-size: 21px;
+}
+button {
+  padding: 10px 16px;
+  margin: 4px 8px 4px 0;
+  cursor: pointer;
+}
+#status {
+  padding: 12px;
+  background: #e7edf4;
+  border-radius: 6px;
+}
+
+#details {
+  white-space: pre-line;
+  font-size: 12px;
+  color: #42566b;
+}
