@@ -2,67 +2,63 @@
 
 Report vulnerabilities through
 [GitHub private vulnerability reporting](https://github.com/nishu-builder/beeper-muse/security/advisories/new).
-Do not publish tokens, private messages, logs, or pairing codes. Version 0.3.x is
-the maintained experimental series; there is no guaranteed support SLA.
+Do not post credentials, private messages, raw logs, profiles or registration files
+in public issues. The current Chrome-only 0.7 series is experimental; there is
+no guaranteed support SLA or claim of an independent security audit.
 
-## Trust and permissions
+## Trust boundaries
 
-Beeper registration gives this bridge a Matrix application-service identity and
-its own ghost namespace. The configuration also supports owner double puppeting.
-Treat registration credentials as powerful account credentials, not a narrow
-permission to one message. The bridge enforces one owner and one dedicated room,
-disables relay mode, and checks recipients before accepting or delivering work.
+A Beeper application-service registration is a powerful account credential, not
+a narrow permission for one message. The runtime checks the configured owner,
+dedicated room and membership before accepting or delivering work. Public builds
+contain no registration. Imported credentials are restricted to trusted extension
+contexts; the Muse page and content script do not receive them.
 
-The Matrix leg requires encryption. The local process necessarily decrypts
-prompts and encrypts replies; encryption does not hide content from this process,
-Muse, or the connected browser. The browser leg uses authenticated HTTP on
-loopback. A malicious local account is outside the isolation boundary.
+The worker owns crypto and storage. Its connection document is authenticated by
+extension ID, exact URL, tab, top-level frame and port name. Request-header rules
+apply only to the exact Beeper WebSocket URL and document. Credentials never
+appear in URL parameters. Matrix requests use a fixed validated HTTPS endpoint,
+omit browser cookies and reject redirects.
 
-The Chrome extension has a content script on `https://muse.ai/*`, storage and
-active-tab access, and a host permission for `http://127.0.0.1:24819/*`. It does
-not request cookies, browsing history, debugger access, or other website access.
-The background worker holds the local token and does not expose it to the page
-or content script. Only the selected main Muse tab and the extension popup may
-issue extension commands.
+The read-only provisioning handler answers public capability metadata and
+owner-authenticated account discovery. It does not expose a general URL proxy,
+local HTTP server, account mutation, contact search or group creation API.
+Unsupported paths and methods fail explicitly.
 
-Only queued prompts and newly captured reply text cross the browser API. The
-adapter reads visible messages to attribute a response, but does not upload old
-history to the bridge. It does not extract Muse session credentials or call
-undocumented Muse endpoints. Agent approval controls are never clicked.
+The content script can read the selected Muse conversation and operate its
+composer. Treat its messages as untrusted input: validate identities, content,
+size bounds and allowed operations in the worker. Do not add cookie extraction,
+undocumented account endpoints, broad host access, or automatic approval clicks.
 
-Both HTTP listeners bind to loopback. The browser API validates Host, Origin,
-bearer authorization, JSON shape, and body size. It exposes queue operations,
-not arbitrary Matrix sends or Beeper history search. The Matrix framework
-validates its separate application-service authorization.
+## Encryption and persistence
 
-## Private storage
+Messages and media use Matrix encryption with bundled Rust/WASM crypto. The
+extension necessarily handles plaintext prompts/replies. Encryption does not
+hide them from Muse, the extension, or a compromised local browser profile.
 
-`.local/bridge.yaml` holds registration credentials, a crypto pickle key, owner
-identity, and browser token. `bridge.db` holds Matrix sessions, recovery material,
-room/member metadata, and message mappings. `queue.db` holds pending prompt and
-reply text. After delivery or acknowledgment, the queue removes message bodies
-from active rows but retains identifiers for deduplication. SQLite pages, WAL
-files, backups, and filesystem snapshots may retain previous content; this is
-not secure erasure.
+IndexedDB stores device credentials, crypto state and its local passphrase,
+pending work and compact deduplication receipts. One worker serializes crypto
+and delivery. Incoming transactions are durably saved before acknowledgment;
+outbound batches are saved before sending. Uncertain prompts are blocked instead
+of automatically replayed. This does not provide end-to-end exactly-once delivery.
 
-`.local/bbctl.json` contains bbctl authentication configuration.
-`.local/pairing-code.txt` contains the browser token. Setup creates owner-only
-configuration files and a private directory on Unix. The popup verifies the code
-against the running bridge before saving it to trusted-context-only Chrome local
-storage. Protect backups and the local account. Public extension files contain
-no credentials; the release packager uses an explicit file allowlist. Old 0.2
-installations may still have a private `.local/extension/local-config.json`;
-never distribute that generated copy. See [privacy](PRIVACY.md).
+Uninstalling or clearing extension data can lose keys and pending messages.
+The registration JSON alone cannot recover them. Browser/OS backups can retain
+old data; deleting files or rows is not secure erasure. A local attacker with
+profile access is outside the extension's isolation boundary.
 
-## Failure boundaries
+## Distribution and dependencies
 
-Queued work is durable. Interrupted sends block for inspection rather than
-replay automatically, but no exactly-once guarantee spans Matrix, the browser,
-and Muse. Response attribution uses visible DOM structure and a quiet-period
-heuristic. A changed page, concurrent manual activity, or delayed agent response
-can prevent capture or make attribution uncertain. Use a dedicated tab and
-inspect unexpected results in Muse.
+The public packager uses an explicit file allowlist, rejects symlinked release
+files, and includes the WASM module and license notices. `.local/`, setup
+credentials, development probes and the legacy companion are excluded. Never
+upload a private development extension directory.
 
-To revoke access, disconnect/remove the extension, stop the bridge, and remove
-its custom network in Beeper. See [operations](docs/operations.md) before deleting
-server rooms, local state, or backups.
+Dependencies are pinned in lockfiles. CI checks formatting, types, tests,
+packaging and the production npm dependency audit. See [notices](NOTICES.md)
+and [release process](docs/RELEASING.md). Tests and audits are not a substitute
+for live compatibility testing or a security review.
+
+To revoke access, pause/remove the extension and use Beeper's supported bridge
+management tools. Review their room-deletion behavior first. See
+[operations](docs/operations.md) and [privacy](PRIVACY.md).

@@ -1,179 +1,113 @@
 # Architecture
 
-There are three runtime components. They communicate over network connections,
-not files:
+Beeper Muse runs in one Chrome extension, using a signed-in Muse tab, a service
+worker, and a small extension connection tab. Beeper's servers route encrypted
+Matrix events. No local daemon, filesystem IPC, native messaging host, or
+Beeper Desktop API is involved in normal operation.
 
 ```mermaid
 flowchart LR
-    Muse[Signed-in Muse tab] <--> Extension[Chrome extension]
-    Extension <-->|Authenticated localhost HTTP| Bridge[Local Go bridge]
-    Bridge <-->|Encrypted Matrix| Beeper[Beeper Muse chat]
-    Bridge --- State[Private SQLite state and encryption keys]
+    Page[Muse webpage] <--> Adapter[DOM adapter]
+    Adapter <--> Tracker[Typed observations and sync tracker]
+    Tracker <-->|Chrome messages| Worker[Service worker]
+    Popup[Popup: setup and controls] <--> Worker
+    Worker --- DB[IndexedDB: crypto, inbox, outbox, receipts]
+    Worker <-->|Private extension port| Socket[Connection tab]
+    Socket <-->|Authenticated WebSocket| Server[Beeper server]
+    Worker <-->|Matrix HTTPS: encrypted events and media| Server
+    Server <--> Clients[Beeper desktop and mobile]
 ```
 
-The Go bridge is currently a process started with `npm start -- start`, which
-invokes `bin/beeper-muse`. No login-start service is installed by setup. It must
-stay running. The Node command is a setup/launch wrapper; it is not a message
-relay. The running bridge does not use the Beeper Desktop API.
+## Components and ownership
 
-## Source boundary
+| Component                   | Responsibility                                                        | Source                                                                      |
+| --------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| Muse adapter                | Read the selected conversation and use its composer                   | `src/adapter.ts`                                                            |
+| Source contract and tracker | Typed messages, attribution, settling, catch-up and deduplication     | `src/muse.d.ts`, `src/sync.ts`, `src/activity.ts`                           |
+| Content script              | Run the adapter for the selected top-level tab                        | `extension/content.js`                                                      |
+| Service worker              | Validate senders, run one bridge, coordinate lifecycle and UI         | `browser-runtime/runtime/background.ts`                                     |
+| Matrix translator           | Native senders, formatting, images, revisions and delivery            | `browser-runtime/runtime/bridge.ts`                                         |
+| Crypto and storage          | Device keys, encrypted sessions, durable records                      | `browser-runtime/runtime/crypto.ts`, `state.ts`, `browser-runtime/inbox.ts` |
+| Connection tab              | WebSocket handshake, heartbeats and frame forwarding                  | `connection.ts`, `document-socket.ts`, `socket.ts` in the runtime directory |
+| Provisioning                | Answer Desktop's read-only bridge discovery requests                  | `browser-runtime/runtime/provisioning.ts`                                   |
+| Popup                       | Import a registration, connect Muse, rescan, pause and inspect errors | `browser-runtime/runtime/popup.ts`                                          |
 
-`src/muse.d.ts` defines the strict TypeScript adapter contract. `src/adapter.ts`
-contains the browser implementation; `src/sync.ts` contains source-independent
-settling, prompt attribution, catch-up, and deduplication. JavaScript is generated
-into `extension/` by `npm run build:extension`. `internal/muse` defines and validates
-the same source-neutral messages in Go. No browser selectors, Matrix room IDs,
-Matrix tokens, or database handles belong in that contract.
+The worker is the single crypto and delivery owner. It authenticates the
+connection document by extension ID, exact URL, top-level frame, tab ID and port
+name. The connection document holds the socket credential in memory and forwards
+frames; it only sends transaction acknowledgments supplied by the worker after
+persistence. The content script never receives Beeper credentials or a selectable
+Matrix destination. It is restricted to the connected Muse tab.
 
-A source message carries a stable ID, sender role, text, optional HTML and images,
-optional absolute source timestamp, first observation time, history flag, and
-optional authoritative reactions/read state. Unknown reactions are distinct from
-an explicitly empty reaction list. Read state is not inferred from acknowledgment
-text, a checkmark, a visible tab, or an assistant saying it is working.
+## Message flow
 
-A future official API adapter would implement `Muse.Adapter`: `snapshot`,
-`submit`, `prepare`, and capability reporting. It supplies the same observations;
-the tracker and Matrix translator remain unchanged. API streaming/pagination
-can be added behind that boundary. Authentication and actual API behavior must
-be implemented against the eventual official API; no speculative endpoints are
-included here.
+For Beeper-to-Muse text, the server delivers an application-service transaction.
+The worker saves it before acknowledging, processes crypto updates, decrypts room
+events, checks the owner and room membership, and queues an eligible prompt.
+The content script claims one prompt, refuses to overwrite a draft, submits
+through the visible composer, and binds the response to the observed prompt echo.
+A claimed prompt interrupted by a restart becomes blocked for inspection.
 
-## Browser implementation and limits
-
-The adapter reads only the connected conversation's DOM and operates the visible
-composer. It strips buttons, toolbars, reaction containers, and status controls
-from text. Formatting is rebuilt from an allowlist again on the Go side. Static
-image-bearing cards can become formatted text plus images; interactive tools,
-approval forms, and embedded browsers remain in Muse.
-
-Images use ordinary page-origin fetches with CORS, no redirect following, an
-8-second timeout, a 2 MiB per-image limit, and 4 MiB per message. No extra Chrome
-host permissions or CORS bypass are used. PNG/JPEG/GIF/WebP bytes go through
-mautrix's encrypted media upload. Unavailable images become links. Outgoing
-Beeper messages still support text only.
-
-The DOM adapter can read absolute `time[datetime]` timestamps. It does not parse
-relative times or invent a date/time zone. Without a source timestamp, it uses
-the first observation time, retained across queue delay and restart. Events label
-that provenance in `com.beeper.muse.timestamp_source`. This is an approximation,
-not a claim to have recovered the historical send time.
-
-The first history selection waits for the loaded message IDs to settle. Completed
-messages can sync while Muse is busy; only its trailing assistant message waits
-for the task to finish. Older messages inserted before known DOM messages remain
-historical. An empty log during page load does not consume the initial selection.
-The popup reports loaded/selected/checked counts independently from delivery queue
-state. **Catch up now** scans the selected loaded history again; durable source
-receipts suppress duplicates. It does not fetch a hidden archive or move already
-posted Matrix events. Scroll in Muse to load older messages before rescanning.
-
-The DOM adapter reads assistant reactions from explicitly labeled image roles and
-owner reactions from pressed removal controls. It reports an empty list only for
-fully rendered messages with no unrecognized reaction markup. Unknown state is
-omitted so the translator does not remove existing reactions. Read receipts are
-still unavailable; the adapter does not synthesize them from acknowledgments.
-
-Virtualized accessibility transcripts are marked `partial`. Their generated role
-prefix is removed only on the transcript element. They may create missing text
-history, but both the tab tracker and durable queue refuse partial updates to
-known source IDs. A rendered observation can upgrade a partial import. This
-prevents scrolling or reconnecting from erasing media, formatting, and reactions.
-The transport requires `partialSync` support before importing these observations.
-
-## Transient activity
-
-`Muse.Activity` reports `idle` or `working` independently of stored messages.
-The DOM adapter derives this from Muse's visible Stop control. The content script
-uses a separate heartbeat during message capture and catch-up. It renews at most
-once per five seconds and clears on idle, page exit, and disconnect. No draft
-text, source message, read state, or catch-up record is sent with activity.
-
-`MuseBridge.Transport.activity` forwards the state through authenticated
-`POST /v1/activity`; the Go connector fixes the destination and Muse sender and
-uses mautrix's `MarkTyping` with a 12-second timeout (zero to stop). Publishing
-working state requires the normal private membership checks. There is no durable
-activity queue: restart cannot replay stale typing. The service worker serializes
-activity and disconnect cleanup. The native bridge also throttles renewals.
-Status advertises `activitySync` so older companions do not break message capture.
-
-This is incoming Muse activity only; the room does not advertise outgoing typing
-or reaction support that the source adapter cannot provide.
+Muse observations carry stable source IDs, roles, content, and optional source
+times, images and reactions. The worker validates observations, translates them,
+encrypts messages/media, and saves the exact outbound batch before sending it.
+A lost response retries the same event IDs and ciphertext. Completed payloads are
+cleared while compact source receipts remain. No exactly-once guarantee spans
+Chrome, Muse, and Beeper.
 
 ## Native Matrix mapping
 
-`internal/connector/delivery.go` is the Matrix translator. It uses mautrix
-bridgev2's sender intents, media encryption, `BatchSend`, and message/reaction
-mapping database. Muse remains the other participant in the private DM.
+| Source information                      | Representation                                                    |
+| --------------------------------------- | ----------------------------------------------------------------- |
+| User / assistant role                   | Owner Matrix identity / Muse bridge identity                      |
+| Text and allowed formatting             | `m.text`, plain-text fallback, sanitized `org.matrix.custom.html` |
+| Accessible image                        | Encrypted media upload and `m.image`                              |
+| Changed content with the same source ID | `m.replace` edit; removed image parts are redacted                |
+| Observed reaction / removal             | `m.reaction` annotation / redaction                               |
+| Muse working / idle                     | Expiring typing notification / typing cleared                     |
+| Historical message                      | Notification-suppressed batch with read state                     |
+| Absolute source time                    | Original Unix milliseconds                                        |
+| Missing source time                     | First-observed time, marked in `com.beeper.muse.timestamp_source` |
 
-| Muse information                | Beeper / Matrix representation                                           |
-| ------------------------------- | ------------------------------------------------------------------------ |
-| User role                       | `IsFromMe` and the owner's configured double-puppet intent               |
-| Assistant role                  | Muse ghost                                                               |
-| Text / formatting               | `m.text` with sanitized `org.matrix.custom.html` and plain-text fallback |
-| Accessible image                | `m.image`, using the framework's encrypted upload result                 |
-| Same source ID, changed content | `m.replace` edits; removed parts are redacted                            |
-| Explicit reaction actor/key     | `m.reaction`; removed reactions are redacted                             |
-| Explicit owner read state       | Native read marker, never a text message                                 |
-| Catch-up                        | Forward batch, `send_notification=false`, `mark_read_by=owner`           |
-| Source timestamp                | Original Unix milliseconds, when known                                   |
+Transport acknowledgments confirm durable intake. The bridge marks a completed
+Beeper prompt read after handling it; that is separate from an authoritative
+Muse read receipt. The DOM adapter does not invent read state from acknowledgments,
+checkmarks, tab focus, or reaction icons.
 
-Catch-up is treated as already read. Only new unread assistant messages request
-notifications. Forward batches preserve the imported order. This is catch-up of
-the selected loaded messages, not arbitrary insertion of all historical events
-into their original positions among already-existing Matrix events.
+Catch-up covers loaded messages only and does not reposition older events among
+messages already in Beeper. Virtualized text-only observations are marked
+`partial`: they can fill missing history but cannot downgrade a known rich
+message. A rendered observation can upgrade a partial one.
 
-Self-sending requires the double-puppet session provisioned by Beeper registration.
-If unavailable, delivery stops instead of silently replacing the owner with a
-second ghost. See the [mautrix explanation](https://docs.mau.fi/bridges/general/double-puppeting.html).
-Existing encrypted transport and key handling stay in mautrix.
+## Replaceable Muse integration
 
-## Queue and recovery
+`Muse.Adapter` exposes `snapshot()`, `submit()`, `prepare()`, and `capabilities`.
+The contract contains source IDs and data, not DOM nodes, Matrix identifiers,
+credentials, or database handles. `snapshot()` may be asynchronous, so a future
+API adapter can supply observations without forcing synchronous network access.
 
-The owner, portal, message type, and room membership are checked before accepting
-Beeper prompts. The browser cannot choose a destination. The local HTTP server
-requires the fixed loopback Host and private bearer token and bounds/validates
-all JSON, text, HTML, timestamps, reaction data, and media.
+A future official API implementation would own its authentication, pagination,
+streaming and stable IDs behind this boundary. It would preserve the message and
+activity contracts, then feed the existing tracker and Matrix translator. Actual
+API semantics must be validated when such an API exists; no speculative Muse
+endpoints or cookie extraction are included.
 
-SQLite persists source revisions and queued payloads in one transaction. Stable
-remote IDs identify a message independently of content revisions. A monotonic
-revision counter permits edits that restore previous text and reactions that
-are removed then re-added. Version 0.4 receipts suppress duplicate imports of
-unchanged legacy text. Already imported legacy senders/timestamps are not rewritten.
+Types are not a security boundary. Validate data crossing Chrome messages,
+WebSocket frames and persisted records. Selector changes belong in the adapter;
+Matrix event behavior belongs in the translator.
 
-A structured prompt result atomically maps its Muse user echo to the existing
-Beeper message and queues individual assistant replies with native reply
-relations. It does not send the echo as another owner message or collapse all
-replies into a new aggregate message.
+## Website limits
 
-Jobs enter `delivering` before Matrix sends. Completion requires persisted Matrix
-mappings; completed text, HTML, and image bytes are cleared. Source IDs, hashes,
-revision counters, and remote mappings remain. Ambiguous sends or interrupted
-claims are blocked, never blindly resubmitted to Muse. See [operations](operations.md)
-before acknowledging a blocked job. SQLite WAL files and backups can retain old
-content even after active rows are cleared.
+The adapter reads loaded DOM and accessibility text. It excludes toolbars and
+reaction controls from message text, uses allowlisted formatting, and obtains
+accessible image bytes through ordinary browser fetches with CORS and bounded
+size/time limits. It does not bypass browser restrictions. Interactive approvals
+and tools stay in Muse.
 
-`internal/matrixfix` retains the existing startup-order workaround for pinned
-mautrix v0.30.0: crypto listeners are registered before queued websocket events
-can arrive. It preserves the framework's cryptography and trust checks.
+Response settling and the visible Stop control are heuristics. Delayed responses,
+website changes, virtualized content, and interleaved manual messages can delay
+or prevent capture. Typing means Muse is visibly working; it does not transmit
+your draft. Rich-content fidelity is bounded by what the webpage exposes.
 
-## Could everything run in Chrome?
-
-A browser implementation could use IndexedDB for persistence and a JavaScript or
-WebAssembly Matrix client. Disk access to Beeper is not the obstacle. However,
-that requires replacing this Go bridge's appservice transport, registration,
-encryption, recovery, and lifecycle handling. Chrome can terminate an idle
-extension service worker; active WebSocket traffic can extend its lifetime, but
-termination and browser shutdown still need recovery. See [Chrome's lifecycle
-documentation](https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle).
-
-The target is an extension-only runtime. `src/bridge.ts` now defines the typed
-`MuseBridge.Transport` boundary and the existing `LocalBridge` implementation.
-The service worker uses `status`, `importMessages`, `claim`, `complete`, and
-`block`; the source adapter has no dependency on localhost or native storage.
-A browser implementation can replace that transport without rewriting DOM
-capture or a future Muse API adapter. The current release still uses the Go
-companion; changing the interface alone does not replace it.
-
-See [the browser runtime design](browser-runtime.md) for the implementation and
-migration requirements. No browser Matrix credentials, new host permissions, or
-experimental crypto are included in the shipped extension yet.
+See [runtime protocol details](browser-runtime.md), [security](../SECURITY.md),
+[privacy](../PRIVACY.md), and [validation](validation.md).

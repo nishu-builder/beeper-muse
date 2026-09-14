@@ -49,7 +49,7 @@ export async function publish(
     throw new Error('Invalid store item identifiers.');
   const manifest = JSON.parse(
     await readFile(
-      new URL('../extension/manifest.json', import.meta.url),
+      new URL('../browser-runtime/runtime/manifest.json', import.meta.url),
       'utf8',
     ),
   );

@@ -1,7 +1,7 @@
 {
   "name": "beeper-muse",
-  "version": "0.5.3",
-  "description": "Custom Beeper bridge for a dedicated Muse chat, connected directly through your browser.",
+  "version": "0.7.0",
+  "description": "Your Muse conversation in Beeper, connected directly from Chrome.",
   "type": "module",
   "private": true,
   "license": "MIT",
@@ -9,20 +9,22 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "npm run build:extension && npm run build:native",
+    "build": "npm run build:browser-runtime",
     "start": "node scripts/manage.mjs",
-    "test": "npm run build:extension && tsx --test test/*.test.ts && go test -tags goolm ./...",
+    "test": "npm run build:browser-runtime && tsx --test test/*.test.ts && go test -tags goolm ./...",
     "typecheck": "tsc --noEmit && tsc -p tsconfig.extension.json --noEmit && tsc -p tsconfig.browser.json --noEmit",
     "format": "prettier --write . && gofmt -w cmd internal",
     "format:check": "prettier --check . && node scripts/check-go-format.mjs",
-    "check": "npm run typecheck && npm test && npm run build:native && npm run build:browser-runtime && npm run format:check",
-    "package": "npm run build:extension && node scripts/package.mjs",
+    "check": "npm run typecheck && npm test && npm run build:native && npm run format:check",
+    "package": "npm run build:browser-runtime && node scripts/package.mjs",
     "build:extension": "tsc -p tsconfig.extension.json && prettier --write extension/adapter.js extension/sync.js extension/bridge.js extension/activity.js",
     "build:native": "go build -tags goolm -o bin/beeper-muse ./cmd/beeper-muse",
     "build:browser-probe": "tsc -p tsconfig.browser.json && node scripts/build-browser-probe.mjs",
     "setup:browser-probe": "npm run build:browser-probe && node scripts/setup-browser-probe.mjs",
     "build:browser-runtime": "npm run build:extension && node scripts/build-browser-runtime.mjs",
-    "prepare:browser-runtime": "npm run build:browser-runtime && node scripts/prepare-browser-runtime.mjs"
+    "prepare:browser-runtime": "npm run build:browser-runtime && node scripts/prepare-browser-runtime.mjs",
+    "build:legacy": "npm run build:extension && npm run build:native",
+    "prepare:registration": "node scripts/registration.mjs"
   },
   "devDependencies": {
     "@types/chrome": "0.2.9",

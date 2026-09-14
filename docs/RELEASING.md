@@ -1,91 +1,80 @@
-# Releasing Beeper Muse
+# Releasing
 
-Releases provide a public extension ZIP and checksum, with an optional Chrome
-Web Store submission job. The local bridge remains a separate source install.
-Store approval is Google's decision; a successful upload or submission does not
-mean that the extension is available to users.
+Current releases ship the Chrome-only extension. The public artifact is built
+from `dist/chrome-extension`, not the legacy `extension` source directory or a
+private `.local` installation.
 
-## First store submission
+## Prepare a release
 
-1. Run `npm ci --ignore-scripts`, `npm run check`, and `npm run package`.
-2. In the Chrome Web Store Developer Dashboard, create an item using
-   `dist/beeper-muse-extension.zip`. Never upload `.local/` or an old generated
-   extension copy. The package script includes only its explicit public file list.
-3. Complete the store listing, privacy disclosures, distribution, and reviewer
-   instructions from [the store notes](store-listing.md). Upload the icon and
-   screenshots under `docs/store/`. Confirm the privacy and setup links are public.
-4. Test pairing, connect/disconnect, and an installed-extension prompt/reply round
-   trip. Record limitations in [validation](validation.md). Submit for review.
-5. Update the README's availability statement when the store actually publishes
-   the item. Keep the GitHub download available as a manual installation option.
+1. Update the version in `package.json`, the root entries of `package-lock.json`,
+   and `browser-runtime/runtime/manifest.json`. The legacy Go/client versions
+   remain independent. Update `CHANGELOG.md` and affected documentation.
+2. Run `npm ci --ignore-scripts`, `npm run check`,
+   `go test -race -tags goolm ./...`, `npm audit --omit=dev --audit-level=high`,
+   and `npm run package`. Review [validation](validation.md) honestly.
+3. Inspect the archive: it must contain the connection tab, runtime JavaScript,
+   `crypto.wasm`, icons and license notices. It must exclude credentials,
+   private configuration, development probes and companion code.
+4. Merge through a ready-for-review PR with passing CI. Tag the merged main commit
+   with the matching version (for example `v0.7.0`) and push that tag.
 
-## Tagged releases
+The tag workflow requires the commit to be an ancestor of main and verifies the
+version against the Chrome manifest and package. It runs checks, publishes
+`beeper-muse-extension.zip` and `SHA256SUMS`, and optionally submits the same
+artifact to Chrome Web Store. ZIP order and timestamps are fixed; toolchain
+versions can still affect compressed bytes.
 
-Update `package.json`, `package-lock.json`, `extension/manifest.json`, and the
-version in `cmd/beeper-muse/main.go` together. Include meaningful release notes,
-any required local-bridge upgrade, and relevant validation. Merge the change to
-`main` through a reviewed PR with passing CI, then tag the merged commit:
+Users can verify the published checksum with `shasum -a 256 -c SHA256SUMS` on
+macOS or `sha256sum -c SHA256SUMS` on Linux. Do not replace existing release
+assets silently; issue a new version for changed bytes.
 
-```sh
-git switch main
-git pull --ff-only
-git tag v0.3.0
-git push origin v0.3.0
-```
+## Chrome Web Store
 
-Use the new version for subsequent releases. The release workflow requires the
-tagged commit to be an ancestor of `main` and the tag to match the manifest. It
-runs checks, builds the ZIP with fixed file order and timestamps, and publishes
-the ZIP and SHA-256 checksum in a GitHub release. Dependency/runtime versions can
-affect compression bytes; use the released checksum to verify a download.
+Item: `bchjpmhhlhpcokhlmbpbiibehfjdgnme`. Use [listing notes](store-listing.md)
+for the short description, current permissions, privacy disclosures and reviewer
+instructions. Keep the privacy/setup links public. Remove stale companion
+screenshots or descriptions when uploading the Chrome-only package.
 
-For a manual integrity check on macOS, from the download folder:
+Upload `dist/beeper-muse-extension.zip` through the developer dashboard, complete
+listing/disclosure changes, then submit for review. An upload or submission is
+not approval. If another release is under review, inspect the dashboard's options
+before replacing it. Record the actual version and status after submission.
 
-```sh
-shasum -a 256 -c SHA256SUMS
-```
+The repository also supports the [Chrome Web Store V2 API](https://developer.chrome.com/docs/webstore/using-api)
+through `scripts/publish-store.mjs`. It uploads, waits for processing and requests
+review with warnings treated as errors. It does not edit listing metadata.
 
-If a release job is interrupted after publication, inspect its existing release
-and assets before retrying. Published releases are not automatically overwritten.
+Configure the protected `chrome-web-store` GitHub environment:
 
-## Optional store automation
+| Kind     | Name                |
+| -------- | ------------------- |
+| Variable | `CWS_PUBLISHER_ID`  |
+| Variable | `CWS_EXTENSION_ID`  |
+| Secret   | `CWS_CLIENT_ID`     |
+| Secret   | `CWS_CLIENT_SECRET` |
+| Secret   | `CWS_REFRESH_TOKEN` |
 
-The repository's protected `chrome-web-store` environment and item identifiers
-are configured. Google OAuth secrets have not been configured, and `CWS_PUBLISH`
-is currently `false`. The first submission was completed through the dashboard.
-Add the credentials described below before enabling automated submissions.
+Use a required maintainer reviewer and Google's documented OAuth scope. Never
+commit these secrets or copy them into issues. Enable repository variable
+`CWS_PUBLISH=true` only when those credentials and the listing are ready; without
+it, GitHub releases work and the store job is skipped. Credentials from another
+repository are not automatically shared.
 
-The first submission uses the dashboard. Later tags can submit the same release
-artifact through the [Chrome Web Store V2 API](https://developer.chrome.com/docs/webstore/using-api).
-This follows the distribution pattern used by
-[Smooth Surfer](https://github.com/nishu-builder/smooth-surfer): tagged release
-downloads plus a protected publishing environment.
+As of this release preparation, publishing secrets are not configured and
+`CWS_PUBLISH` is false. The store update therefore requires the dashboard. A
+previous 0.3.0 submission was recorded, but that historical status does not
+establish the current store version or approval state.
 
-Create a GitHub environment called `chrome-web-store` with a required maintainer
-reviewer. Configure these environment values:
+## Failure handling
 
-| Kind     | Name                | Value                                         |
-| -------- | ------------------- | --------------------------------------------- |
-| Variable | `CWS_PUBLISHER_ID`  | The publisher ID from the store dashboard     |
-| Variable | `CWS_EXTENSION_ID`  | The 32-character extension ID                 |
-| Secret   | `CWS_CLIENT_ID`     | Authorized Google OAuth client ID             |
-| Secret   | `CWS_CLIENT_SECRET` | That client's secret                          |
-| Secret   | `CWS_REFRESH_TOKEN` | Refresh token with the Chrome Web Store scope |
+Inspect existing releases/assets before retrying a failed workflow. After an
+uncertain store response, inspect the dashboard before repeating publication.
+Do not print OAuth response bodies or private registration data. A failed store
+job does not invalidate an already published GitHub release; report their states
+separately.
 
-Follow Google's OAuth setup instructions; do not commit these credentials or
-copy them into issue comments. Enable the repository variable `CWS_PUBLISH=true`
-only after the listing, environment, and credentials are ready. Without that
-variable, GitHub releases still work and the store job is skipped. Existing
-secrets in another repository are not automatically shared with this one.
+## Artwork
 
-The store job uploads the release artifact, waits for upload processing, and
-submits for review with warnings treated as errors. It does not skip review or
-change listing metadata. Approved submissions use automatic publication. Inspect
-the dashboard after uncertain network failures before retrying a submission.
-
-## Asset provenance
-
-The M icon is original geometric artwork. The listing screenshots show the actual
-popup HTML/CSS in a local preview using synthetic connection state, labeled as a
-setup preview. They contain no private accounts, conversations, or pairing code.
-They demonstrate the interface, not evidence of a live end-to-end test.
+The geometric M icon is original artwork. Store illustrations must use synthetic
+content and be clearly described as illustrations, not evidence of live delivery.
+Never publish screenshots containing account details or personal conversations.

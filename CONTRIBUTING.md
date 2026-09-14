@@ -1,28 +1,49 @@
 # Contributing
 
-Use Go 1.26+, a C compiler, and Node.js 24+. Install dependencies with
-`npm ci --ignore-scripts`, then run `npm run check` and
-`go test -race -tags goolm ./...`. Format with `npm run format`.
+Start with [architecture](docs/architecture.md) and [runtime protocol](docs/browser-runtime.md).
+The current product is the Chrome-only extension. Legacy Go code is retained
+for existing installations and protocol reference, not bundled into releases.
 
-Keep changes focused. Add regression coverage for recipient checks, queue state
-transitions, recovery, browser attribution, and authentication. Tests must use
-synthetic fixtures and isolated temporary directories, without real accounts or
-network services. Do not commit credentials, room identifiers, conversations,
-browser profiles, or screenshots of personal data. Never commit `.local/` or
-the generated extension.
+## Development
 
-Use the mautrix framework for Matrix transport and encryption. Keep browser
-permissions narrow. Do not add Muse cookie extraction, undocumented Muse account
-endpoints, or automatic clicks on agent approval controls. Website selector
-changes need a consenting test account and an honest validation record.
+Use Node.js 24+, Go 1.26+, and a C compiler for the full repository checks.
+Only Node/npm are needed to build the Chrome extension.
 
-Update documentation for behavior changes. Commit `go.mod`, `go.sum`, and the npm
-lockfile when dependencies change. Check dependency licenses before adding them.
-Pull requests should explain the concrete problem, resulting behavior, and
-validation. Keep discussions constructive and respectful.
+```sh
+npm ci --ignore-scripts
+npm run build
+npm run check
+go test -race -tags goolm ./...
+npm run package
+```
 
-The source adapter and sync engine are strict TypeScript in `src/`; their
-generated `extension/adapter.js` and `extension/sync.js` files are ignored.
-`npm run build:extension` generates them for Chrome. Update `src/muse.d.ts` and
-`internal/muse` together when changing the source contract. Every received
-payload must be validated by Go; TypeScript types are not a trust boundary.
+`npm run build` writes the public extension to `dist/chrome-extension`.
+`npm run build:legacy` builds the older companion and client. `npm run format`
+formats TypeScript, JavaScript, documentation and Go. Tests use synthetic DOM,
+mocked Chrome APIs and isolated temporary databases; they do not require accounts.
+See [validation](docs/validation.md) for live checks still needed.
+
+## Boundaries to preserve
+
+- Keep selectors in `src/adapter.ts`; source-neutral data belongs in
+  `src/muse.d.ts`. A future API adapter should not depend on Matrix or storage.
+- Keep protocol translation and durable recovery in the Chrome worker runtime.
+  Never acknowledge transactions before persistence or replay uncertain prompts.
+- Validate runtime data at every trust boundary. TypeScript interfaces are not
+  sufficient validation. Keep one owner, one room and one crypto writer.
+- Preserve unknown reaction/read state instead of inventing observations. Do not
+  replace rich messages with partial offscreen text.
+- Keep permissions narrow. Do not extract cookies or auto-approve Muse actions.
+- Use maintained crypto libraries; do not implement cryptographic primitives.
+
+Regression coverage should exercise failures and user-visible behavior: sender
+checks, draft preservation, transport dispatch, crash recovery, deduplication,
+image bounds, credential isolation and package contents. Do not embed personal
+DOM, messages, tokens, room IDs, browser profiles or private screenshots in tests.
+Generated extension bundles and `.local/` must not be committed.
+
+Update docs and the changelog for behavior changes. Pin dependency changes with
+lockfiles and review their licenses. A normal ready-for-review PR should explain
+the problem, resulting behavior, validation and material limitations. Keep
+community discussions constructive. Report security issues privately through
+[the security policy](SECURITY.md).

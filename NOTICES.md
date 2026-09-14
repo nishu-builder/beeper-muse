@@ -1,23 +1,34 @@
 # Third-party notices
 
-Original code in this repository is licensed under MIT; see [LICENSE](LICENSE).
-Dependencies retain their own licenses. They are fetched from the versions pinned
-in `go.mod`, `go.sum`, and `package-lock.json`, rather than vendored here.
+Original Beeper Muse code and geometric M artwork are MIT licensed; see
+[LICENSE](LICENSE). Service names identify compatibility and do not imply Beeper
+or Meta endorsement.
 
-The bridge uses [mautrix-go](https://github.com/mautrix/go), copyright its
-contributors, under the Mozilla Public License 2.0. Its source, including the
-bridgev2 framework and Go Olm implementation, is available from that project at
-the version in `go.mod`. No modifications to mautrix-go are distributed here.
-See its [license](https://github.com/mautrix/go/blob/main/LICENSE).
+## Shipped Chrome extension
 
-Other direct Go dependencies are [go-sqlite3](https://github.com/mattn/go-sqlite3)
-(MIT, with SQLite in the public domain) and [go.mau.fi/util](https://github.com/mautrix/util)
-(MPL 2.0), plus [golang.org/x/net](https://go.googlesource.com/net)
-(BSD 3-Clause) for parsing and sanitizing HTML. The setup wrapper uses [yaml](https://github.com/eemeli/yaml) (ISC).
-Transitive and development dependencies retain the notices supplied in their
-module or npm distributions.
+The bundle includes [`@matrix-org/matrix-sdk-crypto-wasm`](https://github.com/matrix-org/matrix-sdk-crypto-wasm)
+18.8.0, including JavaScript bindings and its Rust/WASM encryption module, under
+Apache License 2.0. The public archive includes its full license as
+`MATRIX-CRYPTO-LICENSE`. Upstream source and dependency notices are available in
+that project. No modifications to that dependency are distributed here.
 
-[bbctl](https://github.com/beeper/bridge-manager) is a separately installed
-Beeper tool under Apache 2.0. Its executable is not included in this repository.
-Beeper, Meta, and Muse names identify the services used; this is an independent
-project and does not imply endorsement.
+The build preserves bundled JavaScript legal comments. `LICENSE` and this notice
+are included in the public archive. Dependencies are pinned in `package-lock.json`;
+no executable code is fetched at runtime.
+
+## Setup, development and legacy components
+
+The setup converter uses [yaml](https://github.com/eemeli/yaml) under ISC; it is
+not part of the browser runtime. [bbctl](https://github.com/beeper/bridge-manager)
+is a separately installed Beeper tool under Apache 2.0 and is not bundled.
+
+The legacy Go companion uses [mautrix-go](https://github.com/mautrix/go) and
+[go.mau.fi/util](https://github.com/mautrix/util) under MPL 2.0,
+[go-sqlite3](https://github.com/mattn/go-sqlite3) under MIT (SQLite is public domain),
+and [golang.org/x/net](https://go.googlesource.com/net) under BSD 3-Clause.
+Versions and transitive modules are pinned in `go.mod` and `go.sum`.
+No modifications to mautrix-go are distributed here.
+
+Other transitive and development dependencies retain the licenses and notices
+supplied in their npm or Go module distributions. Build tools and the legacy Go
+binary are not included in the current Chrome extension ZIP.
