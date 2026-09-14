@@ -1,7 +1,6 @@
 // One-time conversion of an existing bbctl bridgev2 config; no process remains.
-import { readFile, writeFile, cp, mkdir, chmod } from 'node:fs/promises';
-import { parse } from 'yaml';
-import { resolve } from 'node:path';
+import { writeFile, cp, mkdir, chmod } from 'node:fs/promises';
+import { readRegistration } from './registration.mjs';
 const root = new URL('../', import.meta.url);
 const input = process.argv[2];
 if (!input) {
@@ -11,22 +10,7 @@ if (!input) {
   process.exit(1);
 }
 try {
-  const config = parse(await readFile(resolve(input), 'utf8'));
-  const homeserverURL = config.homeserver.address;
-  const owner =
-    '@' +
-    new URL(homeserverURL).pathname.split('/').filter(Boolean).at(-1) +
-    ':beeper.com';
-  const registrationID = config.appservice.bot.username.replace(/bot$/, '');
-  if (!/^sh-muse-(?:chrome|probe)-[a-f0-9]{12}$/.test(registrationID))
-    throw Error('invalid registration name');
-  const registration = {
-    homeserverURL,
-    owner,
-    registrationID,
-    appserviceToken: config.appservice.as_token,
-    bot: '@' + config.appservice.bot.username + ':' + config.homeserver.domain,
-  };
+  const registration = await readRegistration(input);
   const directory = new URL('.local/chrome-extension/', root);
   await mkdir(directory, { recursive: true, mode: 0o700 });
   await chmod(directory, 0o700);

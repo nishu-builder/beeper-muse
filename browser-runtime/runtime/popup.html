@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Beeper Muse</title>
+    <title>Beeper Muse — Chrome-only</title>
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
@@ -12,12 +12,24 @@
         <img src="icons/icon48.png" width="40" height="40" alt="" />
         <div>
           <h1>Beeper Muse</h1>
-          <p class="subtitle">Your Muse conversation, in Beeper.</p>
+          <p class="subtitle">Chrome-only <span id="version"></span></p>
         </div>
       </header>
+      <p class="intro">Connect Muse to Beeper directly from Chrome.</p>
+      <dl class="connections" aria-label="Connections">
+        <div>
+          <dt>Beeper</dt>
+          <dd id="beeper-state">Checking…</dd>
+        </div>
+        <div>
+          <dt>Muse tab</dt>
+          <dd id="muse-state">Checking…</dd>
+        </div>
+      </dl>
       <p id="status" class="status" role="status" aria-live="polite">
         Checking connection…
       </p>
+      <p id="startup-progress" class="note" aria-live="off"></p>
       <section id="setup" hidden>
         <h2>Connect Beeper</h2>
         <p>
@@ -29,35 +41,32 @@
         <p class="note">Never share this file or upload it to GitHub.</p>
       </section>
       <section id="controls" hidden>
-        <label for="history">Catch up when connecting</label
+        <button id="connect" class="primary">Connect this Muse tab</button>
+        <button id="disconnect" hidden>Disconnect Muse tab</button>
+        <label for="history">Catch up</label
         ><select id="history">
           <option value="recent">Latest 20 loaded messages</option>
           <option value="all">All messages loaded in Muse</option>
           <option value="new">Only new messages</option>
         </select>
-        <button id="connect" class="primary">Connect this Muse tab</button
-        ><button id="rescan">Catch up now</button
-        ><button id="disconnect">Disconnect tab</button>
+        <button id="rescan">Catch up now</button>
         <p id="progress" class="note"></p>
         <p class="note">
-          Keep the Muse tab open and its composer empty. Chrome asks before
-          closing it after you interact with the page. Disconnect first to close
-          it without that warning.
-        </p>
-        <p class="note">
-          Messages, formatting, accessible images, reactions, and Muse typing
-          activity sync to Beeper. Approvals and other interactive controls stay
-          in Muse. Catch-up covers messages loaded on the page.
+          Keep your Muse tab and the Beeper Muse connection tab open. Leave the
+          Muse message box empty. Closing Chrome pauses syncing. No companion
+          app or terminal needed.
         </p>
         <div id="blocked"></div>
         <details>
-          <summary>Connection</summary>
+          <summary>Connection settings</summary>
+          <p id="startup-steps" class="note"></p>
           <button id="resume">Reconnect Beeper</button
           ><button id="pause">Pause Beeper connection</button>
           <p class="note">
-            Everything runs in Chrome. Closing Chrome pauses the bridge;
-            reopening it resumes delivery. Removing the extension deletes its
-            local encryption keys and saved work.
+            Chrome asks before closing the connected Muse tab after you interact
+            with the page. Disconnect the tab first to close without that
+            warning. Keep this extension installed when updating to preserve
+            your saved messages and encryption keys.
           </p>
         </details>
       </section>
@@ -72,7 +81,7 @@
           target="_blank"
           rel="noreferrer"
           >Privacy</a
-        ><span>Chrome runtime preview</span>
+        ><span>Preview · Runs entirely in Chrome</span>
       </footer>
     </main>
     <script type="module" src="popup.js"></script>

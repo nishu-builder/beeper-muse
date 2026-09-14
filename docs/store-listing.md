@@ -1,11 +1,9 @@
-# Chrome Web Store listing notes
+# Chrome Web Store listing
 
 Item: **Beeper Muse** (`bchjpmhhlhpcokhlmbpbiibehfjdgnme`).
 Category: Productivity / Communication. Language: English. Free, public.
-
-Version 0.3.0 was submitted on September 13, 2026. The dashboard confirms
-**Pending review**, with automatic publication after approval enabled.
-This is not yet an available Chrome Web Store installation.
+Target package: **0.7.0**, Chrome-only. Verify the actual dashboard status before
+claiming the update is submitted or published.
 
 ## Description
 
@@ -15,46 +13,62 @@ Setup instructions: https://github.com/nishu-builder/beeper-muse
 
 ## URLs and artwork
 
-- Homepage: <https://github.com/nishu-builder/beeper-muse>
-- Setup: <https://github.com/nishu-builder/beeper-muse/blob/main/docs/setup.md>
+- Homepage/setup: <https://github.com/nishu-builder/beeper-muse>
+- Detailed setup: <https://github.com/nishu-builder/beeper-muse/blob/main/docs/chrome-setup.md>
 - Support: <https://github.com/nishu-builder/beeper-muse/issues>
 - Privacy: <https://github.com/nishu-builder/beeper-muse/blob/main/PRIVACY.md>
-- Icon: `extension/icons/icon128.png`.
-- Screenshot: `docs/store/setup-preview.jpg`, 1280 × 800, JPEG.
+- Icon: `extension/icons/icon128.png`
+- Architecture illustration: `docs/store/chrome-only.png` (1280 × 800)
 
-The screenshot shows the actual popup markup with synthetic connection state
-and a visible setup-preview caption. It contains no private conversation or
-credential. Use original assets and keep screenshots aligned with the package.
+Remove the old companion pairing screenshot. The new illustration describes the
+Chrome-only architecture with synthetic text; it is not a screenshot or live
+verification record. Use the supplied icon, with no private account images.
 
-## Privacy disclosures
+## Single purpose
 
-Single purpose: connect one dedicated Muse chat in Beeper to the user's existing
-signed-in Muse browser conversation through a local companion bridge, forwarding
-new text prompts and their replies.
+Connect one dedicated Muse chat in Beeper to the user's selected signed-in Muse
+conversation, directly from Chrome. Forward text prompts and sync observable
+conversation content through an encrypted Beeper application-service connection.
 
-| Permission                         | Justification                                                                                                                 |
-| ---------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| `storage`                          | Save a private bridge token in trusted-context-only local storage and the selected tab ID in session storage. No Chrome Sync. |
-| `activeTab`                        | Identify and validate the active Muse tab when the user clicks Connect.                                                       |
-| `http://127.0.0.1:24819/*`         | Exchange queued prompts and captured replies with the authenticated local companion.                                          |
-| `https://muse.ai/*` content script | Use visible controls and chat bubbles in the explicitly connected main Muse chat.                                             |
+## Permission justifications
 
-No remotely hosted executable code. Data disclosures identify authentication
-information (the local pairing token), personal communications (prompts/replies),
-and website content (visible chat text/links). They do not claim that the
-maintainer receives this information: its path and local storage are explained
-in the privacy policy. No sale, advertising, unrelated use, or credit scoring.
+| Permission                            | Justification                                                                                                            |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `storage`                             | Store imported registration in trusted local extension storage and selected-tab state in session storage; no Chrome Sync |
+| `unlimitedStorage`                    | Retain IndexedDB encryption keys, durable message queues and deduplication receipts                                      |
+| `alarms`                              | Schedule reconnection/recovery checks when the worker restarts                                                           |
+| `activeTab`                           | Identify the active Muse tab when the user chooses Connect                                                               |
+| `declarativeNetRequestWithHostAccess` | Set required authentication headers and remove Origin only for the exact Beeper appservice WebSocket and connection tab  |
+| `webRequest`                          | Observe that scoped WebSocket handshake for header verification, HTTP status and bounded error diagnostics               |
+| `https://muse.ai/*`                   | Read the connected conversation and submit text through its visible composer                                             |
+| `https://matrix.beeper.com/*`         | Exchange Matrix events, device keys and encrypted media directly with Beeper                                             |
+| `wss://matrix.beeper.com/*`           | Maintain the authenticated application-service WebSocket                                                                 |
+
+No localhost host permission or companion process is required. All executable
+JavaScript and WebAssembly are bundled; no remotely hosted executable code.
+
+## Data disclosures
+
+Disclose authentication information (Beeper registration/device credentials),
+personal communications (prompts, replies, images, reactions), and website content
+(the selected Muse conversation). Data is stored locally as needed and sent to
+Beeper/Muse to provide the stated function, not to the maintainer. No sale,
+advertising, unrelated use, or credit scoring. The [privacy policy](../PRIVACY.md)
+explains local storage, provider processing, permissions and removal.
+
+Do not claim that messages are never read or transmitted: the extension handles
+plaintext to bridge them and transmits encrypted Matrix events to Beeper.
 
 ## Reviewer instructions
 
-Reviewers need their own Beeper and Muse accounts and a macOS/Linux computer with
-the setup prerequisites. There is no shared developer account. The extension
-does not need account passwords entered into its popup.
+Reviewers need their own Beeper and Muse accounts, Chrome 127+, and a macOS/Linux
+machine for the one-time bbctl/Node registration step. There is no shared personal
+account or password to enter into the extension.
 
-Follow the public setup guide, start the bridge, pair using its generated code,
-sign in to Muse, refresh its main chat, and connect that tab. Send
-`Reply with exactly: MUSE_CONNECTED` in Beeper's dedicated Muse chat and verify
-the reply appears from Muse. Inspect Disconnect and Forget this bridge as well.
-Keep the terminal and browser running. Do not provide a maintainer's personal
-credentials to reviewers; respond to requests for further access with a suitable
-dedicated test arrangement.
+Follow the public setup guide to create and import the private registration JSON.
+No companion app or terminal remains running afterward. Keep the connection tab
+open, sign into Muse, refresh its main chat, and choose **Connect this Muse tab**.
+Send `Reply with exactly: MUSE_CONNECTED` in Beeper's Muse chat and check the reply.
+Test disconnect, pause/reconnect and a repeated catch-up. Interactive approvals
+stay in Muse. The release remains experimental; the public validation document
+states live-test limits. Never supply a maintainer's personal credentials.

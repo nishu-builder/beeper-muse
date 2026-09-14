@@ -8,6 +8,8 @@ import {
 } from './matrix.js';
 import { MatrixCrypto, type Event } from './crypto.js';
 import { StateStore } from './state.js';
+import { museBridgeInfo } from './bridge-metadata.js';
+import { provisioningResponse } from './provisioning.js';
 export interface Job {
   id: string;
   prompt: string;
@@ -70,6 +72,7 @@ export class BrowserBridge {
     let crypto: MatrixCrypto | undefined;
     let inbox: IndexedDBInbox | undefined;
     try {
+      report('Registering the Beeper identity');
       try {
         await api.request('POST', '/_matrix/client/v3/register', {
           type: 'm.login.application_service',
@@ -86,7 +89,7 @@ export class BrowserBridge {
         { displayname: 'Muse' },
       );
       report('Opening encryption keys');
-      crypto = await MatrixCrypto.open(api, state, wasmURL, memoryOnly);
+      crypto = await MatrixCrypto.open(api, state, wasmURL, memoryOnly, report);
       report('Preparing the Muse chat');
       let room = await state.get<string>('room');
       if (!room) {
@@ -102,16 +105,7 @@ export class BrowserBridge {
         } catch (error) {
           if (!(error instanceof MatrixError) || error.code !== 'M_NOT_FOUND')
             throw error;
-          const bridge = {
-            bridgebot: config.bot,
-            creator: config.bot,
-            protocol: {
-              id: 'muse',
-              displayname: 'Muse',
-              external_url: 'https://muse.ai',
-            },
-            channel: { id: 'muse', displayname: 'Muse' },
-          };
+          const bridge = museBridgeInfo(config);
           room = (
             await api.request<{ room_id: string }>(
               'POST',
@@ -169,6 +163,39 @@ export class BrowserBridge {
       if (encryption.algorithm !== 'm.megolm.v1.aes-sha2')
         throw Error('Muse chat encryption is not enabled.');
       await api.members(room);
+      // Migrate only this bridge's known state keys; preserve unrelated metadata.
+      const metadata = museBridgeInfo(config);
+      for (const type of ['m.bridge', 'uk.half-shot.bridge']) {
+        const path =
+          '/_matrix/client/v3/rooms/' +
+          enc(room) +
+          '/state/' +
+          type +
+          '/' +
+          enc('muse://muse');
+        const existing = await api.request<Record<string, unknown>>(
+          'GET',
+          path,
+        );
+        if (existing.bridgebot !== config.bot)
+          throw Error('Muse room bridge identity changed.');
+        const channel = existing.channel as Record<string, unknown> | undefined;
+        if (
+          existing['com.beeper.room_type.v2'] !== 'dm' ||
+          existing['com.beeper.room_type'] !== 'dm' ||
+          channel?.['fi.mau.receiver'] !== metadata.channel['fi.mau.receiver']
+        ) {
+          await api.request('PUT', path, {
+            ...existing,
+            'com.beeper.room_type': 'dm',
+            'com.beeper.room_type.v2': 'dm',
+            channel: {
+              ...channel,
+              'fi.mau.receiver': metadata.channel['fi.mau.receiver'],
+            },
+          });
+        }
+      }
       inbox = await IndexedDBInbox.open(config, factory);
       const bridge = new BrowserBridge(api, state, inbox, crypto, room);
       // Claims are uncertain after a worker restart; never submit them twice.
@@ -191,6 +218,15 @@ export class BrowserBridge {
     }
   }
   async receive(frame: unknown, send: (data: string) => void) {
+    const parsed = typeof frame === 'string' ? JSON.parse(frame) : frame;
+    if (
+      parsed &&
+      typeof parsed === 'object' &&
+      parsed.command === 'http_proxy'
+    ) {
+      send(await provisioningResponse(parsed, this.api));
+      return;
+    }
     // Persist/acknowledge in arrival order without waiting for image uploads or
     // outgoing encryption. Crypto processing still has exactly one owner.
     const received = this.intake.then(() =>

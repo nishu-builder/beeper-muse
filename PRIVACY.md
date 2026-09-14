@@ -1,101 +1,81 @@
-# Beeper Muse privacy policy
+# Privacy policy
 
-Effective September 13, 2026.
+Effective September 13, 2026. Applies to the Chrome-only 0.7 release series.
 
-Beeper Muse is an open-source Chrome extension and local bridge maintained in
-the [Beeper Muse repository](https://github.com/nishu-builder/beeper-muse). It
-connects your dedicated Muse chat in Beeper to your signed-in Muse browser tab.
-The maintainer does not operate a message relay, analytics service, or advertising
-service for this extension.
+Beeper Muse connects one dedicated Beeper chat to your selected signed-in Muse
+conversation. It is maintained in the [public repository](https://github.com/nishu-builder/beeper-muse).
+The maintainer operates no relay, analytics, advertising, or data-collection service.
 
-## Chrome-only preview
+## Data used and where it goes
 
-Version 0.6.0 connects directly from Chrome to `matrix.beeper.com` over HTTPS
-and WebSocket. It does not contact a localhost service. Its one-time registration
-setup uses Beeper's official bridge manager. The imported application-service
-credential stays in trusted extension storage and is never sent to the Muse
-page or Chrome Sync.
+The extension receives text prompts from your Beeper chat, decrypts them locally,
+and enters them in the Muse tab you connect. It reads loaded conversation text,
+links, formatting, accessible images, explicit reactions and visible activity
+so it can send the corresponding Matrix events to Beeper. Selected catch-up
+can include earlier messages already loaded in that conversation.
 
-IndexedDB stores the device access token, encrypted crypto database, its local
-passphrase, source IDs and hashes, pending encrypted Matrix transactions and
-outgoing batches, and pending Muse prompts. Completed prompt bodies and outgoing
-batch payloads are cleared after delivery. Deduplication receipts are retained.
-The operating system and browser profile backups can retain deleted data. The
-`unlimitedStorage` permission protects extension storage from Chrome's ordinary
-quota eviction; it does not protect against disk failure or removal of the
-extension. Uninstalling the extension deletes its local keys and work.
+The Muse website uses your existing signed-in session to communicate with Muse.
+The extension connects directly to `matrix.beeper.com` over HTTPS and WebSocket.
+These providers process data under their own policies. There is no companion
+server or localhost connection in the current package. No messages or credentials
+are sent to the maintainer, sold, used for advertising, or used for credit scoring.
 
-The preview reads the same selected Muse conversation described below, including
-observed reactions and activity. It sends reactions as Matrix annotations and
-activity as a typing signal. The maintainer receives no messages, credentials,
-or telemetry. The remaining references to a local companion describe releases
-through 0.5.3.
+The extension does not read Muse passwords, cookies, authentication tokens,
+browsing history, or unrelated tabs' content. It does not automatically scroll
+through your whole history or switch conversations. Image retrieval uses ordinary
+browser fetches subject to CORS and size/time limits; inaccessible images remain
+links. No remotely hosted executable code is loaded.
 
-## Information used
+## Local storage
 
-- **Prompts and replies:** the local bridge receives new text messages from your
-  dedicated Beeper chat. The extension enters each prompt in the Muse tab you
-  explicitly connect, reads the visible conversation to identify the corresponding
-  new reply, and returns that reply to the local bridge for delivery to Beeper.
-  On connection, the selected catch-up sends the most recent 20 loaded messages
-  by default, all loaded messages, or only new messages to the local bridge and
-  Beeper. It also reads later messages, formatting, accessible images, and revisions while connected. No
-  automatic scrolling or account-wide history retrieval is performed.
-- **Pairing code:** the extension stores your bridge's private pairing token in
-  Chrome's local extension storage, not Chrome Sync. Access is restricted to
-  trusted extension contexts; the page and content script do not receive it.
-- **Tab selection:** the selected Muse tab identifier is stored for the browser
-  session. The extension uses it to restrict which tab can claim bridge work or
-  import messages. It also remembers which tabs have already shown an automatic
-  popup, so dismissing it does not repeatedly reopen it.
-- **Private bridge state:** the local companion stores Beeper registration and
-  encryption credentials, room/message identifiers, and queued structured messages and image bytes on
-  your computer. Completed message bodies and image bytes are cleared from active queue rows.
-  Source message identifiers and content hashes are retained to prevent duplicate
-  imports after restarts. SQLite files, backups, and filesystem snapshots may
-  retain previous content.
+The imported application-service credential stays in trusted Chrome extension
+storage, not Chrome Sync or the Muse content script. A private extension port
+passes it in memory to the connection tab for the WebSocket handshake. Treat the
+registration JSON as a powerful account credential and keep setup files private.
 
-The extension does not read your Muse password, cookies, or authentication
-tokens. It uses the website through your existing signed-in browser session.
-For images already displayed in the connected chat, the extension may make an
-ordinary browser fetch to that image URL, subject to the page's CORS rules. It
-does not add host permissions or bypass browser restrictions. Accessible images
-are uploaded through the bridge's encrypted Matrix media path; inaccessible
-images are represented by links. Messages can contain whatever personal
-information you choose to send.
+IndexedDB holds the crypto device token, encrypted crypto database, its local
+passphrase, room/source identifiers, hashes, pending incoming transactions,
+outgoing encrypted batches and pending Muse prompt text. Completed payloads are
+cleared while compact deduplication records remain. The selected Muse tab and
+popup state are stored for the session. Profile backups can retain deleted data.
 
-## Where information goes
-
-The extension communicates with the bridge at `http://127.0.0.1:24819`, on your
-own computer. The bridge exchanges messages with Beeper, and the Muse website
-sends prompts to its own service using your existing account. These providers
-process messages under their respective policies. Beeper Muse does not sell
-data, use it for advertising, or send it to the maintainer. No analytics or
-remote executable code is included.
-
-The bridge must decrypt messages to send them to Muse. Encryption between
-Beeper and the bridge does not hide content from your local process, browser,
-or Muse.
+The crypto-store passphrase lives on the same Chrome profile. This protects the
+protocol state format, not against someone controlling that profile. Beeper-to-
+bridge encryption does not hide messages from this extension, the local browser,
+or Muse: the bridge must read plaintext to perform the integration.
 
 ## Permissions
 
-`storage` saves the private pairing and session tab selection. `activeTab` lets
-the popup identify the tab you choose to connect. Access to `https://muse.ai/*`
-lets the content script read and operate the main Muse chat after you connect it.
-Access to `http://127.0.0.1:24819/*` lets the extension exchange queued prompts
-and replies with the authenticated local bridge. The extension does not request
-browsing history, cookie access, or permission to operate unrelated websites.
+| Permission or host                    | Use                                                                        |
+| ------------------------------------- | -------------------------------------------------------------------------- |
+| `storage`                             | Save registration and session selection in local/session extension storage |
+| `unlimitedStorage`                    | Persist IndexedDB queues and crypto state without ordinary quota eviction  |
+| `alarms`                              | Schedule reconnect/recovery checks                                         |
+| `activeTab`                           | Identify the active tab when connecting Muse                               |
+| `declarativeNetRequestWithHostAccess` | Set authentication headers for the exact Beeper socket and connection tab  |
+| `webRequest`                          | Observe that socket's handshake for bounded diagnostics                    |
+| `https://muse.ai/*`                   | Run the adapter on the explicitly connected Muse conversation              |
+| `https://matrix.beeper.com/*`         | Matrix requests, encryption key exchange and encrypted media upload        |
+| `wss://matrix.beeper.com/*`           | Beeper application-service WebSocket                                       |
+
+Handshake diagnostics show verification flags, status codes and bounded errors;
+they do not display or transmit credentials or raw frames. Read-only bridge
+capability requests contain no conversation data. Account discovery validates the
+owner and supplied client token against the configured Beeper homeserver.
 
 ## Your controls
 
-Use **Disconnect tab** to stop using the selected tab. In **Change bridge**, use
-**Forget this bridge** to remove the stored pairing code. Removing the extension
-removes its local extension storage. Stop the bridge to stop its connection to
-Beeper; its private local files and backups must be removed separately. None of
-these actions deletes conversations already saved by Beeper or Muse. See
-[removal instructions](docs/operations.md#removal) before deleting bridge state.
+Disconnect the Muse tab to stop observation; pause the Beeper connection to stop
+server connectivity. Closing Chrome pauses the bridge. Uninstalling deletes its
+local storage and pending work but does not revoke the remote Beeper registration
+or remove messages already held by Beeper or Muse. Private setup files and
+backups must be removed separately. See [removal and recovery](docs/operations.md).
 
-Policy changes will be committed in this repository. For privacy questions,
-open a [GitHub issue](https://github.com/nishu-builder/beeper-muse/issues) without
-including private data. For sensitive security reports, use
-[private vulnerability reporting](https://github.com/nishu-builder/beeper-muse/security/advisories/new).
+Earlier companion versions stored credentials/messages in local files and SQLite
+and communicated over loopback. Those components are not in the current public
+ZIP; consult [legacy companion](docs/legacy-companion.md) if still using them.
+
+Policy changes are committed here. Ask privacy questions in a
+[GitHub issue](https://github.com/nishu-builder/beeper-muse/issues) without private
+data; use [private vulnerability reporting](https://github.com/nishu-builder/beeper-muse/security/advisories/new)
+for sensitive security reports.

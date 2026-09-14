@@ -47,7 +47,7 @@ export function endpoint(registration: Registration): string {
   if (
     !/^sh-muse-(?:probe|chrome)-[a-f0-9]{12}$/.test(registration.registrationID)
   ) {
-    throw new Error('Use a separate Chrome probe registration.');
+    throw new Error('Use a separate Beeper Muse Chrome registration.');
   }
   if (!/^[\x21-\x7e]{16,4096}$/.test(registration.appserviceToken)) {
     throw new Error('Invalid appservice credential.');

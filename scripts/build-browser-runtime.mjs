@@ -8,6 +8,7 @@ await build({
   entryPoints: [
     'browser-runtime/runtime/background.ts',
     'browser-runtime/runtime/popup.ts',
+    'browser-runtime/runtime/connection.ts',
   ],
   outdir: output.pathname,
   bundle: true,
@@ -17,18 +18,18 @@ await build({
   sourcemap: false,
   legalComments: 'eof',
 });
-for (const name of ['manifest.json', 'popup.html'])
+for (const name of [
+  'manifest.json',
+  'popup.html',
+  'popup.css',
+  'connection.html',
+  'connection.css',
+])
   await copyFile(
     new URL('browser-runtime/runtime/' + name, root),
     new URL(name, output),
   );
-for (const name of [
-  'popup.css',
-  'adapter.js',
-  'sync.js',
-  'activity.js',
-  'content.js',
-])
+for (const name of ['adapter.js', 'sync.js', 'activity.js', 'content.js'])
   await copyFile(new URL('extension/' + name, root), new URL(name, output));
 await cp(new URL('extension/icons/', root), new URL('icons/', output), {
   recursive: true,
@@ -44,5 +45,6 @@ await copyFile(
   new URL('node_modules/@matrix-org/matrix-sdk-crypto-wasm/LICENSE', root),
   new URL('MATRIX-CRYPTO-LICENSE', output),
 );
-await copyFile(new URL('LICENSE', root), new URL('LICENSE', output));
+for (const name of ['LICENSE', 'NOTICES.md'])
+  await copyFile(new URL(name, root), new URL(name, output));
 console.log('Built dist/chrome-extension without private registration data.');

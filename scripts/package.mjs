@@ -13,11 +13,17 @@ export const extensionFiles = [
   'sync.js',
   'activity.js',
   'background.js',
-  'bridge.js',
   'content.js',
   'popup.html',
   'popup.css',
   'popup.js',
+  'connection.html',
+  'connection.css',
+  'connection.js',
+  'crypto.wasm',
+  'MATRIX-CRYPTO-LICENSE',
+  'LICENSE',
+  'NOTICES.md',
   'icons/icon16.png',
   'icons/icon32.png',
   'icons/icon48.png',
@@ -31,7 +37,9 @@ function crc32(buffer) {
   }
   return (crc ^ 0xffffffff) >>> 0;
 }
-export async function packageExtension(source = join(root, 'extension')) {
+export async function packageExtension(
+  source = join(root, 'dist/chrome-extension'),
+) {
   const manifest = JSON.parse(
     await readFile(join(source, 'manifest.json'), 'utf8'),
   );

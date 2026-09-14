@@ -1,43 +1,66 @@
 # Changelog
 
+## 0.7.0
+
+First public package of the Chrome-only runtime. One-time bbctl registration is
+still required; there is no companion process during use.
+
+- Bundle the service worker, dedicated socket tab, persistent Rust/WASM encryption,
+  durable inbox/outbox, icons and license notices in the public release ZIP.
+- Forward text prompts and translate observable Muse content to native sender
+  identities, formatting, encrypted images, edits, reactions and typing.
+- Retain source timestamps when available, deduplicate catch-up, suppress history
+  notifications and block interrupted prompts rather than automatically resending.
+- Include the 0.6.6 Desktop capabilities handler, account announcements and DM
+  metadata. Desktop now lists the room; a room-detail API error and full live
+  acceptance remain under investigation.
+- Add a private registration converter for public/store installations. Make the
+  default build/package commands target Chrome-only; retain `build:legacy`.
+- Rewrite setup, architecture, operations, privacy, security, contribution and
+  release documentation around the current runtime and its limits.
+
+Unpacked and Web Store installations have separate encryption storage. Updating
+in place preserves state; switching installation identities has no automatic
+crypto migration. See [setup](docs/chrome-setup.md) and [validation](docs/validation.md).
+
+## 0.6.0–0.6.6 — Chrome development previews
+
+- Move Matrix encryption, durable transactions and delivery into Chrome.
+- Correct native fetch binding and expose bounded startup diagnostics.
+- Host the authenticated WebSocket in a dedicated extension tab; use worker-driven
+  heartbeats, document ownership checks and recovery after disconnection.
+- Announce the bridge account and add matching direct-chat receiver metadata.
+- Answer Desktop's read-only `http_proxy` provisioning requests instead of silently
+  dropping them and leaving Desktop waiting for account capabilities.
+
+## 0.5.0–0.5.3 — companion development
+
+- Introduce a typed source adapter contract and native Matrix translation.
+- Add owner identity, formatting, encrypted images, edits and silent catch-up.
+- Preserve source times with explicit first-observed fallback provenance.
+- Capture verified reaction actor labels and visible Muse activity.
+- Keep partial virtualized text from overwriting known rich messages.
+
+## 0.4.0 — companion development
+
+- Add selected loaded-history catch-up, later messages and revisions.
+- Offer the popup on Muse tabs and request Chrome's standard leave-page warning.
+- Persist source receipts to avoid duplicate imports after reconnecting.
+
 ## 0.3.0
 
-- Fix dropped replies when Muse adds a reaction beside a message bubble; prompt
-  matching and reply capture now exclude sibling reactions and toolbars.
-- Ship a public Chrome extension with a popup pairing flow, local private token
-  storage, explicit connection feedback, and a Forget this bridge control.
-- Replace generated private extension copies with `.local/pairing-code.txt`.
-- Add a reproducible public ZIP allowlist, release checksums, tag-triggered
-  GitHub releases, and optional protected Chrome Web Store V2 submissions.
-- Add installation, upgrade, privacy, store, and maintainer release instructions.
-- Verify the corrected installed adapter with an automatic encrypted Beeper to
-  Muse to Beeper round trip. Store installation remains separately unverified.
+- Exclude sibling reactions/toolbars from prompt and reply matching.
+- Add public extension pairing, connection feedback and a forget control.
+- Add allowlisted ZIP packaging, checksums, tagged releases and optional store API
+  submission. Verify an installed-companion automatic text round trip.
 
 ## 0.2.0
 
-- Replace the Note to self relay with a custom mautrix bridgev2 network.
-- Create a dedicated Muse DM with a distinct Muse sender and ordinary text input.
-- Connect directly to Beeper with official bbctl registration and encrypted Matrix
-  transport; remove the Desktop API OAuth runtime dependency.
-- Add a durable SQLite queue, persisted delivery mappings, owner/recipient checks,
-  startup locking, and recovery for interrupted jobs.
-- Register application-service crypto handlers before event dispatch to avoid a
-  startup race in the pinned framework.
-- Retain the Muse browser adapter and narrow extension permissions.
-- Add Go tests, race checks, setup tests, dependency notices, and migration docs.
-
-This is an experimental release. See `docs/validation.md` for live verification
-limits and current Beeper compatibility findings.
+- Replace the Note to self relay with a custom mautrix bridgev2 network and
+  dedicated encrypted Muse chat.
+- Add durable SQLite queues, sender checks, recovery and native crypto handling.
+- Remove the Desktop local API as a runtime dependency.
 
 ## 0.1.0
 
-Initial text-only prototype using explicit commands in Beeper Note to self and a
-local Chrome extension. Superseded by the custom bridge in 0.2.
-
-## 0.5.0 — development
-
-- Introduce a strict typed Muse adapter contract and a separate native Matrix translator.
-- Use native self-sending, silent catch-up batches, formatted messages, encrypted image uploads, and edits.
-- Preserve source timestamps when available and distinguish first-observed fallback times.
-- Support native reactions/read markers in the source protocol; the DOM adapter leaves unverified state unknown.
-- Preserve old import receipts and erase completed structured payloads, including image bytes.
+Initial text-only Note to self prototype, superseded by the custom bridge.

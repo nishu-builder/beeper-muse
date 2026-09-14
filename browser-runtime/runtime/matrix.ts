@@ -39,7 +39,9 @@ export class MatrixError extends Error {
 export class MatrixAPI {
   constructor(
     readonly config: Configuration,
-    private fetcher: typeof fetch = fetch,
+    // Native browser fetch checks its receiver; calling an unbound copy as
+    // this.fetcher() supplies MatrixAPI instead of the worker global.
+    private fetcher: typeof fetch = globalThis.fetch.bind(globalThis),
   ) {}
   async request<T = Record<string, unknown>>(
     method: string,

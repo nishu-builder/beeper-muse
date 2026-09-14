@@ -1,103 +1,125 @@
-# Chrome-only setup
+# Set up Beeper Muse
 
-Beeper Muse 0.6.0 is a preview that runs in Chrome. A service worker connects
-to Beeper; the selected Muse tab supplies the conversation. No companion,
-localhost server, native messaging host, or background terminal is needed while
-it runs. Registration is a one-time setup using Beeper's `bbctl` tool.
+The current extension runs in Chrome. Registration is a one-time terminal step;
+there is no companion process to leave running afterward.
 
-The transport handshake and encrypted API delivery have passed live tests.
-The complete Chrome worker, encryption storage, and both-direction conversation
-flow still need a live Chrome acceptance run. Use the preview for testing.
+## Requirements
 
-## Prepare the extension
+- Chrome 127 or newer, a Beeper account, and access to [Muse](https://muse.ai/).
+- Node.js 24+, npm, Git, and [bbctl](https://github.com/beeper/bridge-manager)
+  for registration on macOS or Linux. Follow bbctl's current installation and
+  sign-in instructions. Native Windows registration and WSL are untested here.
+- One Chrome profile and one extension installation per registration. Two active
+  copies with the same registration conflict.
 
-Use Node.js 24 or newer and Chrome 127 or newer. Install and sign in to
-[bbctl](https://github.com/beeper/bridge-manager) using its instructions.
-Clone this repository, then run:
+On macOS, bbctl is available with `brew install beeper/tap/bbctl`.
+A Beeper Desktop API token and a Go compiler are not needed for this setup.
+
+## 1. Create a private registration
 
 ```sh
+git clone https://github.com/nishu-builder/beeper-muse.git
+cd beeper-muse
 npm ci --ignore-scripts
+umask 077
 mkdir -p .local
 BEEPER_MUSE_REGISTRATION="sh-muse-chrome-$(node -p "require('node:crypto').randomBytes(6).toString('hex')")"
 bbctl config --type bridgev2 --output .local/chrome-bridge.yaml "$BEEPER_MUSE_REGISTRATION"
-npm run prepare:browser-runtime -- .local/chrome-bridge.yaml
+npm run prepare:registration -- .local/chrome-bridge.yaml
 ```
 
-This creates `.local/chrome-extension`, with its private registration included
-for local setup. Never publish that directory. `dist/chrome-extension` is the
-public build and contains no credentials. A public build asks you to import
-`.local/chrome-extension/local-config.json` through its popup.
+Follow bbctl's sign-in instructions if required. This creates
+`.local/chrome-registration.json`. Import that file in the extension; do not
+paste it into a website, issue, or chat. It grants the bridge access to your
+Beeper account. The converter refuses to overwrite an existing JSON file.
+Reuse your existing registration when updating; do not rerun registration just
+to fix a disconnected tab.
 
-Disable earlier Beeper Muse extensions and stop the old companion before switching.
-Do not load a second copy using the same registration: a connection conflict
-stops this runtime until you explicitly reconnect.
+## 2. Install the extension
 
-1. Open `chrome://extensions`, enable Developer mode, and choose **Load unpacked**.
-2. Select the complete `.local/chrome-extension` directory.
-3. Open and sign in to `https://muse.ai/`. Refresh the webpage after loading or
-   reloading the extension; reloading the extension does not replace an existing
-   page's content script.
-4. Open Beeper Muse from the toolbar. Wait for **Beeper connected**, then choose
-   **Connect this Muse tab**. A new **Muse** chat appears in Beeper.
-5. Send a short message in that Beeper chat and verify the reply returns.
+### Public download
 
-The build includes a toolbar icon. On an active Muse page, the extension offers
-its popup once if no tab is connected. Keep the connected tab open with its
-composer empty. Chrome can show its standard leave-page confirmation after
-interaction with the Muse page; the extension cannot choose that dialog's text.
-Use **Disconnect tab** before closing if you do not want that confirmation.
+Download `beeper-muse-extension.zip` and `SHA256SUMS` from
+[GitHub Releases](https://github.com/nishu-builder/beeper-muse/releases/latest).
+On macOS, you can verify the download with `shasum -a 256 -c SHA256SUMS`;
+on Linux, use `sha256sum -c SHA256SUMS` in the download directory.
 
-## What syncs
+Extract the ZIP to a permanent folder. Open `chrome://extensions`, enable
+**Developer mode**, choose **Load unpacked**, and select the extracted folder
+containing `manifest.json`. Keep that folder in place.
 
-- New Beeper text messages are entered in Muse. Unsupported incoming message
-  types and edits are not submitted as new prompts.
-- Muse text, allowed formatting, accessible images, and subsequent revisions
-  are sent using Matrix events. Images are encrypted before upload.
-- Messages written in Muse appear as the owner, with assistant replies as Muse.
-- Observed reactions use Matrix annotations and redactions. Muse activity uses
-  a typing indicator that expires unless refreshed.
-- Catch-up suppresses notifications and marks the imported batch read. Source
-  timestamps are preserved when available; otherwise the first observation time
-  is used and identified as a fallback in event metadata.
+If installing through Chrome Web Store, confirm the version is 0.7.0 or newer.
+Older companion releases use a different setup, and store review can delay the
+new version. Store installations update through Chrome; unpacked installs need
+manual updates.
 
-Catch-up covers only what Muse has loaded: latest 20, all loaded, or only new
-messages. It does not scroll or retrieve an account's full history. It does not
-reposition older imports between events already in Beeper. Approvals, shopping
-widgets, and other interactive controls remain in Muse. CORS-inaccessible images
-cannot be uploaded by the page adapter. Beeper-to-Muse attachments, reactions,
-and typing are not implemented; source read status is only propagated when the
-adapter actually provides it.
+### Build from source
 
-## Recovery
+From the repository, run `npm run build`, then load `dist/chrome-extension`
+using the same **Load unpacked** steps. The source `extension/` directory is
+part of the older companion build; do not load it for Chrome-only operation.
 
-Incoming transactions and outgoing encrypted batches are saved in IndexedDB.
-A lost send response retries the same ciphertext and event IDs. Crypto keys and
-the device identity persist across worker restarts. If the saved keys do not match
-the registered device, startup stops rather than replacing that device's keys.
+## 3. Import and connect
 
-The worker sends a protocol ping every 20 seconds. A Chrome alarm can restart a
-failed connection with bounded backoff. Closing Chrome pauses delivery. Reopening
-Chrome reconnects Beeper; connect a Muse tab again if the previous browser session
-ended. The popup distinguishes Beeper connectivity from Muse-tab connectivity.
+1. Open the **Beeper Muse — Chrome-only** popup and choose the private
+   `.local/chrome-registration.json` file under **Beeper registration JSON**.
+2. Keep the automatically opened **Beeper Muse connection** tab open. Pinning it
+   helps keep it out of the way. Wait for **Beeper: Connected** in the popup.
+3. Open and sign in to <https://muse.ai/>. Refresh the webpage if it was open
+   before installing the extension.
+4. Open the popup on the Muse main chat. Choose the catch-up amount and click
+   **Connect this Muse tab**. Check the separate **Muse tab** status.
+5. Open **Muse** in Beeper. Check message requests if it is not in your inbox.
+   Send a short test prompt and verify its reply appears in Beeper.
 
-A prompt claimed before a worker interruption is marked **interrupted**, because
-Muse may already have accepted it. Check Muse, then use **I handled this in Muse**
-to clear it. The extension never automatically resubmits an uncertain prompt.
+The Connect button starts observation and the selected catch-up. It does not
+send a test prompt. “Beeper connected” describes the server connection, not a
+completed end-to-end sync. See [troubleshooting](operations.md) if either side
+stops progressing.
 
-Use **Pause Beeper connection** to stop locally. Removing the extension also
-removes its encryption storage and pending work. Keep the extension installed
-when updating: reload the same directory instead of removing and reinstalling.
-Remote registration deletion is separate and can be done with Beeper's bridge
-management tools. Deletion may also affect associated rooms; check that tool's
-instructions first.
+Keep both tabs open and the Muse message box empty during bridge work. Closing
+Chrome pauses syncing. After a browser restart, reconnect the Muse tab if needed.
+The extension offers its popup once on an active Muse tab when no healthy tab is
+connected. Chrome controls whether a leave-page warning appears and its wording;
+it normally requires prior interaction with the webpage. Use **Disconnect Muse
+tab** before closing to remove the extension's warning.
 
-## Building a public package
+## Catch-up
 
-```sh
-npm run build:browser-runtime
-```
+Choose **Latest 20 loaded messages**, **All messages loaded in Muse**, or
+**Only new messages**. **Catch up now** rescans the selected loaded history.
+Scroll in Muse first to load older messages; the extension does not scroll or
+fetch hidden account history. Repeated observations are deduplicated.
 
-Package the contents of `dist/chrome-extension` only. Keep `crypto.wasm` and
-`MATRIX-CRYPTO-LICENSE` alongside the JavaScript. Do not package `.local` or a
-registration JSON file. The preview is not the extension currently under Chrome
-Web Store review.
+History uses silent batches and read markers. Source timestamps are used when
+available; otherwise timestamps describe when the extension first observed the
+message. Older imports are appended, not inserted between existing Beeper events.
+Offscreen text placeholders may gain formatting and images when rendered later.
+
+## Update without losing state
+
+Wait for pending work to finish. Replace public unpacked files in the same folder,
+then click **Reload** at `chrome://extensions`. Refresh the Muse webpage and
+reconnect it. The extension refreshes its own connection tab automatically.
+Do not remove and reinstall the extension to update: removing it deletes its
+local encryption keys and queues.
+
+Local development installs in `.local/chrome-extension` can still be refreshed
+with `npm run prepare:browser-runtime -- .local/chrome-bridge.yaml`. This helper
+builds a private copy with a seeded registration. Never upload that directory.
+
+Switching between an unpacked extension and the Web Store installation changes
+the extension identity and storage. There is no crypto-state export/import tool.
+Plan a fresh registration/chat for that switch, disable the old copy, and retain
+old messages. Do not promise that importing credentials transfers the old keys.
+
+## Moving from the Go companion
+
+Finish or inspect pending jobs, stop the old companion, and disable its extension.
+Create a new Chrome registration using this guide. The new runtime does not
+import the Go SQLite encryption database, queued work, or old room mappings.
+Keep private backups until you have verified the new chat. The old setup is
+recorded in [legacy companion](legacy-companion.md).
+
+For pausing, interrupted jobs, removal, and credential revocation, see
+[operations](operations.md). Current testing limits are in [validation](validation.md).

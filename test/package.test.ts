@@ -11,7 +11,7 @@ test('release ZIP is reproducible, readable by unzip, and excludes private files
   const temp = await mkdtemp(join(tmpdir(), 'beeper-muse-package-'));
   t.after(() => rm(temp, { recursive: true, force: true }));
   const source = join(temp, 'extension');
-  await cp(new URL('../extension/', import.meta.url), source, {
+  await cp(new URL('../dist/chrome-extension/', import.meta.url), source, {
     recursive: true,
   });
   const privateValue = 'private-pairing-must-not-ship';
@@ -26,7 +26,9 @@ test('release ZIP is reproducible, readable by unzip, and excludes private files
     .trim()
     .split('\n');
   assert.deepEqual(names.sort(), [...extensionFiles].sort());
-  const extracted = execFileSync('unzip', ['-p', path]);
+  const extracted = execFileSync('unzip', ['-p', path], {
+    maxBuffer: 64 * 1024 * 1024,
+  });
   assert.ok(!extracted.includes(privateValue));
   const manifest = JSON.parse(
     execFileSync('unzip', ['-p', path, 'manifest.json'], { encoding: 'utf8' }),
@@ -35,5 +37,22 @@ test('release ZIP is reproducible, readable by unzip, and excludes private files
     await readFile(new URL('../package.json', import.meta.url), 'utf8'),
   );
   assert.equal(manifest.version, pkg.version);
-  assert.deepEqual(manifest.permissions, ['storage', 'activeTab']);
+  assert.ok(
+    manifest.permissions.includes('declarativeNetRequestWithHostAccess'),
+  );
+  assert.ok(manifest.permissions.includes('unlimitedStorage'));
+  assert.ok(!manifest.permissions.includes('nativeMessaging'));
+  assert.ok(
+    manifest.host_permissions.every(
+      (h: string) => !h.includes('127.0.0.1') && !h.includes('localhost'),
+    ),
+  );
+  assert.ok(names.includes('crypto.wasm'));
+  assert.ok(names.includes('connection.js'));
+  assert.ok(names.includes('MATRIX-CRYPTO-LICENSE'));
+  assert.ok(names.includes('NOTICES.md'));
+  const wasm = execFileSync('unzip', ['-p', path, 'crypto.wasm'], {
+    maxBuffer: 32 * 1024 * 1024,
+  });
+  assert.deepEqual([...wasm.subarray(0, 4)], [0, 97, 115, 109]);
 });

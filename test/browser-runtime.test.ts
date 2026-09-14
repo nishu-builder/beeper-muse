@@ -395,3 +395,73 @@ test('durable incoming receipt is not delayed by a slow outgoing upload', async 
   await Promise.all([sending, receiving]);
   h.close();
 });
+
+test('default fetch retains the worker global receiver for native browser calls', async () => {
+  const original = globalThis.fetch;
+  let calls = 0;
+  globalThis.fetch = async function (this: unknown, _input, _init) {
+    if (this !== globalThis) throw new TypeError('Illegal invocation');
+    calls++;
+    return Response.json({ ok: true });
+  };
+  try {
+    const api = new MatrixAPI(config);
+    assert.deepEqual(
+      await api.request('GET', '/_matrix/client/v3/account/whoami'),
+      { ok: true },
+    );
+    assert.equal(calls, 1);
+  } finally {
+    globalThis.fetch = original;
+  }
+});
+
+test('startup diagnostics expose categories without raw account or credential text', async () => {
+  const { startupFailure } =
+    await import('../browser-runtime/runtime/diagnostics.ts');
+  const secret = 'private-account-and-token';
+  assert.match(startupFailure(new TypeError(secret)), /TypeError/);
+  assert(!startupFailure(new TypeError(secret)).includes(secret));
+  const unexpected = new Error(secret);
+  unexpected.name = secret;
+  assert(!startupFailure(unexpected).includes(secret));
+  assert.match(
+    startupFailure(new Error('Browser storage unavailable.')),
+    /saved data/,
+  );
+  assert.match(startupFailure(new MatrixError(401, 'M_UNKNOWN_TOKEN')), /401/);
+});
+
+test('Muse room metadata identifies a DM and the same login advertised in bridge status', async () => {
+  const { museBridgeInfo, connectedBridgeState } =
+    await import('../browser-runtime/runtime/bridge-metadata.ts');
+  const info = museBridgeInfo(config);
+  const state = connectedBridgeState(config.owner);
+  assert.equal(info['com.beeper.room_type'], 'dm');
+  assert.equal(info['com.beeper.room_type.v2'], 'dm');
+  assert.equal(info.channel['fi.mau.receiver'], state.remote_id);
+  assert.equal(state.user_id, config.owner);
+  assert.equal(info.bridgebot, config.bot);
+  assert(!JSON.stringify({ info, state }).includes(config.appserviceToken));
+});
+
+test('Desktop provisioning bypasses message persistence and encryption', async () => {
+  const h = await harness();
+  try {
+    const sent: string[] = [];
+    await h.bridge.receive(
+      JSON.stringify({
+        command: 'http_proxy',
+        id: 61,
+        data: { method: 'GET', path: '/_matrix/provision/v3/capabilities' },
+      }),
+      (data) => sent.push(data),
+    );
+    assert.equal(sent.length, 1);
+    assert.equal(JSON.parse(sent[0]!).data.status, 200);
+    assert.equal(h.encryptions, 0);
+    assert.equal(h.batches.length, 0);
+  } finally {
+    h.close();
+  }
+});

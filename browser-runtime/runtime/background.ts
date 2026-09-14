@@ -1,12 +1,24 @@
+import { connectedBridgeState } from './bridge-metadata.js';
 import { BrowserBridge } from './bridge.js';
-import { configuration, MatrixError, type Configuration } from './matrix.js';
-import { BeeperSocket } from './socket.js';
+import { configuration, type Configuration } from './matrix.js';
+import { startupFailure } from './diagnostics.js';
+import {
+  DocumentSocket,
+  CONNECTION_PAGE,
+  CONNECTION_PORT,
+} from './document-socket.js';
+import { StartupProgress } from './startup.js';
 let bridge: BrowserBridge | undefined;
-let socket: BeeperSocket | undefined;
+let socket: DocumentSocket | undefined;
 let starting: Promise<void> | undefined;
 let phase = 'disconnected';
 let failure = '';
-let stage = '';
+const startup = new StartupProgress((stage) => {
+  phase = 'error';
+  failure =
+    stage +
+    ' has not finished after 60 seconds. Reload the extension to retry. Saved data has not been cleared.';
+});
 let retryAt = 0;
 let failures = 0;
 const secure = Promise.all([
@@ -41,6 +53,7 @@ async function start() {
     const config = configuration(saved.configuration);
     phase = 'connecting';
     failure = '';
+    startup.begin();
     try {
       if (socket) await socket.stop();
       if (!bridge)
@@ -50,21 +63,26 @@ async function start() {
           indexedDB,
           false,
           (value) => {
-            stage = value;
+            startup.step(value);
           },
         );
       if ((await chrome.storage.local.get('enabled')).enabled === false) {
+        startup.stop();
         bridge.pause();
         phase = 'paused';
         return;
       }
       bridge.resume();
-      socket = new BeeperSocket(
+      socket = new DocumentSocket(
         config,
         (frame, send) => bridge!.receive(frame, send),
-        (state) => {
+        (state, reason) => {
+          startup.stop();
+          if (reason) failure = reason;
           phase = state;
           if (state === 'connected') {
+            socket?.publishBridgeState(connectedBridgeState(config.owner));
+            failure = '';
             failures = 0;
             retryAt = 0;
           }
@@ -76,17 +94,18 @@ async function start() {
           if (state === 'conflict')
             void chrome.storage.local.set({ conflict: true });
         },
+        (value) => startup.step(value),
       );
       await socket.start();
     } catch (error) {
+      startup.stop();
       phase = 'error';
       failure =
         'Beeper could not start at ' +
-        stage +
+        startup.snapshot().stage +
         '. ' +
-        (error instanceof MatrixError
-          ? error.message
-          : 'Your saved messages are retained.');
+        startupFailure(error) +
+        ' Saved data has not been cleared.';
       retryAt =
         Date.now() + Math.min(300000, 10000 * 2 ** Math.min(failures++, 5));
     }
@@ -148,6 +167,9 @@ async function report() {
     configured: !!config,
     phase: conflict ? 'conflict' : enabled === false ? 'paused' : phase,
     failure,
+    startup: startup.snapshot(),
+    starting: !!starting,
+    retrySeconds: Math.max(0, Math.ceil((retryAt - Date.now()) / 1000)),
     connected:
       !!tabID && ['ready', 'busy', 'draft'].includes(String(tab.health)),
     health: tab.health,
@@ -365,3 +387,24 @@ chrome.tabs.onRemoved.addListener((tabID) => {
 void secure.then(() => start()).catch(() => {});
 // Kept as a type check for the credential boundary; never exported to Muse.
 export type { Configuration };
+
+// Connections are accepted only from our own top-level extension document.
+chrome.runtime.onConnect.addListener((port) => {
+  const sender = port.sender;
+  if (
+    port.name !== CONNECTION_PORT ||
+    sender?.id !== chrome.runtime.id ||
+    sender.url !== chrome.runtime.getURL(CONNECTION_PAGE) ||
+    sender.frameId !== 0 ||
+    !Number.isInteger(sender.tab?.id)
+  ) {
+    port.disconnect();
+    return;
+  }
+  void start()
+    .then(() => {
+      if (socket) socket.accept(port);
+      else port.disconnect();
+    })
+    .catch(() => port.disconnect());
+});

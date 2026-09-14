@@ -94,6 +94,8 @@ test('worker handshake uses scoped headers and sends heartbeats under the idle t
   t.mock.timers.tick(20000);
   assert.equal(h.network.sent.length, 2);
   assert.equal(JSON.parse(h.network.sent[1]!).command, 'ping');
+  h.network.reply({ command: 'response', id: 2 });
+  assert.equal(h.states.filter((state) => state === 'connected').length, 1);
   assert.deepEqual(h.changes[0]!.addRules![0]!.condition.initiatorDomains, [
     'a'.repeat(32),
   ]);
@@ -136,4 +138,29 @@ test('transactions reach the durable consumer and no handshake means timeout', a
   t.mock.timers.tick(15000);
   assert.equal(h.network.closed, true);
   assert.ok(h.states.includes('error'));
+});
+
+test('a failed handshake keeps its error after the socket closes', async (t) => {
+  const h = await harness(t);
+  h.network.onerror?.();
+  assert.equal(h.network.closed, true);
+  assert.equal(h.states.at(-1), 'error');
+  t.mock.timers.tick(60000);
+  assert.equal(h.states.at(-1), 'error');
+});
+
+test('Desktop provisioning requests reach the consumer instead of being silently discarded', async (t) => {
+  const h = await harness(t);
+  h.network.open();
+  h.network.reply({ command: 'response', id: 1 });
+  const frame = {
+    command: 'http_proxy',
+    id: 81,
+    data: { method: 'GET', path: '/_matrix/provision/v3/capabilities' },
+  };
+  h.network.reply(frame);
+  await Promise.resolve();
+  assert.deepEqual(JSON.parse(h.frames[0]!), frame);
+  assert.equal(h.network.sent.at(-1), '{"ack":"fixture"}');
+  assert.equal(h.network.closed, false);
 });

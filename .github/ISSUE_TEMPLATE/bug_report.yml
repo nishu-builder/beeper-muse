@@ -3,7 +3,7 @@ description: Report a reproducible connector problem.
 body:
   - type: markdown
     attributes:
-      value: Do not include tokens, private chat contents, pairing codes, or browser profiles.
+      value: Do not include tokens, private chat contents, registration files, or browser profiles.
   - type: textarea
     id: problem
     attributes:
@@ -21,6 +21,6 @@ body:
     id: versions
     attributes:
       label: Versions
-      description: OS, Node, Chrome, and Beeper versions.
+      description: Extension version, OS, Chrome, and Beeper versions; note whether Desktop and mobile differ.
     validations:
       required: true
