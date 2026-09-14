@@ -468,7 +468,8 @@ test('image submission rejects unrelated file pickers without touching them', as
   );
   f.dom.window.close();
 });
-for (const [tag, accept] of [
+for (const [tag, accept, nested] of [
+  ['div', '', true],
   ['form', 'image/*'],
   ['div', 'image/*'],
   ['div', '.png,.jpg,.jpeg'],
@@ -476,7 +477,7 @@ for (const [tag, accept] of [
   ['div', ''],
   ['div', 'application/pdf, .PNG'],
 ] as const)
-  test(`image upload in a ${tag} with ${accept || 'no accept filter'} waits for a loaded preview and preserves an existing draft`, async () => {
+  test(`image upload in a ${tag} with ${accept || 'no accept filter'}${nested ? ' and sibling actions' : ''} waits for a loaded preview and preserves an existing draft`, async () => {
     const f = fixture(),
       doc = f.document,
       form = doc.createElement(tag);
@@ -490,6 +491,12 @@ for (const [tag, accept] of [
     input.type = 'file';
     input.accept = accept;
     form.append(input);
+    if (nested) {
+      form.setAttribute('data-hatch-composer-chrome', 'true');
+      const inner = doc.createElement('div');
+      inner.append(input, field);
+      form.prepend(inner);
+    }
     assert.equal(f.adapter.create(doc).imageReadiness!().imageInputs, 1);
     let files: File[] = [];
     Object.defineProperty(input, 'files', {
@@ -609,32 +616,34 @@ test('image readiness reports only control counts and diagnoses a missing upload
   f.dom.window.close();
 });
 
-test('form-free discovery refuses a shared transcript ancestor', async () => {
-  const f = fixture();
-  const region = f.document.createElement('div');
-  region.append(...f.document.body.childNodes);
-  region.insertAdjacentHTML(
-    'beforeend',
-    '<input type="file" accept="image/*">',
-  );
-  f.document.body.append(region);
-  const a = f.adapter.create(f.document);
-  assert.equal(a.imageReadiness().hasUploadRegion, false);
-  assert.equal(a.imageReadiness().pageImageInputs, 1);
-  await assert.rejects(
-    a.submitImage(
-      '',
-      { name: 'test.png', mime: 'image/png', data: 'iVBORw0KGgo=' },
-      async () => {},
-    ),
-    /composer/,
-  );
-  assert.equal(
-    region.querySelector<HTMLInputElement>('input')!.files!.length,
-    0,
-  );
-  f.dom.window.close();
-});
+for (const marked of [false, true])
+  test(`composer discovery refuses a shared transcript ancestor (marked=${marked})`, async () => {
+    const f = fixture();
+    const region = f.document.createElement('div');
+    if (marked) region.setAttribute('data-hatch-composer-chrome', 'true');
+    region.append(...f.document.body.childNodes);
+    region.insertAdjacentHTML(
+      'beforeend',
+      '<input type="file" accept="image/*">',
+    );
+    f.document.body.append(region);
+    const a = f.adapter.create(f.document);
+    assert.equal(a.imageReadiness().hasUploadRegion, false);
+    assert.equal(a.imageReadiness().pageImageInputs, 1);
+    await assert.rejects(
+      a.submitImage(
+        '',
+        { name: 'test.png', mime: 'image/png', data: 'iVBORw0KGgo=' },
+        async () => {},
+      ),
+      /composer/,
+    );
+    assert.equal(
+      region.querySelector<HTMLInputElement>('input')!.files!.length,
+      0,
+    );
+    f.dom.window.close();
+  });
 
 test('structured source text preserves table boundaries, continued lists and code indentation', () => {
   const f = fixture();

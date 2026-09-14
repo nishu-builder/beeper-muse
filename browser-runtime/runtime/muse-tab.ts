@@ -26,12 +26,12 @@ export async function ensureMuseTab(api: MuseTabAPI, id: number) {
   if (!isMuseURL(tab.url) || tab.discarded)
     throw Error('Muse tab unavailable.');
   let probe = await api.send(id, { type: 'probe' }).catch(() => null);
-  if (probe?.protocol !== 15) {
+  if (probe?.protocol !== 16) {
     await api.inject(id, sourceFiles);
     probe = await api.send(id, { type: 'probe' });
   }
   if (
-    probe?.protocol !== 15 ||
+    probe?.protocol !== 16 ||
     !['ready', 'draft', 'busy'].includes(probe.health || '')
   )
     throw Error('Open and sign in to the main Muse chat.');
