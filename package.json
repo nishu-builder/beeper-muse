@@ -1,6 +1,6 @@
 {
   "name": "beeper-muse",
-  "version": "0.8.6",
+  "version": "0.8.7",
   "description": "Your Muse conversation in Beeper, connected directly from Chrome.",
   "type": "module",
   "private": true,
@@ -46,6 +46,7 @@
   },
   "dependencies": {
     "@matrix-org/matrix-sdk-crypto-wasm": "18.8.0",
+    "parse5": "8.0.1",
     "yaml": "2.9.1"
   }
 }

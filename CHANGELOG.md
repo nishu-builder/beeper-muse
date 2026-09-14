@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.7
+
+- Preserve headings, tables, continued ordered lists, code language and other
+  supported Matrix formatting using a bounded HTML parser instead of tag regexes.
+- Keep table cell separators, list numbers and code indentation in plain text.
+- Drop active/foreign markup and unsafe attributes; use the plain message when
+  formatting exceeds structural limits. Images remain native attachments.
+- Bundle the parser and dependency licenses with the public extension package.
+- Live source inventory and Desktop/mobile rendering verification remain open.
+
 ## 0.8.6
 
 - Report native Beeper connection status from fresh checks of the selected Muse

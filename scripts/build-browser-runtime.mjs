@@ -84,6 +84,14 @@ await copyFile(
   new URL('node_modules/@matrix-org/matrix-sdk-crypto-wasm/LICENSE', root),
   new URL('MATRIX-CRYPTO-LICENSE', output),
 );
+for (const [dependency, file] of [
+  ['parse5', 'PARSE5-LICENSE'],
+  ['entities', 'ENTITIES-LICENSE'],
+])
+  await copyFile(
+    new URL('node_modules/' + dependency + '/LICENSE', root),
+    new URL(file, output),
+  );
 for (const name of ['LICENSE', 'NOTICES.md'])
   await copyFile(new URL(name, root), new URL(name, output));
 console.log('Built dist/chrome-extension without private registration data.');

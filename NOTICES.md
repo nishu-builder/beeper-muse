@@ -12,6 +12,11 @@ Apache License 2.0. The public archive includes its full license as
 `MATRIX-CRYPTO-LICENSE`. Upstream source and dependency notices are available in
 that project. No modifications to that dependency are distributed here.
 
+The HTML formatter bundles [parse5](https://github.com/inikulin/parse5) 8.0.1
+under MIT and its [entities](https://github.com/fb55/entities) dependency under
+BSD 2-Clause. Their full licenses ship as `PARSE5-LICENSE` and `ENTITIES-LICENSE`.
+No modifications to those dependencies are distributed here.
+
 The build preserves bundled JavaScript legal comments. `LICENSE` and this notice
 are included in the public archive. Dependencies are pinned in `package-lock.json`;
 no executable code is fetched at runtime.

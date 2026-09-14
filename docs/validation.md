@@ -258,3 +258,18 @@ resent and no new conversation test was sent.
 
 Full validation passed with 190 JS/TS tests, TypeScript checks, Go tests/build
 and formatting. The extension package remains free of private registration data.
+
+### Structured formatting (0.8.7)
+
+Synthetic adapter-to-runtime tests preserve continued list numbering, heading/table
+structure, cell boundaries, code language and indentation. Parser regressions
+cover malformed HTML, encoded unsafe URLs, embedded credentials, foreign markup,
+active controls, output reparsing and structural/size limits. Excess formatting
+retains a visible plain message rather than emitting an empty formatted body.
+Parser and entity dependency licenses are included in the public archive.
+
+Live browser inspection still returns `Debugger unattached`, and the chosen log
+has no fresh heartbeat. These tests do not establish an exhaustive current Muse
+inventory or prove the installed Beeper clients render all allowed tags.
+
+Full checks passed with 196 JS/TS tests, TypeScript, Go tests/build and formatting.
