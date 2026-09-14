@@ -56,7 +56,16 @@ declare namespace Muse {
     id: string;
     hash: string;
   }
+  interface SyncProgress {
+    loaded: number;
+    eligible: number;
+    checked: number;
+    waiting: number;
+    missingTimes: number;
+    skippedWidgets: number;
+  }
   interface SyncTracker {
+    readonly progress: SyncProgress;
     remember(sources: Source[]): void;
     sync(
       view: Snapshot,

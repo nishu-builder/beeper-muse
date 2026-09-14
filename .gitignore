@@ -16,3 +16,4 @@ bin/
 # Generated from strict TypeScript in src/.
 /extension/adapter.js
 /extension/sync.js
+/extension/bridge.js

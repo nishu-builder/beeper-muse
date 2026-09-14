@@ -3,6 +3,8 @@ const pairing = document.getElementById('pairing');
 const controls = document.getElementById('controls');
 const code = document.getElementById('pair-code');
 const connect = document.getElementById('connect');
+const rescan = document.getElementById('rescan');
+const progress = document.getElementById('sync-progress');
 const disconnect = document.getElementById('disconnect');
 const history = document.getElementById('history-mode');
 let settingsLoaded = false;
@@ -23,7 +25,21 @@ async function refresh() {
   }
   pairing.hidden = result.paired;
   controls.hidden = !result.paired;
-  history.disabled = result.connected;
+  history.disabled = !result.reachable;
+  rescan.disabled = !result.connected || result.rescanning;
+  const scan = result.progress;
+  progress.textContent =
+    result.connected && scan
+      ? `${scan.loaded} messages loaded in Muse; ${scan.checked} of ${scan.eligible} selected messages checked. ` +
+        (scan.waiting ? `${scan.waiting} still settling. ` : '') +
+        (scan.missingTimes
+          ? `${scan.missingTimes} have no original timestamp. `
+          : '') +
+        (scan.skippedWidgets
+          ? `${scan.skippedWidgets} interactive cards stay in Muse. `
+          : '') +
+        'For older history, scroll up in Muse to load it, then click Catch up now.'
+      : '';
   if (!settingsLoaded && result.historyMode) {
     history.value = result.historyMode;
     settingsLoaded = true;
@@ -52,17 +68,22 @@ async function refresh() {
   )
     status.textContent =
       'Update and restart the local bridge to enable catch-up and new Muse messages.';
+  else if (result.rescanning)
+    status.textContent =
+      result.phase === 'claimed'
+        ? 'Catch-up requested. Finishing the current Beeper reply first.'
+        : 'Checking loaded Muse history…';
   else if (result.syncError)
     status.textContent =
       'Muse messages are waiting to be saved. Check the bridge; the extension will retry.';
   else if (result.health === 'draft')
     status.textContent = `Connected · ${result.queued} queued. Clear the draft in Muse to continue.`;
   else if (result.health === 'busy')
-    status.textContent = `Connected · ${result.queued} queued. Waiting for Muse to finish.`;
+    status.textContent = `Connected · ${result.queued} queued. Syncing completed messages while Muse works.`;
   else if (result.connected)
     status.textContent = result.queued
       ? `Connected · ${result.queued} messages waiting for delivery to Beeper.`
-      : `Connected · watching for new Muse messages. ${result.imported || 0} saved for delivery this session.`;
+      : 'Connected · delivery queue empty. Watching for new Muse messages.';
   else status.textContent = 'Bridge ready. Open Muse and connect its tab.';
 }
 document.getElementById('pair-form').onsubmit = async (event) => {
@@ -95,6 +116,21 @@ connect.onclick = async () => {
     actionFailed = true;
     connect.disabled = false;
     status.textContent = result?.error || 'Could not connect this Muse tab.';
+    return;
+  }
+  await refresh();
+};
+rescan.onclick = async () => {
+  actionPending = true;
+  actionFailed = false;
+  rescan.disabled = true;
+  status.textContent = 'Checking loaded Muse history…';
+  const result = await send({ type: 'rescan', historyMode: history.value });
+  actionPending = false;
+  if (!result?.ok) {
+    actionFailed = true;
+    rescan.disabled = false;
+    status.textContent = result?.error || 'Could not start catch-up.';
     return;
   }
   await refresh();

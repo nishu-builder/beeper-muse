@@ -12,6 +12,7 @@ export const extensionFiles = [
   'adapter.js',
   'sync.js',
   'background.js',
+  'bridge.js',
   'content.js',
   'popup.html',
   'popup.css',

@@ -1,4 +1,4 @@
-const bridgeURL = 'http://127.0.0.1:24819';
+importScripts('bridge.js');
 // Keep the pairing token out of content-script storage and Chrome Sync.
 const storageReady = chrome.storage.local
   .setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' })
@@ -11,24 +11,7 @@ async function token() {
   const { bridgeToken } = await chrome.storage.local.get('bridgeToken');
   return /^[a-f0-9]{64}$/.test(bridgeToken || '') ? bridgeToken : null;
 }
-async function request(key, path, body) {
-  if (!key) throw new Error('Pair the extension first.');
-  const response = await fetch(bridgeURL + path, {
-    method: body === undefined ? 'GET' : 'POST',
-    headers: {
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-    },
-    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-    redirect: 'error',
-    signal: AbortSignal.timeout(20000),
-  });
-  if (!response.ok) throw new Error('Bridge unavailable.');
-  return response.json();
-}
-async function api(path, body) {
-  return request(await token(), path, body);
-}
+const bridgeTransport = new BeeperMuseBridge.LocalBridge(token);
 function museURL(value) {
   try {
     const url = new URL(value);
@@ -44,18 +27,25 @@ async function detach() {
   if (tabID)
     await chrome.tabs.sendMessage(tabID, { type: 'stop' }).catch(() => {});
 }
-async function tabHealth(tabID, type = 'probe') {
+async function tabReport(tabID, type = 'probe') {
   try {
     const result = await chrome.tabs.sendMessage(tabID, { type });
     if (
-      result?.protocol === 3 &&
+      result?.protocol === 4 &&
       ['ready', 'busy', 'draft', 'unavailable'].includes(result.health)
     )
-      return result.health;
+      return {
+        health: result.health,
+        progress: result.progress,
+        rescanning: result.rescanning,
+      };
   } catch {
     // A tab opened before extension reload has no usable content script.
   }
-  return 'reload';
+  return { health: 'reload' };
+}
+async function tabHealth(tabID, type = 'probe') {
+  return (await tabReport(tabID, type)).health;
 }
 const tabReady = (health) => ['ready', 'busy', 'draft'].includes(health);
 let openingPopup = false;
@@ -116,7 +106,9 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
           error: 'Enter the 64-character code from your bridge.',
         };
       try {
-        const status = await request(candidate, '/v1/status');
+        const status = await new BeeperMuseBridge.LocalBridge(
+          async () => candidate,
+        ).status();
         if (
           typeof status.phase !== 'string' ||
           !Number.isInteger(status.queued)
@@ -145,8 +137,11 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       const { tabID } = await chrome.storage.session.get('tabID');
       if (!paired) return { ok: true, paired: false, connected: false };
       try {
-        const status = await api('/v1/status');
-        const health = tabID ? await tabHealth(tabID) : 'disconnected';
+        const status = await bridgeTransport.status();
+        const report = tabID
+          ? await tabReport(tabID)
+          : { health: 'disconnected' };
+        const health = report.health;
         const sync = await chrome.storage.session.get([
           'imported',
           'syncError',
@@ -159,6 +154,8 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
           attached: !!tabID,
           connected: tabReady(health),
           health,
+          progress: report.progress,
+          rescanning: report.rescanning,
           phase: status.phase,
           queued: status.queued,
           museSync: status.museSync === true,
@@ -178,7 +175,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       }
     }
     if (popup && message.type === 'attach') {
-      const bridge = await api('/v1/status');
+      const bridge = await bridgeTransport.status();
       const [tab] = await chrome.tabs.query({
         active: true,
         currentWindow: true,
@@ -220,6 +217,16 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       }
       return { ok: true };
     }
+    if (popup && message.type === 'rescan') {
+      const { tabID } = await chrome.storage.session.get('tabID');
+      if (!tabID || !tabReady(await tabHealth(tabID)))
+        return { ok: false, error: 'Connect a Muse tab first.' };
+      const historyMode = ['recent', 'all', 'new'].includes(message.historyMode)
+        ? message.historyMode
+        : 'recent';
+      await chrome.storage.local.set({ historyMode });
+      return await chrome.tabs.sendMessage(tabID, { type: 'rescan' });
+    }
     if (popup && message.type === 'detach') {
       await detach();
       return { ok: true };
@@ -235,7 +242,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       throw new Error('This Muse tab is not connected.');
     }
     if (message.type === 'connected') {
-      const bridge = await api('/v1/status');
+      const bridge = await bridgeTransport.status();
       const { historyMode } = await chrome.storage.local.get('historyMode');
       return {
         ok: true,
@@ -247,10 +254,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     }
     if (message.type === 'import' && Array.isArray(message.messages)) {
       try {
-        const bridge = await api('/v1/status');
-        if (bridge.sourceProtocol !== 2)
-          throw new Error('Update the local bridge for structured sync.');
-        const result = await api('/v1/import', { messages: message.messages });
+        const result = await bridgeTransport.importMessages(message.messages);
         const { imported = 0 } = await chrome.storage.session.get('imported');
         await chrome.storage.session.set({
           imported: imported + (result.added || 0),
@@ -263,26 +267,17 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       }
     }
     if (message.type === 'claim')
-      return { ok: true, ...(await api('/v1/claim', {})) };
+      return { ok: true, ...(await bridgeTransport.claim()) };
     if (
       message.type === 'result' &&
       typeof message.id === 'string' &&
       typeof message.text === 'string'
     ) {
-      const bridge = await api('/v1/status');
-      if (bridge.sourceProtocol === 2 && Array.isArray(message.messages)) {
-        await api('/v2/result', { id: message.id, messages: message.messages });
-        return { ok: true };
-      }
-      await api('/v1/result', {
-        id: message.id,
-        text: message.text,
-        ...(bridge.museSync ? { sources: message.sources || [] } : {}),
-      });
+      await bridgeTransport.complete(message);
       return { ok: true };
     }
     if (message.type === 'block' && typeof message.id === 'string') {
-      await api('/v1/block', { id: message.id });
+      await bridgeTransport.block(message.id);
       return { ok: true };
     }
     throw new Error('Unknown request.');

@@ -58,6 +58,15 @@ the first observation time, retained across queue delay and restart. Events labe
 that provenance in `com.beeper.muse.timestamp_source`. This is an approximation,
 not a claim to have recovered the historical send time.
 
+The first history selection waits for the loaded message IDs to settle. Completed
+messages can sync while Muse is busy; only its trailing assistant message waits
+for the task to finish. Older messages inserted before known DOM messages remain
+historical. An empty log during page load does not consume the initial selection.
+The popup reports loaded/selected/checked counts independently from delivery queue
+state. **Catch up now** scans the selected loaded history again; durable source
+receipts suppress duplicates. It does not fetch a hidden archive or move already
+posted Matrix events. Scroll in Muse to load older messages before rescanning.
+
 The source contract and Matrix translator support reaction snapshots and owner
 read receipts. **The DOM adapter currently reports these capabilities as absent:**
 we have not verified markup exposing the reaction actor or authoritative read
@@ -130,6 +139,14 @@ extension service worker; active WebSocket traffic can extend its lifetime, but
 termination and browser shutdown still need recovery. See [Chrome's lifecycle
 documentation](https://developer.chrome.com/docs/extensions/develop/concepts/service-workers/lifecycle).
 
-The current design keeps the native companion. A small packaged installer and
-optional login-start service would simplify setup without replacing the Matrix
-implementation. Neither is installed automatically by this change.
+The target is an extension-only runtime. `src/bridge.ts` now defines the typed
+`MuseBridge.Transport` boundary and the existing `LocalBridge` implementation.
+The service worker uses `status`, `importMessages`, `claim`, `complete`, and
+`block`; the source adapter has no dependency on localhost or native storage.
+A browser implementation can replace that transport without rewriting DOM
+capture or a future Muse API adapter. The current release still uses the Go
+companion; changing the interface alone does not replace it.
+
+See [the browser runtime design](browser-runtime.md) for the implementation and
+migration requirements. No browser Matrix credentials, new host permissions, or
+experimental crypto are included in the shipped extension yet.

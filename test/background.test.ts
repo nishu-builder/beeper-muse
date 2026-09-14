@@ -2,6 +2,10 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
+const bridgeSource = await readFile(
+  new URL('../extension/bridge.js', import.meta.url),
+  'utf8',
+);
 const source = await readFile(
   new URL('../extension/background.js', import.meta.url),
   'utf8',
@@ -40,14 +44,15 @@ function harness(paired = true) {
     reachable = true,
     receiver = true;
   let health = 'ready';
-  let protocol = 3;
+  let protocol = 4;
   let listener!: (
     message: unknown,
     sender: Sender,
     respond: (reply: Reply) => void,
   ) => boolean;
   let removed!: (id: number) => Promise<void>;
-  runInNewContext(source, {
+  runInNewContext(bridgeSource + '\n' + source, {
+    importScripts: () => {},
     URL,
     AbortSignal,
     fetch: async (url: string, options?: RequestInit) => {
@@ -106,8 +111,9 @@ function harness(paired = true) {
       },
       tabs: {
         query: async () => [active],
-        sendMessage: async () => {
+        sendMessage: async (_tabID: number, message: { type: string }) => {
           if (!receiver) throw new Error('No content script');
+          if (message.type === 'rescan') return { ok: true };
           return { protocol, health };
         },
         onRemoved: {
@@ -339,4 +345,23 @@ test('disconnect, tab close, and forgetting revoke access; forgetting removes th
   assert.equal(h.local.bridgeToken, undefined);
   assert.equal((await h.tab('claim')).ok, false);
   assert.equal((await h.popup('status')).paired, false);
+});
+
+test('only the popup can rescan an attached tab and change the history selection', async () => {
+  const h = harness();
+  assert.equal((await h.popup('rescan', { historyMode: 'all' })).ok, false);
+  await h.popup('attach');
+  assert.equal((await h.popup('rescan', { historyMode: 'all' })).ok, true);
+  assert.equal(h.local.historyMode, 'all');
+  assert.equal(h.saved.tabID, 7);
+  const result = await h.send(
+    { type: 'rescan', historyMode: 'new' },
+    {
+      id: extensionID,
+      url: 'https://muse.ai/',
+      tab: { id: 7 },
+    },
+  );
+  assert.equal(result.ok, false);
+  assert.equal(h.local.historyMode, 'all');
 });

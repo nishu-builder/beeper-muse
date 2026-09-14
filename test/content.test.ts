@@ -235,6 +235,7 @@ test('the normal content flow submits once and forwards a settled reply once', a
   h.signal('start');
   await flush();
   await h.advance(10000);
+  await h.executed;
   assert.equal(h.submits, 1);
   assert.equal(h.messages.filter((m) => m.type === 'result').length, 1);
   assert.equal(h.messages.at(-1)?.text, 'Synthetic answer');
@@ -249,7 +250,23 @@ test('readiness probes expose no draft or chat text', () => {
     [{ unavailable: true }, 'unavailable'],
   ] as const) {
     h.view(view);
-    assert.deepEqual(h.signal('probe'), { protocol: 3, health });
+    const probe = h.signal('probe');
+    assert.equal(probe.protocol, 4);
+    assert.equal(probe.health, health);
+    assert.deepEqual(Object.keys(probe).sort(), [
+      'health',
+      'progress',
+      'protocol',
+      'rescanning',
+    ]);
+    assert.deepEqual(probe.progress, {
+      loaded: 0,
+      eligible: 0,
+      checked: 0,
+      waiting: 0,
+      missingTimes: 0,
+      skippedWidgets: 0,
+    });
   }
   assert.equal(h.messages.length, 0);
 });

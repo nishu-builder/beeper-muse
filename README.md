@@ -8,7 +8,7 @@ bridge.
 [Setup guide](docs/setup.md) · [Extension download](https://github.com/nishu-builder/beeper-muse/releases/latest)
 · [Privacy](PRIVACY.md) · [Troubleshooting](docs/operations.md)
 
-The source now includes version 0.5.0 structured message sync. Build
+The source now includes version 0.5.1 structured message sync. Build
 both the local bridge and extension from this source to use them; the existing
 0.3.0 release ZIP does not include these changes. See [the component design](docs/architecture.md)
 for how a future Muse API can replace the browser adapter.

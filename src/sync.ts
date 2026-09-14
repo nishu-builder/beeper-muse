@@ -100,6 +100,19 @@
   }
   class Tracker implements Muse.SyncTracker {
     private initialized = false;
+    private baseline = { ids: '', at: 0 };
+    private excluded = new Set<string>();
+    private current: Muse.SyncProgress = {
+      loaded: 0,
+      eligible: 0,
+      checked: 0,
+      waiting: 0,
+      missingTimes: 0,
+      skippedWidgets: 0,
+    };
+    get progress(): Muse.SyncProgress {
+      return { ...this.current };
+    }
     private seen = new Map<string, string>();
     private pending = new Map<string, Muse.Source & { at: number }>();
     private firstSeen = new Map<string, { at: number; historical: boolean }>();
@@ -133,30 +146,73 @@
       const items = messages(view);
       const sources = await Promise.all(items.map(fingerprint));
       if (!active()) return;
-      for (const m of items) {
-        if (!this.firstSeen.has(m.id))
-          this.firstSeen.set(m.id, {
-            at: this.now(),
-            historical: !this.initialized,
-          });
+      this.current = {
+        loaded: items.length,
+        eligible: 0,
+        checked: 0,
+        waiting: 0,
+        missingTimes: items.filter((m) => m.timestampMs === undefined).length,
+        skippedWidgets: view.messages.filter(
+          (m) => m.widget && !m.images?.length,
+        ).length,
+      };
+      // The log can mount before its messages. An empty snapshot is not a
+      // completed history scan. Wait for a stable ID list before choosing 20.
+      if (!items.length) return;
+      const ids = JSON.stringify(items.map((m) => m.id));
+      if (ids !== this.baseline.ids) this.baseline = { ids, at: this.now() };
+      let lastKnown = -1;
+      items.forEach((m, i) => {
+        if (this.firstSeen.has(m.id)) lastKnown = i;
+      });
+      for (let i = 0; i < items.length; i++) {
+        const m = items[i]!;
+        if (!this.firstSeen.has(m.id)) {
+          const historical = !this.initialized || i < lastKnown;
+          this.firstSeen.set(m.id, { at: this.now(), historical });
+          // Prepending older DOM nodes must never turn them into live arrivals.
+          if (
+            this.initialized &&
+            historical &&
+            (mode === 'new' || (mode === 'recent' && i < items.length - 20))
+          )
+            this.excluded.add(m.id);
+        }
+      }
+      for (const source of sources) {
+        if (this.pending.get(source.id)?.hash !== source.hash)
+          this.pending.set(source.id, { ...source, at: this.now() });
       }
       if (!this.initialized) {
+        if (mode !== 'new' && this.now() - this.baseline.at < 4000) {
+          this.current.eligible =
+            mode === 'all' ? items.length : Math.min(20, items.length);
+          this.current.waiting = this.current.eligible;
+          return;
+        }
         const count = mode === 'all' ? items.length : mode === 'new' ? 0 : 20;
-        this.remember(sources.slice(0, Math.max(0, items.length - count)));
+        for (const item of items.slice(0, Math.max(0, items.length - count)))
+          this.excluded.add(item.id);
         this.initialized = true;
       }
       const ready: { message: Muse.Message; source: Muse.Source }[] = [];
       for (let i = 0; i < items.length; i++) {
         const message = items[i]!,
           source = sources[i]!;
-        if (this.seen.get(source.id) === source.hash) continue;
-        let candidate = this.pending.get(source.id);
-        if (!candidate || candidate.hash !== source.hash) {
-          candidate = { ...source, at: this.now() };
-          this.pending.set(source.id, candidate);
+        if (this.excluded.has(source.id)) continue;
+        this.current.eligible++;
+        if (this.seen.get(source.id) === source.hash) {
+          this.current.checked++;
+          continue;
         }
-        if (!view.busy && this.now() - candidate.at >= 4000)
+        const candidate = this.pending.get(source.id)!;
+        // Only the trailing assistant bubble might still be streaming. A
+        // long-running Muse task must not hold up settled earlier messages.
+        const streaming =
+          view.busy && message.role === 'assistant' && i === items.length - 1;
+        if (!streaming && this.now() - candidate.at >= 4000)
           ready.push({ message, source });
+        else this.current.waiting++;
       }
       for (let i = 0; i < ready.length; i += 1) {
         if (!active()) return;
@@ -178,6 +234,7 @@
           messages: prepared,
         });
         this.remember(batch.map((item) => item.source));
+        this.current.checked += batch.length;
       }
     }
   }

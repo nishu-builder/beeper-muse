@@ -48,7 +48,7 @@ account directly; enabling the Beeper Desktop local API is not necessary.
 
 ## 3. Install the Chrome extension
 
-The current source includes version 0.5.0. Until that version is released, use
+The current source includes version 0.5.1. Until that version is released, use
 **From source** below and rebuild the bridge for catch-up and automatic popups.
 Version 0.3.0 is pending Chrome Web Store review as of September 13, 2026.
 Until it is approved, choose one of these:
@@ -87,7 +87,7 @@ from a second terminal in this repository. That preserves your current pairing.
 3. Leave the main chat open with an empty composer. Wait for active Muse work to
    finish.
 4. The extension popup opens automatically if no Muse tab is connected. Choose
-   **Most recent 20 messages**, **All messages loaded in Muse**, or **Only new
+   **Latest 20 loaded messages**, **All messages loaded in Muse**, or **Only new
    messages**, then click **Connect this Muse tab**. The button changes to
    **Muse tab connected** after checking that Muse's chat is available. The popup
    tells you if a draft or active Muse work is holding up the queue. You only
@@ -175,3 +175,23 @@ one, the bridge cannot recover the original send time from a relative label.
 Reaction actors and read status are not currently exposed by the browser adapter;
 status controls are excluded from message text, and no read receipts are guessed.
 See [architecture](architecture.md) for the supported source contract.
+
+## Catch-up diagnostics
+
+Choose **Latest 20 loaded messages** or **All messages loaded in Muse**, then
+click **Catch up now** to scan again without disconnecting. Scroll up in Muse first
+if older messages are not loaded. The extension reads the page's loaded messages;
+it does not fetch the complete account history.
+
+The popup distinguishes the delivery queue from source capture. An empty queue
+means there is no pending delivery, not that every Muse message has been captured.
+Loaded, selected, checked, and still-settling counts help identify the difference.
+Completed history can sync while Muse runs a task. Its trailing assistant message
+waits until generation finishes. Original timestamps are only available when Muse
+exposes an absolute machine-readable time; otherwise the capture time is used.
+Already imported messages keep their existing position in the Beeper timeline.
+
+After updating an unpacked extension, reload it in `chrome://extensions` **and
+refresh the Muse webpage**, then reconnect. Version 0.5.1 still requires the
+local bridge. The extension-only runtime is described in
+[browser-runtime.md](browser-runtime.md); it is not shipped yet.
