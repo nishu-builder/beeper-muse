@@ -94,6 +94,7 @@ async function refresh() {
     if (s.connected && beeperReady && s.health === 'draft')
       el('status').textContent =
         'Send or clear your draft in Muse to resume sending from Beeper.';
+    if (s.update) el('status').textContent = s.update;
     if (actionError) el('status').textContent = actionError;
     el('blocked').replaceChildren();
     for (const job of s.blockedJobs || []) {

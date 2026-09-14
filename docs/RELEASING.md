@@ -55,8 +55,8 @@ Configure the protected `chrome-web-store` GitHub environment:
 | Secret   | `CWS_REFRESH_TOKEN` |
 
 Use a required maintainer reviewer and Google's documented OAuth scope. Never
-commit these secrets or copy them into issues. Enable repository variable
-`CWS_PUBLISH=true` only when those credentials and the listing are ready; without
+commit these secrets or copy them into issues. Run `npm run store:check` to verify required secret names and publishing IDs,
+then `npm run store:check -- --enable` when the credentials and listing are ready; without
 it, GitHub releases work and the store job is skipped. Credentials from another
 repository are not automatically shared.
 
@@ -78,3 +78,19 @@ separately.
 The geometric M icon is original artwork. Store illustrations must use synthetic
 content and be clearly described as illustrations, not evidence of live delivery.
 Never publish screenshots containing account details or personal conversations.
+
+### Configure store credentials once
+
+Create a Google OAuth client and authorize the publisher account following
+[Google's API setup](https://developer.chrome.com/docs/webstore/using-api).
+Use the `https://www.googleapis.com/auth/chromewebstore` scope and obtain an
+offline refresh token. Store the client ID, client secret and refresh token as
+`CWS_CLIENT_ID`, `CWS_CLIENT_SECRET` and `CWS_REFRESH_TOKEN` in the repository's
+**Settings → Environments → chrome-web-store → Environment secrets**. Do not
+paste them into chat, commit them, or pass them as command-line arguments.
+The configured publisher/item IDs must belong to the account that authorized it.
+
+`npm run store:check -- --enable` checks names, not token validity, before enabling
+submission on future release tags. Only Google's authorization/upload responses
+can establish validity. It does not submit an existing tag or alter the listing.
+Missing secrets leave publishing disabled; GitHub packages can still be released.

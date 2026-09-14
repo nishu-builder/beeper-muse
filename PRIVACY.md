@@ -46,17 +46,18 @@ or Muse: the bridge must read plaintext to perform the integration.
 
 ## Permissions
 
-| Permission or host                    | Use                                                                        |
-| ------------------------------------- | -------------------------------------------------------------------------- |
-| `storage`                             | Save registration and session selection in local/session extension storage |
-| `unlimitedStorage`                    | Persist IndexedDB queues and crypto state without ordinary quota eviction  |
-| `alarms`                              | Schedule reconnect/recovery checks                                         |
-| `activeTab`                           | Identify the active tab when connecting Muse                               |
-| `declarativeNetRequestWithHostAccess` | Set authentication headers for the exact Beeper socket and connection tab  |
-| `webRequest`                          | Observe that socket's handshake for bounded diagnostics                    |
-| `https://muse.ai/*`                   | Run the adapter on the explicitly connected Muse conversation              |
-| `https://matrix.beeper.com/*`         | Matrix requests, encryption key exchange and encrypted media upload        |
-| `wss://matrix.beeper.com/*`           | Beeper application-service WebSocket                                       |
+| Permission or host                    | Use                                                                                                            |
+| ------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| `storage`                             | Save registration and session selection in local/session extension storage                                     |
+| `scripting`                           | Reinstall bundled content scripts in the selected Muse main frame after an update, without refreshing the page |
+| `unlimitedStorage`                    | Persist IndexedDB queues and crypto state without ordinary quota eviction                                      |
+| `alarms`                              | Schedule reconnect/recovery checks                                                                             |
+| `activeTab`                           | Identify the active tab when connecting Muse                                                                   |
+| `declarativeNetRequestWithHostAccess` | Set authentication headers for the exact Beeper socket and connection tab                                      |
+| `webRequest`                          | Observe that socket's handshake for bounded diagnostics                                                        |
+| `https://muse.ai/*`                   | Run the adapter on the explicitly connected Muse conversation                                                  |
+| `https://matrix.beeper.com/*`         | Matrix requests, encryption key exchange and encrypted media upload                                            |
+| `wss://matrix.beeper.com/*`           | Beeper application-service WebSocket                                                                           |
 
 Handshake diagnostics show verification flags, status codes and bounded errors;
 they do not display or transmit credentials or raw frames. Read-only bridge
@@ -79,3 +80,8 @@ Policy changes are committed here. Ask privacy questions in a
 [GitHub issue](https://github.com/nishu-builder/beeper-muse/issues) without private
 data; use [private vulnerability reporting](https://github.com/nishu-builder/beeper-muse/security/advisories/new)
 for sensitive security reports.
+
+During a planned update, a reconnect ticket containing the selected tab ID, Chrome document ID and
+a two-minute expiry is saved locally and removed on restoration or expiry.
+Unpacked development builds read a local build marker; they do not contact an
+update server or download executable code. Store updates are delivered by Chrome.

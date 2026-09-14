@@ -317,11 +317,16 @@ export class BrowserBridge {
       blockedJobs: jobs
         .filter((j) => j.phase === 'blocked')
         .map((j) => ({ id: j.id, prompt: j.prompt })),
+      claimed: jobs.filter((j) => j.phase === 'claimed').length,
       queued: jobs.filter((j) => j.phase === 'queued').length,
       blocked: jobs.filter((j) => j.phase === 'blocked').length,
       pending: (await this.inbox.pending(128)).length,
       room: this.room,
     };
+  }
+  async checkpoint() {
+    await this.intake;
+    await this.serial(async () => {});
   }
   claim() {
     return this.serial(async () => {

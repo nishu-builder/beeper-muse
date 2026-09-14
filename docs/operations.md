@@ -12,17 +12,19 @@ what the Muse adapter has observed.
 | “Start the local bridge” or a pairing-code field  | You loaded the legacy extension. Follow [Chrome setup](chrome-setup.md); disable the old copy.                                                       |
 | Beeper connecting or needs attention              | Open **Connection settings** and inspect the startup stage/error. Keep the connection tab open. Use **Reconnect Beeper** after addressing the error. |
 | Another instance is connected                     | Pause/disable the other extension or development probe using this registration, then reconnect deliberately.                                         |
-| Beeper connected, Muse tab not connected          | Open the signed-in Muse main chat, refresh it after an extension update, and click **Connect this Muse tab**.                                        |
+| Beeper connected, Muse tab not connected          | Open the signed-in Muse main chat, and click **Connect this Muse tab**.                                                                              |
 | Pending prompt does not appear in Muse            | Keep the selected main chat open, clear any draft, and wait for existing Muse work to finish.                                                        |
 | Muse answered but Beeper did not                  | Inspect the queue and interrupted-job controls. Do not resend blindly; the prompt may already have reached Muse.                                     |
 | Catch-up misses messages                          | Scroll them into view in Muse, then use **Catch up now** with the appropriate history mode. The bridge cannot fetch hidden history.                  |
 | Images or reactions are missing                   | Render the message in Muse and rescan. Unknown/virtualized markup and CORS restrictions can limit extraction.                                        |
 | Times look recent or history appears out of order | Muse may not expose original timestamps. Fallback times describe first observation; forward imports do not reorder existing events.                  |
 
-After updating an unpacked extension, reload it at `chrome://extensions`, refresh
-**the Muse webpage**, and reconnect that tab. Keep the same installed extension
-and folder to retain local storage. Clearing data or reinstalling is not a normal
-troubleshooting step.
+Local 0.7.2+ development builds use `npm run update:local` for automatic reload
+and reconnection. An update waits for active work and a responsive source tab.
+If it remains waiting, inspect pending prompts and Muse activity; reconnect a
+missing or discarded tab. See [update setup](chrome-setup.md#update-without-losing-state)
+for the one-time transition and manually unpacked ZIPs. Keep the same installed
+extension and folder; clearing data or reinstalling is not a normal fix.
 
 Muse's product-query or monitoring errors do not by themselves diagnose a bridge
 failure. Use the extension's status rather than assuming every Muse console error

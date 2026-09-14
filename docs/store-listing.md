@@ -35,6 +35,7 @@ conversation content through an encrypted Beeper application-service connection.
 | Permission                            | Justification                                                                                                            |
 | ------------------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `storage`                             | Store imported registration in trusted local extension storage and selected-tab state in session storage; no Chrome Sync |
+| `scripting`                           | Reinstall bundled content scripts in the selected Muse main frame after an update, without refreshing the page           |
 | `unlimitedStorage`                    | Retain IndexedDB encryption keys, durable message queues and deduplication receipts                                      |
 | `alarms`                              | Schedule reconnection/recovery checks when the worker restarts                                                           |
 | `activeTab`                           | Identify the active Muse tab when the user chooses Connect                                                               |

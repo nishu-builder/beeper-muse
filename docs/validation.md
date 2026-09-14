@@ -6,7 +6,7 @@ remains experimental; the public package is not a claim of production reliabilit
 
 ## Automated coverage
 
-For 0.7.1, local checks passed: 120 JavaScript/TypeScript tests, TypeScript
+For 0.7.2, local checks passed: 130 JavaScript/TypeScript tests, TypeScript
 checks, Go tests and race tests, both builds, formatting, the public ZIP tests,
 and the production npm audit (zero reported vulnerabilities). The release gate
 is `npm run check`, Go race tests, `npm run package`, and the production npm audit. CI runs on Linux and macOS. Tests use synthetic DOM,
@@ -44,6 +44,21 @@ by Chrome Web Store or establish that every current Muse selector still works.
 History suppression has been checked through request flags and read/unread state.
 Operating-system notification banners across clients have not been comprehensively
 observed. Original timestamps can only be verified when the source supplies them.
+
+## Update automation acceptance
+
+Automated tests cover busy-source deferral, pending claims, overlapping checks,
+source recovery after failure, durable delivery checkpoints, draft preservation,
+old-script disposal, tab/expiry validation and staged-file installation. Package
+tests confirm that local build markers and private configuration are excluded.
+These are synthetic Chrome API tests, not an observed installed-extension reload.
+
+After the one-time manual transition, make a new local build with `update:local`.
+Verify that the popup version changes without a Chrome extensions-page reload,
+that the same Muse page remains open with any draft intact, and that a fresh
+Beeper prompt completes. Repeat with a prompt in progress: the update must wait.
+Also test a downloaded store update after Google authorization and review. Store
+publishing is not enabled until its required secrets are configured.
 
 ## Release acceptance checklist
 

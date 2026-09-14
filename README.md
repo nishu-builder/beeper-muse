@@ -33,6 +33,12 @@ Keep the Muse tab and the small **Beeper Muse connection** tab open. You can pin
 the connection tab. Closing Chrome pauses syncing. Your phone can use the Beeper
 chat while Chrome stays running on your computer.
 
+For local development updates, `npm run update:local` rebuilds and installs the
+current checkout. Once the update hook is installed, the extension waits for
+active work, reloads and reconnects Muse automatically. See the
+[one-time setup](docs/chrome-setup.md#update-without-losing-state). Store installs
+use Chrome's update service.
+
 ## What syncs
 
 | Direction      | Supported                                                            |

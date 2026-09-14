@@ -1,10 +1,49 @@
 import { build } from 'esbuild';
-import { mkdir, copyFile, cp, rm } from 'node:fs/promises';
+import {
+  mkdir,
+  copyFile,
+  cp,
+  rm,
+  readFile,
+  readdir,
+  writeFile,
+} from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 const root = new URL('../', import.meta.url);
 const output = new URL('dist/chrome-extension/', root);
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
+// Stable across machines: hash source bytes and paths, never timestamps/private files.
+const hash = createHash('sha256');
+async function fingerprint(directory) {
+  for (const entry of (
+    await readdir(new URL(directory, root), { withFileTypes: true })
+  ).sort((a, b) => a.name.localeCompare(b.name, 'en'))) {
+    const path = directory + entry.name;
+    if (entry.isDirectory()) await fingerprint(path + '/');
+    else if (entry.isFile()) {
+      hash.update(path + '\0');
+      hash.update(await readFile(new URL(path, root)));
+    }
+  }
+}
+for (const directory of [
+  'src/',
+  'browser-runtime/runtime/',
+  'extension/icons/',
+])
+  await fingerprint(directory);
+for (const path of [
+  'extension/content.js',
+  'package-lock.json',
+  'scripts/build-browser-runtime.mjs',
+]) {
+  hash.update(path + '\0');
+  hash.update(await readFile(new URL(path, root)));
+}
+const buildID = hash.digest('hex');
 await build({
+  define: { __BEEPER_MUSE_BUILD_ID__: JSON.stringify(buildID) },
   entryPoints: [
     'browser-runtime/runtime/background.ts',
     'browser-runtime/runtime/popup.ts',
@@ -48,3 +87,8 @@ await copyFile(
 for (const name of ['LICENSE', 'NOTICES.md'])
   await copyFile(new URL(name, root), new URL(name, output));
 console.log('Built dist/chrome-extension without private registration data.');
+
+await writeFile(
+  new URL('build-info.json', output),
+  JSON.stringify({ build: buildID }),
+);

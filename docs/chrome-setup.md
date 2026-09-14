@@ -50,8 +50,8 @@ containing `manifest.json`. Keep that folder in place.
 
 If installing through Chrome Web Store, confirm the version is 0.7.0 or newer.
 Older companion releases use a different setup, and store review can delay the
-new version. Store installations update through Chrome; unpacked installs need
-manual updates.
+new version. Store installations update through Chrome. For local builds, use
+the automatic reload setup below.
 
 ### Build from source
 
@@ -98,15 +98,39 @@ Offscreen text placeholders may gain formatting and images when rendered later.
 
 ## Update without losing state
 
-Wait for pending work to finish. Replace public unpacked files in the same folder,
-then click **Reload** at `chrome://extensions`. Refresh the Muse webpage and
-reconnect it. The extension refreshes its own connection tab automatically.
-Do not remove and reinstall the extension to update: removing it deletes its
-local encryption keys and queues.
+Store installations use Chrome's update service. When a downloaded update is
+ready, the extension stops claiming new prompts, waits for current activity to
+finish, saves its reconnect ticket, then reloads. The same selected Muse tab is
+reconnected without a page refresh; drafts, encryption keys and queues are kept.
+Google review and Chrome's download schedule still determine availability.
 
-Local development installs in `.local/chrome-extension` can still be refreshed
-with `npm run prepare:browser-runtime -- .local/chrome-bridge.yaml`. This helper
-builds a private copy with a seeded registration. Never upload that directory.
+For a source checkout, update the existing `.local/chrome-extension` folder with:
+
+```sh
+npm run update:local
+```
+
+This builds the current checkout, stages a complete replacement, preserves private
+configuration and publishes a completed-build marker. An installed 0.7.2+ local
+build checks that marker and reloads when idle. It does not download arbitrary
+code from GitHub, run a local server, or require a background terminal. Run the
+command after pulling reviewed changes; it exits after installing the files.
+
+**One-time transition:** after installing this update hook for the first time,
+reload the extension at `chrome://extensions`, refresh Muse once, and connect it.
+Later updates made with this command reconnect automatically. Use the same folder.
+A freshly unpacked release ZIP still needs manual file replacement and reload;
+the development marker is intentionally excluded from public ZIPs.
+
+For initial private setup, `npm run prepare:browser-runtime --
+.local/chrome-bridge.yaml` also seeds the registration. Future `update:local`
+runs retain it. Never upload `.local`, staging folders or local configuration.
+Do not remove/reinstall the extension to update: removal deletes encryption keys.
+
+Reconnection is limited to the selected main Muse tab and a two-minute update
+window. Closed, discarded or signed-out tabs need attention. If the updater cannot
+confirm a safe source state, it waits; it never interrupts a prompt to force an
+update. Chrome shutdown or a manual reload can still interrupt work.
 
 Switching between an unpacked extension and the Web Store installation changes
 the extension identity and storage. There is no crypto-state export/import tool.

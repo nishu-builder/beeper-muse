@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.7.2
+
+- Add `update:local`: stage complete builds, preserve private configuration and
+  let the installed extension detect a completed build and reload when idle.
+- Apply downloaded store updates at the same safe boundary. Stop new claims,
+  wait for current prompts/delivery and keep encryption keys and durable queues.
+- Reconnect the previously selected Muse tab using packaged content scripts,
+  without refreshing the page or clearing drafts. Add the `scripting` permission.
+- Add store-publishing configuration checks and one-time credential instructions.
+  Google authorization is still required before automated store submissions.
+- Cover update deferral, interrupted preparation, installation failure and tab
+  validation with automated tests. Installed Chrome reload behavior still needs
+  live verification after the one-time transition.
+
 ## 0.7.1
 
 - Request fresh Muse activity from the worker so background-tab timer throttling

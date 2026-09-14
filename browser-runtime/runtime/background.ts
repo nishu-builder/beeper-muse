@@ -1,3 +1,6 @@
+import { Updates, localUpdate } from './updates.js';
+import { ensureMuseTab, isMuseURL, resumeTicket } from './muse-tab.js';
+declare const __BEEPER_MUSE_BUILD_ID__: string;
 import { ActivityPulse } from './activity-pulse.js';
 import { connectedBridgeState } from './bridge-metadata.js';
 import { BrowserBridge } from './bridge.js';
@@ -22,20 +25,27 @@ const startup = new StartupProgress((stage) => {
 });
 let retryAt = 0;
 let failures = 0;
+let applyingUpdate = false;
+let handling = 0;
+let restoring: Promise<void> | undefined;
+const museTabs = {
+  get: (id: number) => chrome.tabs.get(id),
+  send: (id: number, message: { type: string }) =>
+    chrome.tabs.sendMessage(id, message),
+  inject: (id: number, files: string[]) =>
+    chrome.scripting.executeScript({
+      target: { tabId: id, frameIds: [0] },
+      files,
+    }),
+};
 const secure = Promise.all([
   chrome.storage.local.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' }),
   chrome.storage.session.setAccessLevel({ accessLevel: 'TRUSTED_CONTEXTS' }),
 ]);
-const museURL = (url?: string) => {
-  try {
-    const u = new URL(url!);
-    return u.origin === 'https://muse.ai' && u.pathname === '/';
-  } catch {
-    return false;
-  }
-};
+const museURL = isMuseURL;
 async function start() {
   await secure;
+  if (applyingUpdate) return;
   if (starting) return starting;
   if (
     phase === 'connected' ||
@@ -86,6 +96,7 @@ async function start() {
             failure = '';
             failures = 0;
             retryAt = 0;
+            void restoreAfterUpdate();
           }
           if (state === 'disconnected' || state === 'error') {
             retryAt =
@@ -168,6 +179,7 @@ async function report() {
     configured: !!config,
     phase: conflict ? 'conflict' : enabled === false ? 'paused' : phase,
     failure,
+    update: updates.message,
     startup: startup.snapshot(),
     starting: !!starting,
     retrySeconds: Math.max(0, Math.ceil((retryAt - Date.now()) / 1000)),
@@ -186,6 +198,8 @@ async function handle(
 ) {
   await secure;
   if (sender.id !== chrome.runtime.id) throw Error('Invalid sender.');
+  if (applyingUpdate && message.type !== 'status')
+    throw Error('Update in progress.');
   const popup =
     sender.url === chrome.runtime.getURL('popup.html') && !sender.tab;
   if (popup) {
@@ -226,13 +240,7 @@ async function handle(
       });
       if (!tab?.id || !museURL(tab.url))
         throw Error('Open the main Muse chat first.');
-      const health = await chrome.tabs
-        .sendMessage(tab.id, { type: 'probe' })
-        .catch(() => null);
-      if (!health || !['ready', 'busy', 'draft'].includes(health.health))
-        throw Error(
-          'Refresh the Muse webpage and sign in, then connect again.',
-        );
+      await ensureMuseTab(museTabs, tab.id);
       await detach();
       const historyMode = ['recent', 'all', 'new'].includes(
         String(message.historyMode),
@@ -325,7 +333,10 @@ async function handle(
     await bridge.activity(message.activity);
     return { ok: true };
   }
-  if (message.type === 'claim') return { ok: true, ...(await bridge.claim()) };
+  if (message.type === 'claim')
+    return updates.pending
+      ? { ok: true, job: null }
+      : { ok: true, ...(await bridge.claim()) };
   if (
     message.type === 'result' &&
     typeof message.id === 'string' &&
@@ -345,17 +356,23 @@ async function handle(
 }
 chrome.runtime.onMessage.addListener(
   (message: Record<string, unknown>, sender, respond) => {
-    void handle(message, sender).then(respond, () =>
-      respond({
-        ok: false,
-        error:
-          'Beeper Muse could not complete that action. Check the connection and refresh Muse.',
-      }),
-    );
+    handling++;
+    void handle(message, sender)
+      .finally(() => {
+        handling--;
+      })
+      .then(respond, () =>
+        respond({
+          ok: false,
+          error:
+            'Beeper Muse could not complete that action. Check the connection and refresh Muse.',
+        }),
+      );
     return true;
   },
 );
 chrome.alarms.onAlarm.addListener(() => {
+  void updates.tick();
   void start()
     .then(() => (phase === 'connected' ? bridge?.tick() : undefined))
     .catch(() => {});
@@ -376,7 +393,11 @@ chrome.runtime.onInstalled.addListener(() => {
         ).catch(() => null);
         if (response?.ok) await setConfig(await response.json());
       }
+      const pending = await chrome.storage.local.get('availableUpdate');
+      if (pending.availableUpdate === chrome.runtime.getManifest().version)
+        await chrome.storage.local.remove('availableUpdate');
       await start();
+      await restoreAfterUpdate();
     })
     .catch(() => {});
 });
@@ -421,3 +442,145 @@ const activityPulse = new ActivityPulse(
   (tabID) => chrome.tabs.sendMessage(tabID, { type: 'activity-pulse' }),
 );
 setInterval(() => void activityPulse.tick(), 4000);
+
+// A short-lived ticket exists only for an update we initiated. Ordinary browser
+// startup does not choose an arbitrary Muse tab or erase crypto/session storage.
+async function restoreAfterUpdate() {
+  if (restoring) return restoring;
+  if (phase !== 'connected' || applyingUpdate) return;
+  restoring = (async () => {
+    const saved = await chrome.storage.local.get([
+      'updateResume',
+      'enabled',
+      'conflict',
+    ]);
+    if (!saved.updateResume) return;
+    const ticket = resumeTicket(saved.updateResume);
+    if (saved.enabled === false || saved.conflict || !ticket) {
+      await chrome.storage.local.remove('updateResume');
+      return;
+    }
+    try {
+      await ensureMuseTab(
+        {
+          get: museTabs.get,
+          send: (id, message) =>
+            chrome.tabs.sendMessage(id, message, {
+              documentId: ticket.documentID,
+            }),
+          inject: (id, files) =>
+            chrome.scripting.executeScript({
+              target: { tabId: id, documentIds: [ticket.documentID] },
+              files,
+            }),
+        },
+        ticket.tabID,
+      );
+      await chrome.storage.session.set({ tabID: ticket.tabID });
+      await chrome.tabs.sendMessage(
+        ticket.tabID,
+        { type: 'start' },
+        { documentId: ticket.documentID },
+      );
+      await chrome.storage.local.remove('updateResume');
+    } catch {
+      // Missing/discarded/loading tabs stay disconnected; a later retry may work.
+    }
+  })().finally(() => {
+    restoring = undefined;
+  });
+  return restoring;
+}
+const development = chrome.management
+  .getSelf()
+  .then((info) => info.installType === 'development')
+  .catch(() => false);
+const updates = new Updates({
+  async candidate() {
+    await secure;
+    if (await development) {
+      const response = await fetch(chrome.runtime.getURL('dev-update.json'), {
+        cache: 'no-store',
+      }).catch(() => null);
+      if (!response?.ok) return;
+      return localUpdate(await response.json(), __BEEPER_MUSE_BUILD_ID__);
+    }
+    const { availableUpdate } =
+      await chrome.storage.local.get('availableUpdate');
+    return typeof availableUpdate === 'string' &&
+      availableUpdate !== chrome.runtime.getManifest().version
+      ? 'store:' + availableUpdate
+      : undefined;
+  },
+  async ready() {
+    if (starting || handling || applyingUpdate || restoring) return false;
+    return !bridge || (await bridge.status()).claimed === 0;
+  },
+  async prepareSource() {
+    const { tabID } = await chrome.storage.session.get('tabID');
+    if (typeof tabID !== 'number' || !Number.isInteger(tabID)) return true;
+    try {
+      const reply = await chrome.tabs.sendMessage(tabID, {
+        type: 'prepare-update',
+      });
+      return reply?.ready === true;
+    } catch {
+      // Do not guess whether an unreachable selected tab was in the middle of work.
+      return false;
+    }
+  },
+  async apply() {
+    applyingUpdate = true;
+    try {
+      if (handling || starting || (bridge && (await bridge.status()).claimed))
+        throw Error('Work started while preparing update.');
+      const { tabID } = await chrome.storage.session.get('tabID');
+      if (typeof tabID === 'number' && Number.isInteger(tabID)) {
+        const [document] = await chrome.scripting.executeScript({
+          target: { tabId: tabID, frameIds: [0] },
+          func: () =>
+            location.origin === 'https://muse.ai' && location.pathname === '/',
+        });
+        if (!document?.result || !document.documentId)
+          throw Error('Muse navigated during update.');
+        await chrome.storage.local.set({
+          updateResume: {
+            tabID,
+            documentID: document.documentId,
+            expires: Date.now() + 120000,
+          },
+        });
+      }
+      bridge?.pause();
+      phase = 'updating';
+      await socket?.stop();
+      await bridge?.checkpoint();
+      chrome.runtime.reload();
+    } catch (error) {
+      applyingUpdate = false;
+      throw error;
+    }
+  },
+  async recover() {
+    applyingUpdate = false;
+    const { enabled } = await chrome.storage.local.get('enabled');
+    if (enabled === false) return;
+    bridge?.resume();
+    const { tabID } = await chrome.storage.session.get('tabID');
+    if (typeof tabID === 'number' && Number.isInteger(tabID))
+      await chrome.tabs.sendMessage(tabID, { type: 'start' }).catch(() => {});
+    if (phase === 'updating') phase = 'disconnected';
+    retryAt = 0;
+    await start();
+  },
+});
+chrome.runtime.onUpdateAvailable.addListener(({ version }) => {
+  void secure
+    .then(() => chrome.storage.local.set({ availableUpdate: version }))
+    .then(() => updates.tick())
+    .catch(() => {});
+});
+setInterval(() => {
+  void updates.tick();
+  void restoreAfterUpdate();
+}, 5000);
