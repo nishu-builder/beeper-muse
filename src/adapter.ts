@@ -397,17 +397,36 @@
         }
         const bubble = rendered || e;
         const clean = cleanContent(bubble, role);
-        const images: Muse.Image[] = [...clean.querySelectorAll('img[src]')]
+        // User attachments can sit beside their caption bubble. Only include
+        // the observed media control owned by this message, never nearby cards.
+        const siblingImages =
+          role === 'user'
+            ? [
+                ...e.querySelectorAll<HTMLImageElement>(
+                  'button[data-pel-click="chat_media_click"] img[src]',
+                ),
+              ].filter(
+                (img) =>
+                  img.closest('[data-message-item]') === e &&
+                  !bubble.contains(img),
+              )
+            : [];
+        const seenImages = new Set<string>();
+        const images: Muse.Image[] = [
+          ...clean.querySelectorAll<HTMLImageElement>('img[src]'),
+          ...siblingImages,
+        ]
           .slice(0, 4)
           .flatMap((img) => {
-            const rawURL = img.getAttribute('src') || '';
+            const rawURL = img.currentSrc || img.getAttribute('src') || '';
             let url: string;
             try {
               url = new URL(rawURL, document.baseURI).href;
             } catch {
               return [];
             }
-            if (!safeImageURL(url)) return [];
+            if (!safeImageURL(url) || seenImages.has(url)) return [];
+            seenImages.add(url);
             return [
               { url, alt: (img.getAttribute('alt') || '').slice(0, 1000) },
             ];

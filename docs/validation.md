@@ -394,3 +394,18 @@ corrected region now reports two image elements and one Send control where the
 old region reported zero of each. These counts do not identify the images, but
 they confirm the boundary changed actual observation. Inspect and remove only
 leftover synthetic test attachments before dismissing that test and trying again.
+
+## Live photo interpretation and echo parsing (0.8.13)
+
+With fresh connected diagnostics and zero queue counts after user cleanup, the
+0.8.12 image test reached Send. Browser inspection verified the exact marked
+caption, its image, and Muse's correct RED response without revealing the color
+in the prompt. This establishes delivery to Muse and successful interpretation.
+The bridge instead emitted native failure at reply-attribution because user media
+sits beside the caption bubble. Subsequent read-only observation confirmed the
+correct reply in Beeper: roundTrip=true, nativeFailure=true and nativeDelivery=false.
+Native success remains unverified; no resend or post-photo text was sent.
+
+Synthetic regression tests for 0.8.13 cover owned sibling media, renamed image
+labels, unchanged captions, excluded decoration, delayed media evidence and
+rejection of unrelated prompts. The original submitted job remains held.

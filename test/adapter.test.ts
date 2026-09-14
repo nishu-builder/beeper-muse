@@ -571,13 +571,14 @@ test('photo attribution requires an image echo and rejects interleaved user mess
     ),
     'A photo',
   );
-  assert.throws(() =>
+  assert.equal(
     f.adapter.responseAfter(
       new Set(),
       '',
       { messages: [{ ...user, images: [] }, reply] },
       'photo.png',
     ),
+    null,
   );
   assert.throws(() =>
     f.adapter.responseAfter(
@@ -823,4 +824,52 @@ test('a cleared or replaced image picker requires byte-identical preview evidenc
     }
     f.dom.window.close();
   }
+});
+
+test('captioned user photos include sibling media controls without importing nearby decoration', () => {
+  const f = fixture();
+  const log = f.document.querySelector('[role="log"]')!;
+  log.insertAdjacentHTML(
+    'beforeend',
+    `<div data-message-item data-message-id="photo" data-message-role="user">
+     <button data-pel-click="chat_media_click"><img src="blob:https://muse.ai/test-photo" alt="renamed.png"></button>
+     <img src="https://muse.ai/decoration.png">
+     <div class="hatch-chat-groupable-bubble"><span class="sr-only">You:</span><p>Inspect this photo.</p></div>
+     </div><div data-message-item data-message-id="answer" data-message-role="assistant"><div class="hatch-chat-groupable-bubble">Red</div><button data-pel-click="chat_media_click"><img src="/unrelated-card.png"></button></div>`,
+  );
+  const view = f.adapter.snapshot(f.document);
+  const photo = view.messages.find((m: { id: string }) => m.id === 'photo')!;
+  assert.equal(photo.text, 'Inspect this photo.');
+  assert.equal(photo.images.length, 1);
+  assert.equal(photo.images[0].url, 'blob:https://muse.ai/test-photo');
+  assert.equal(view.messages.at(-1).images.length, 0);
+  assert.equal(
+    f.adapter.responseAfter(
+      new Set(['old']),
+      'Inspect this photo.',
+      view,
+      'original.png',
+    ),
+    'Red',
+  );
+  photo.images = [];
+  assert.equal(
+    f.adapter.responseAfter(
+      new Set(['old']),
+      'Inspect this photo.',
+      view,
+      'original.png',
+    ),
+    null,
+  );
+  photo.text = 'Another prompt';
+  assert.throws(() =>
+    f.adapter.responseAfter(
+      new Set(['old']),
+      'Inspect this photo.',
+      view,
+      'original.png',
+    ),
+  );
+  f.dom.window.close();
 });

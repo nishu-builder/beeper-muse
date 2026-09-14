@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.13
+
+- Include user photo attachments rendered beside their caption bubble, using the
+  message's media controls. Preserve the caption and ignore unrelated decoration.
+- Wait for a matching caption's image to render before confirming delivery,
+  instead of treating missing media as an unrelated message.
+
 ## 0.8.12
 
 - Locate the complete Muse composer so attachment previews and Send controls in
