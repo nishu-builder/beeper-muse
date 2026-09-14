@@ -477,7 +477,7 @@ test('HTML allows formatting and HTTP links without active attributes', () => {
   );
   assert.equal(
     html,
-    '<p><strong>Text</strong><a>bad</a><a href="https://example.org">good</a></p>',
+    '<p><strong>Text</strong><a>bad</a><a href="https://example.org/">good</a></p>',
   );
 });
 
@@ -934,5 +934,25 @@ test('known pre-upload failures keep the photo failed but do not hold later text
     } finally {
       h.close();
     }
+  }
+});
+
+test('formatting beyond structural limits keeps a visible plain message', async () => {
+  const h = await harness();
+  try {
+    await h.bridge.importMessages([
+      {
+        id: 'deep-format',
+        role: 'assistant',
+        text: 'Readable fallback',
+        html: '<div>'.repeat(101) + 'Readable fallback' + '</div>'.repeat(101),
+      },
+    ]);
+    const content = h.batches[0]!.events[0].content.content;
+    assert.equal(content.body, 'Readable fallback');
+    assert.equal(content.format, undefined);
+    assert.equal(content.formatted_body, undefined);
+  } finally {
+    h.close();
   }
 });

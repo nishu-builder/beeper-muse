@@ -253,3 +253,20 @@ cannot guarantee a final packet, so Beeper must detect the lost transport or exp
 its last status. Server expiry and visible Desktop/mobile banners remain unverified.
 Source transitions use fixed `muse-connected` / `muse-disconnected` diagnostic codes;
 they contain no chat content or account identifiers.
+
+## Rich text boundaries
+
+The source adapter keeps headings/tables, ordered-list starts and code language
+attributes while removing message controls and status UI. Its separate text
+representation includes table cell separators, explicit list markers and fenced
+code so indentation survives clients using the plain body.
+
+The worker parses source HTML with bundled `parse5` and emits a bounded subset of
+[Matrix message formatting](https://spec.matrix.org/v1.15/client-server-api/#mroommessage-msgtypes).
+Only safe HTTP(S) links, bounded ordered-list starts and language classes are
+retained as attributes. Styles, handlers, active controls, foreign namespaces and
+inline image HTML are omitted; images use the native encrypted attachment path.
+Depth over 100, more than 10,000 visited nodes or output over 200,000 characters
+falls back to the supplied plain body. Oversized input is rejected before parsing.
+The parser repairs incomplete HTML from bounded source snapshots; it does not
+execute source code or load remote content. Native client support still varies.

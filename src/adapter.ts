@@ -67,7 +67,11 @@
     // Keep only formatting attributes. The worker sanitizes again before Matrix.
     clone.querySelectorAll('*').forEach((n) => {
       for (const a of [...n.attributes]) {
-        if (!['href', 'src', 'alt'].includes(a.name)) n.removeAttribute(a.name);
+        const formatting =
+          (n.tagName === 'OL' && a.name === 'start') ||
+          (n.tagName === 'CODE' && a.name === 'class');
+        if (!formatting && !['href', 'src', 'alt'].includes(a.name))
+          n.removeAttribute(a.name);
       }
     });
     return clone;
@@ -171,15 +175,81 @@
   }
   function text(element: Element, role: Muse.Role) {
     const clone = cleanContent(element, role);
-    clone.querySelectorAll('a[href]').forEach((a) => {
-      const href = a.getAttribute('href');
-      if (/^https?:\/\//.test(href || '') && a.textContent !== href)
-        a.appendChild(element.ownerDocument.createTextNode(' (' + href + ')'));
-    });
-    clone
-      .querySelectorAll('p,li,pre,blockquote,br')
-      .forEach((n) => n.after(element.ownerDocument.createTextNode('\n')));
-    return (clone.textContent || '').trim();
+    function render(node: Node, listDepth = 0, pre = false, depth = 0): string {
+      if (depth > 100) return node.textContent || '';
+      if (node.nodeType === 3) {
+        const value = node.textContent || '';
+        return pre ? value : value.replace(/[ \t\r\n]+/g, ' ');
+      }
+      if (node.nodeType !== 1) return '';
+      const el = node as Element;
+      const tag = el.tagName.toLowerCase();
+      if (tag === 'img') return '';
+      const children = (keepSpace = pre) =>
+        [...el.childNodes]
+          .map((n) => render(n, listDepth, keepSpace, depth + 1))
+          .join('');
+      if (tag === 'pre') {
+        const code = children(true);
+        const fence = '`'.repeat(
+          (code.match(/`+/g) || []).reduce(
+            (n, run) => Math.max(n, run.length + 1),
+            3,
+          ),
+        );
+        return (
+          '\n' +
+          fence +
+          '\n' +
+          code +
+          (code.endsWith('\n') ? '' : '\n') +
+          fence +
+          '\n'
+        );
+      }
+      if (tag === 'br') return '\n';
+      if (tag === 'hr') return '\n---\n';
+      if (tag === 'ol' || tag === 'ul') {
+        const raw = el.getAttribute('start') || '1';
+        let index =
+          /^-?\d{1,10}$/.test(raw) && Math.abs(Number(raw)) <= 2147483647
+            ? Number(raw)
+            : 1;
+        return (
+          '\n' +
+          [...el.children]
+            .map((li) => {
+              if (li.tagName !== 'LI')
+                return render(li, listDepth, false, depth + 1);
+              const body = [...li.childNodes]
+                .map((n) => render(n, listDepth + 1, false, depth + 1))
+                .join('')
+                .trim();
+              const marker = tag === 'ol' ? String(index++) + '. ' : '- ';
+              return (
+                '  '.repeat(Math.min(listDepth, 20)) + marker + body + '\n'
+              );
+            })
+            .join('')
+        );
+      }
+      if (tag === 'tr')
+        return (
+          [...el.children]
+            .filter((cell) => ['TD', 'TH'].includes(cell.tagName))
+            .map((cell) => render(cell, listDepth, false, depth + 1).trim())
+            .join('\t') + '\n'
+        );
+      let body = children();
+      if (tag === 'a') {
+        const url = el.getAttribute('href') || '';
+        if (safeURL(url) && body.trim() !== url) body += ' (' + url + ')';
+      }
+      if (/^(p|div|h[1-6]|blockquote|table|caption|summary|details)$/.test(tag))
+        return '\n' + body.trim() + '\n';
+      return body;
+    }
+    return render(clone).trim();
   }
   function reactions(element: Element): Muse.Reaction[] | undefined {
     const result: Muse.Reaction[] = [];

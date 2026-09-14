@@ -261,7 +261,7 @@ test('browser response capture excludes history, buttons, and widgets, and prese
     'Test prompt',
     f.adapter.snapshot(f.document),
   );
-  assert.match(result, /Hello\nSee example \(https:\/\/example.com\)/);
+  assert.match(result, /Hello\n\nSee example \(https:\/\/example.com\)/);
   assert.doesNotMatch(result, /private|widget|purchase/i);
   f.dom.window.close();
 });
@@ -625,5 +625,19 @@ test('form-free discovery refuses a shared transcript ancestor', async () => {
     region.querySelector<HTMLInputElement>('input')!.files!.length,
     0,
   );
+  f.dom.window.close();
+});
+
+test('structured source text preserves table boundaries, continued lists and code indentation', () => {
+  const f = fixture();
+  f.document.querySelector('[role="log"]')!.innerHTML =
+    `<div data-message-item data-message-id="format" data-message-role="assistant"><h2>Options</h2><table><tr><th>Name</th><th>Price</th></tr><tr><td>Small</td><td>$5</td></tr></table><ol start="2"><li>Second<ul><li>Nested</li></ul></li><li>Third</li></ol><pre><code class="language-ts">  const x = 1;\n    return x;\n</code></pre><p>After</p></div>`;
+  const message = f.adapter.snapshot(f.document).messages[0];
+  assert.match(message.html, /<ol start="2">/);
+  assert.match(message.html, /<code class="language-ts">/);
+  assert.match(message.text, /Options\n[\s]*Name\tPrice\nSmall\t\$5/);
+  assert.match(message.text, /2\. Second\n  - Nested\n3\. Third/);
+  assert.match(message.text, /```\n  const x = 1;\n    return x;\n```/);
+  assert.match(message.text, /\nAfter$/);
   f.dom.window.close();
 });

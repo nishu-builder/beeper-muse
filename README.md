@@ -48,7 +48,7 @@ errors or resending tests manually.
 | -------------- | ----------------------------------------------------------------------------------------- |
 | Beeper to Muse | Text prompts; photo uploads in preview (see below)                                        |
 | Muse to Beeper | User and assistant messages with native sender identities                                 |
-| Rich content   | Allowed formatting, links, accessible encrypted images, and edits                         |
+| Rich content   | Headings, tables, lists, code, links, accessible encrypted images, and edits              |
 | Activity       | Observed Muse reactions; typing translation implemented, live display under investigation |
 | Catch-up       | Latest 20 loaded messages, all loaded messages, or only new messages                      |
 

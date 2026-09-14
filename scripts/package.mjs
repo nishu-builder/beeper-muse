@@ -22,6 +22,8 @@ export const extensionFiles = [
   'connection.js',
   'crypto.wasm',
   'MATRIX-CRYPTO-LICENSE',
+  'PARSE5-LICENSE',
+  'ENTITIES-LICENSE',
   'LICENSE',
   'NOTICES.md',
   'icons/icon16.png',

@@ -1,6 +1,8 @@
 /// <reference path="../../src/muse.d.ts" />
 import { AvatarSync } from './avatar.js';
 import { SourceConnectionHealth } from './source-connection.js';
+import { validateSourceHTML } from './formatting.js';
+export { validateSourceHTML } from './formatting.js';
 import { explanations, failureCode } from './diagnostic-log.js';
 import { incomingImage, type IncomingImage } from './media.js';
 import { IndexedDBInbox, receiveTransaction } from '../inbox.js';
@@ -686,11 +688,12 @@ export class BrowserBridge {
         ? 'source'
         : 'observed',
     };
-    // The adapter supplies a small allowed HTML vocabulary. Strip any attributes
-    // beyond safe link URLs at the source boundary (see validateSourceHTML).
     if (message.html && !fallback) {
-      content.format = 'org.matrix.custom.html';
-      content.formatted_body = validateSourceHTML(message.html);
+      const formatted = validateSourceHTML(message.html);
+      if (formatted) {
+        content.format = 'org.matrix.custom.html';
+        content.formatted_body = formatted;
+      }
     }
     const plain = { ...content };
     if (saved) {
@@ -926,19 +929,4 @@ function sourceReactionKeys(value: unknown): string[] | undefined {
     return JSON.stringify([reaction.actor, reaction.key]);
   });
   return [...new Set(keys)].sort();
-}
-export function validateSourceHTML(html: string): string {
-  if (html.length > 200000) throw Error('Muse formatting is too large.');
-  // Fail closed to plain text if the adapter ever returns unfamiliar markup.
-  const allowed =
-    /^(?:p|br|strong|b|em|i|u|s|del|code|pre|blockquote|ul|ol|li|a|span)$/;
-  return html.replace(/<([^>]+)>/g, (_whole, tag: string) => {
-    const match = /^\/?([a-z]+)([^]*)$/i.exec(tag);
-    if (!match || !allowed.test(match[1]!.toLowerCase())) return '';
-    if (tag.startsWith('/')) return '</' + match[1]!.toLowerCase() + '>';
-    if (match[1]!.toLowerCase() !== 'a')
-      return '<' + match[1]!.toLowerCase() + '>';
-    const href = /^\s+href="(https?:\/\/[^"<>\s]+)"\s*$/i.exec(match[2]!);
-    return href ? '<a href="' + href[1] + '">' : '<a>';
-  });
 }
