@@ -10,7 +10,10 @@ export interface HeaderRule {
   priority: number;
   action: {
     type: 'modifyHeaders';
-    requestHeaders: Array<{ header: string; operation: 'set'; value: string }>;
+    requestHeaders: Array<
+      | { header: string; operation: 'set'; value: string }
+      | { header: string; operation: 'remove'; value?: never }
+    >;
   };
   condition: {
     urlFilter: string;
@@ -76,6 +79,9 @@ export function authenticationRule(
         },
         { header: 'X-Mautrix-Process-ID', operation: 'set', value: processID },
         { header: 'X-Mautrix-Websocket-Version', operation: 'set', value: '3' },
+        // The appservice endpoint rejects the Chrome extension Origin. Match
+        // the native, bearer-authenticated handshake on this exact socket only.
+        { header: 'Origin', operation: 'remove' },
       ],
     },
     condition: {

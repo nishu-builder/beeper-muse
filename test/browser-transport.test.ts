@@ -63,6 +63,10 @@ test('authentication is limited to the exact socket URL and this extension initi
   );
   assert.deepEqual(rule.condition.initiatorDomains, [extensionID]);
   assert.deepEqual(rule.condition.resourceTypes, ['websocket']);
+  assert.deepEqual(
+    rule.action.requestHeaders.filter((h) => h.operation === 'remove'),
+    [{ header: 'Origin', operation: 'remove' }],
+  );
   assert.equal(
     rule.action.requestHeaders.find((h) => h.header === 'Authorization')?.value,
     'Bearer ' + registration.appserviceToken,

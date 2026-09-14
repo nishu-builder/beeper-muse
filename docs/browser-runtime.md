@@ -103,7 +103,9 @@ Beeper protocol message or a correlated ping response. Report only the displayed
 The extension has no content scripts or localhost permission. A temporary
 [Chrome request-header rule](https://developer.chrome.com/docs/extensions/reference/api/declarativeNetRequest)
 sets the three appservice headers only on the exact WebSocket URL initiated by
-this extension ID. Credentials never appear in URLs. The rule is removed when
+this extension ID and diagnostic tab. It also removes the Origin header on
+that socket to match the native appservice handshake. Credentials never appear
+in URLs. The rule is removed when
 the test ends, the diagnostic tab closes, or Chrome starts. Cleanup uses the
 same ownership lock as the page, so a worker wakeup cannot clear a live test. Raw server responses and credentials
 are not shown in the popup.
@@ -129,8 +131,9 @@ permission flow and store packaging before release.
 
 Probe 0.1.2 runs the WebSocket from a dedicated extension document. The 0.1.1
 worker test accepted its permission and rule setup but failed the handshake in
-Chrome; worker request interception remains a suspected cause, not an established
-one. The document test also checks Chrome's hypothetical rule match and observes
+Chrome. The document test also failed, despite observing all three required
+authentication headers on the outgoing request; worker interception was not
+established as the cause. The document test also checks Chrome's hypothetical rule match and observes
 handshake metadata via [webRequest](https://developer.chrome.com/docs/extensions/reference/api/webRequest).
 Only verification flags, numeric status codes, and bounded network error codes
 reach the UI. Headers, credentials, URLs, and message bodies are never displayed.
@@ -140,3 +143,10 @@ origin, and diagnostic tab. A Web Lock permits only one connection test at a tim
 This experiment requires keeping its diagnostic tab open for at most 15 seconds.
 It does not establish a production background runtime; encryption, durability,
 and a supported document lifecycle still need implementation and verification.
+
+Probe 0.1.3 removes `Origin` from this narrowly scoped appservice handshake.
+A native API control using the same isolated registration returned HTTP 101 and
+a protocol ping response without Origin, but HTTP 403 with a Chrome extension
+Origin. The diagnostic now reports whether the outgoing Origin header is absent.
+This identifies a server rejection independently of Chrome; a successful live
+Chrome run is still required to confirm the complete fix.

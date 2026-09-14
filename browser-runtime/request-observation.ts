@@ -26,6 +26,11 @@ export function describeRequest(
     return [];
   const lines: string[] = [];
   if (request.requestHeaders) {
+    lines.push(
+      request.requestHeaders.some((h) => h.name.toLowerCase() === 'origin')
+        ? 'Origin: still present'
+        : 'Origin: absent (native handshake)',
+    );
     for (const name of [
       'Authorization',
       'X-Mautrix-Process-ID',

@@ -25,6 +25,7 @@ test('handshake diagnostics verify headers without displaying any values', () =>
     statusCode: 101,
   });
   assert.deepEqual(lines, [
+    'Origin: absent (native handshake)',
     'Authorization: verified',
     'X-Mautrix-Process-ID: verified',
     'X-Mautrix-Websocket-Version: verified',
@@ -53,7 +54,7 @@ test('missing and duplicate headers are not mistaken for correct authentication'
     ],
   ]) {
     const lines = describeRequest(scope, { ...request, requestHeaders });
-    assert.equal(lines[0], 'Authorization: missing or changed');
+    assert.ok(lines.includes('Authorization: missing or changed'));
   }
 });
 test('raw network errors and invalid status values are never reflected', () => {
@@ -69,4 +70,15 @@ test('raw network errors and invalid status values are never reflected', () => {
     }),
     ['Network request failed'],
   );
+});
+
+test('remaining Origin headers are reported without exposing their values', () => {
+  for (const name of ['Origin', 'ORIGIN', 'origin']) {
+    const lines = describeRequest(scope, {
+      ...request,
+      requestHeaders: [{ name, value: 'chrome-extension://private-extension' }],
+    });
+    assert.equal(lines[0], 'Origin: still present');
+    assert.doesNotMatch(lines.join('\n'), /private-extension/);
+  }
 });

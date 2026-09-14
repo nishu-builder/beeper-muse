@@ -53,7 +53,7 @@ const labels: Record<ProbeResult | 'idle' | 'connecting', string> = {
 const status = document.getElementById('status')!;
 const details = document.getElementById('details')!;
 let active: AbortController | undefined;
-let lines: string[] = ['Connection test 0.1.2 — extension document'];
+let lines: string[] = ['Connection test 0.1.3 — extension document'];
 const show = (result: keyof typeof labels) => {
   status.textContent = labels[result];
   details.textContent = lines.join('\n');
@@ -66,7 +66,7 @@ async function run() {
   if (active) return;
   const abort = new AbortController();
   active = abort;
-  lines = ['Connection test 0.1.2 — extension document'];
+  lines = ['Connection test 0.1.3 — extension document'];
   show('connecting');
   try {
     report('Acquiring test ownership');
@@ -149,7 +149,9 @@ async function run() {
               if (addRules?.length) {
                 scope = {
                   ...scope,
-                  headers: addRules[0]!.action.requestHeaders,
+                  headers: addRules[0]!.action.requestHeaders.flatMap((h) =>
+                    h.operation === 'set' ? [h] : [],
+                  ),
                 };
                 const match =
                   await chrome.declarativeNetRequest.testMatchOutcome({
