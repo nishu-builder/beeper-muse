@@ -79,11 +79,13 @@
   async function prepare(
     message: Muse.Message,
     imageLimit = 2 * 1024 * 1024,
+    report: Muse.PreparationReporter = () => {},
   ): Promise<Muse.Message> {
     const images: Muse.Image[] = [];
     let remaining = 4 * 1024 * 1024;
     for (const image of message.images || []) {
       if (!safeImageURL(image.url)) continue;
+      let failure: Muse.PreparationEvent = 'image-fetch-failed';
       try {
         // Ordinary page-origin fetch: no added host permissions or CORS bypass.
         const response = await fetch(image.url, {
@@ -94,14 +96,13 @@
         const mime = (response.headers.get('content-type') || '').split(
           ';',
         )[0]!;
+        if (!response.ok || !response.body) throw Error('Image unavailable');
         if (
-          !response.ok ||
-          !['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(
-            mime,
-          ) ||
-          !response.body
-        )
+          !['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(mime)
+        ) {
+          failure = 'image-format-unsupported';
           throw Error('Image unavailable');
+        }
         const reader = response.body.getReader();
         const chunks: Uint8Array[] = [];
         let size = 0;
@@ -110,8 +111,10 @@
             const chunk = await reader.read();
             if (chunk.done) break;
             size += chunk.value.length;
-            if (size > Math.min(remaining, imageLimit))
+            if (size > Math.min(remaining, imageLimit)) {
+              failure = 'image-too-large';
               throw Error('Image too large');
+            }
             chunks.push(chunk.value);
           }
         } finally {
@@ -129,13 +132,18 @@
           binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
         images.push({ ...image, data: btoa(binary), mime });
         remaining -= size;
+        report('image-prepared');
       } catch {
+        report(failure);
         images.push(image);
       }
     }
     return { ...message, images };
   }
-  function create(document: Document): Muse.Adapter {
+  function create(
+    document: Document,
+    report?: Muse.PreparationReporter,
+  ): Muse.Adapter {
     let cached: { url: string; at: number; profile: Muse.Profile } | undefined;
     return {
       capabilities: {
@@ -170,7 +178,7 @@
       submitImage: (prompt, image, wait, active) =>
         submitImage(document, prompt, image, wait, active),
       submit: (prompt, wait, active) => submit(document, prompt, wait, active),
-      prepare,
+      prepare: (message) => prepare(message, undefined, report),
     };
   }
   function text(element: Element, role: Muse.Role) {

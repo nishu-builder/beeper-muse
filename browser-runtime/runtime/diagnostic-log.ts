@@ -30,6 +30,10 @@ export type FailureCode = keyof typeof explanations;
 const events = new Set<string>([
   ...Object.keys(explanations),
   'image-readiness',
+  'image-prepared',
+  'image-fetch-failed',
+  'image-format-unsupported',
+  'image-too-large',
   'image-upload-start',
   'image-submitted',
   'text-submit-start',

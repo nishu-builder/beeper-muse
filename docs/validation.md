@@ -422,3 +422,26 @@ replayed or following text sent; native SUCCESS remains pending live verificatio
 
 Read-only Desktop observation confirmed that this test's correct reply also
 returned to Beeper (roundTrip=true). Native failure remains; it was not resent.
+
+## Passed live incoming photo and follow-up text (0.8.14)
+
+A fresh small PNG test returned the correct undisclosed color and exact marker in
+Beeper, with native SUCCESS/deliveredToUsers identifying Muse. A subsequent plain
+text test returned its exact marker and native SUCCESS too. Both reports record
+roundTrip=true, nativeDelivery=true, nativeFailure=false and duplicate=false.
+The queue claim released between attempts; no user dismissal was required for
+either successful job. Tests refused to enqueue while a prior claim was still
+present. The earlier failed test journals were retained without replay.
+
+This verifies the incoming photo → text path for the synthetic image, not every
+image format/size, visible client indicators or OS notification behavior. The
+Muse-to-Beeper generated-image scenario is a separate check.
+
+## Reverse-image diagnostic boundary (0.8.15)
+
+The marked generation reply returned with native SUCCESS. Muse rendered a
+separate image in the same source turn; the recent Desktop message list did not
+show it. The automatic checker requires an attachment on the marked reply, so
+that scenario remains unverified. No generation was replayed. Fixed preparation
+codes now distinguish fetching, unsupported formats and exceeded size budgets;
+regression tests check these without logging image URLs or response contents.

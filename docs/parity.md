@@ -10,17 +10,11 @@ The product remains Chrome-only. Maintainer test tools are optional.
 
 ## Current priorities
 
-1. Complete the live iteration loop. Beeper Desktop's API recovered after restart.
-   Fresh 0.8.9 diagnostics allowed a new text test; its round trip passed. After
-   the 0.8.10 status fix, that same test also reports native delivery. Automatic
-   reload, diagnostic-file retention and selected-tab recovery were verified
-   during the 0.8.10 → 0.8.11 update; the held photo job stayed held.
-2. Finish native photo confirmation. Two submitted photos received correct
-   undisclosed test-color replies, but reply matching still failed in 0.8.13.
-   Live inspection established that the media button and caption are both
-   top-level bubble surfaces. Version 0.8.14 reads both, with an exact synthetic
-   layout regression. Native SUCCESS and post-photo text remain unverified;
-   the newest already submitted test is held and must not be replayed.
+1. The live 0.8.14 photo → text sequence passed: both uniquely marked replies
+   returned to Beeper with native SUCCESS. Fresh logs and automatic local updates
+   work. Keep broader update/restart cases and unattended recovery on the ledger.
+2. Verify Muse-to-Beeper image generation separately, then broaden photo coverage
+   beyond the single small PNG used in the successful incoming-photo test.
 3. Verify the new Babar avatar synchronization and diagnose missing typing indicators.
 4. Verify both-direction photos and native delivery status end to end.
 5. Work through the rendering/type inventory below; inspect actual source support
@@ -56,9 +50,9 @@ A newly opened Muse tab now supports live DOM inspection; see the latest entry.
 
 | ID      | Report / desired behavior                                         | Implementation and evidence                                                                                                                                                                                                    | Status / next acceptance                                                                                                                                                                             |
 | ------- | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| REL-01  | Incoming Beeper photo never reached Muse                          | Media download/decryption works; live attempt interrupted. Readiness shows composer has no native form. 0.8.3 removes that assumption with bounded container discovery.                                                        | **Open.** Confirm actual input, preview, submission and correct image-aware response.                                                                                                                |
-| REL-02  | Interrupted photo blocks later text                               | 0.8.2 lets known pre-upload failures release later work. Unknown old attempts remain held and visible.                                                                                                                         | **Partial.** Verify recovery of the existing held job and subsequent text. Never auto-retry it.                                                                                                      |
-| REL-03  | Beeper says Sent without confirmed delivery                       | Native PENDING/FAIL_PERMANENT/SUCCESS events implemented; success waits for a matched source echo and reply.                                                                                                                   | **Open live verification.** Confirm pending/failure/delivered states in Desktop and mobile, not just HTTP acceptance.                                                                                |
+| REL-01  | Incoming Beeper photo never reached Muse                          | **Live verified in 0.8.14:** synthetic PNG received and interpreted correctly by Muse; exact reply returned to Beeper with native SUCCESS.                                                                                     | Broaden formats, sizes and multiple-image coverage; do not claim all attachments are verified.                                                                                                       |
+| REL-02  | Interrupted photo blocks later text                               | User dismissed the earlier held attempts. A fresh 0.8.14 photo and subsequent text both passed with native SUCCESS; the completed photo released its queue claim.                                                              | Successful photo → text verified. Ambiguous interrupted sends remain held for inspection, without replay.                                                                                            |
+| REL-03  | Beeper says Sent without confirmed delivery                       | Live photo and text tests in 0.8.14 each returned exact replies and native SUCCESS naming Muse as the delivered recipient. Earlier failed attempts exposed native failure.                                                     | Native API status verified for these cases; visible Desktop/mobile pending and delivery labels still require observation.                                                                            |
 | REL-04  | Too much manual testing and relaying errors                       | Typed Desktop API driver, send journal, sanitized reports, local updater and chosen log file implemented. File grant and fresh 0.8.2 heartbeat observed. Logging later became stale during update attempt.                     | **Partial.** Complete unattended build → reload → heartbeat → text/photo/text cycle; verify file grant survives updates.                                                                             |
 | REL-05  | Connect button appears to do nothing / misleading Connected state | Separate Beeper/Muse states, queue information and error descriptions implemented.                                                                                                                                             | **Partial.** Exercise stale scripts, disconnected source, held queue and reconnect UI. Connected transport must not imply successful delivery.                                                       |
 | ID-01   | Chat avatar should match Muse                                     | User explicitly chose **Babar's Muse assistant picture**, not the extension icon. Live Matrix reads show neither room nor bot avatar set.                                                                                      | **Implemented, not live verified (0.8.4).** Typed profile sync, native metadata, deduplication and partial retry tests added. Verify actual Babar selection, client display and restart persistence. |
@@ -403,3 +397,32 @@ passing synthetic coverage alone does not close REL-01/REL-03.
 
 Read-only Desktop observation confirmed that this test's correct reply also
 returned to Beeper (roundTrip=true). Native failure remains; it was not resent.
+
+## September 14 acceptance: photo followed by text (0.8.14)
+
+After the user dismissed the already submitted failed test, fresh diagnostics
+confirmed the exact 0.8.14 build, both connections, ready source and zero queued,
+claimed, blocked and pending work. A new synthetic image test passed:
+roundTrip=true, nativeDelivery=true, nativeFailure=false and duplicate=false.
+Its undisclosed color was correctly identified. The driver archived that success.
+
+The next text test waited for the photo job to finish its source capture and
+release its claim. It then passed both exact reply and native delivery without
+another user action. Preflight refusals while a claim was still present did not
+send messages. No uncertain prior photo was replayed. These are live Desktop API
+and source observations; client animation, notification suppression and original
+timestamps are not established by them. A separate generated-image test is underway.
+
+## Reverse-image investigation and diagnostics (0.8.15)
+
+The generated-image test's marked text reply reached Beeper with native SUCCESS.
+Browser inspection found a separate image message in that same Muse turn, but
+Desktop's recent message list did not show that image. The strict automatic
+checker also requires media on the marked reply itself; its unverified result
+must not be treated as either a passed image test or definitive transport failure.
+The active test journal remains open and no generation prompt was resent.
+
+Image preparation previously swallowed fetch, format and size failures while
+retaining only the source URL. Version 0.8.15 reports fixed diagnostic codes for
+those cases and successful preparation, without identifiers, URLs or contents.
+Synthetic tests cover the error distinctions and successful data preparation.
