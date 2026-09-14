@@ -139,6 +139,7 @@ export async function sendOnce(
 ) {
   if (run.phase !== 'prepared')
     throw new DevError('This run may already have sent. Observe it instead.');
+  await desktop.verifySendPath(run.target);
   // Persist BEFORE any mutation. Losing an upload/send response never causes replay.
   run.phase = 'sending';
   await save(run);

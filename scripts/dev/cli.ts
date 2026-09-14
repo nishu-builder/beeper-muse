@@ -85,6 +85,14 @@ try {
         checks.messageSearch =
           error instanceof DevError ? error.message : 'Unavailable';
       }
+    if (checks.target === 'passed')
+      try {
+        await desktop.verifySendPath(target);
+        checks.sendPath = 'passed';
+      } catch (error) {
+        checks.sendPath =
+          error instanceof DevError ? error.message : 'Unavailable';
+      }
     try {
       const raw = await readLog(),
         d = diagnostics(raw);
@@ -94,7 +102,10 @@ try {
       checks.collectionFresh = d.collectionFresh;
       checks.recentEvents = d.events.slice(-12);
       ready(raw, version, build);
-      checks.readyToTest = true;
+      checks.readyToTest =
+        checks.target === 'passed' &&
+        checks.messageSearch === 'passed' &&
+        checks.sendPath === 'passed';
     } catch (error) {
       checks.readyToTest = false;
       checks.diagnostics =

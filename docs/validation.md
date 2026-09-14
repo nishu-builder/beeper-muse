@@ -314,3 +314,24 @@ are not evidence of a successful live image submission.
 Staging the new local package was followed by the diagnostic file ceasing to
 advance after 21:50:15 UTC. Automatic reload and file-grant retention therefore
 remain unverified; disk package contents do not establish the running version.
+
+## Desktop preflight and subsequent connection report
+
+The selected log later confirmed the exact 0.8.9 fingerprint, then stopped
+advancing at 22:04:35 UTC. The user reports Muse connected; Desktop's account
+API independently reports connected. Current source health, queue state and
+image-input recognition remain unverified because that log is stale.
+
+Read-only get-chat calls using both documented identifier forms return HTTP 500.
+Listing and message search succeed. The updated development doctor detects the
+failed per-chat prerequisite separately and exits with status 2. No test was sent.
+Synthetic driver regressions verify that working listing cannot authorize a send
+when retrieval fails, and reject incorrect identity, malformed and read-only
+chat details. A successful preflight is not delivery confirmation.
+
+The prior text-send journal remains open. No photo or subsequent text test was
+sent, no user job was dismissed and no installed Beeper app code was changed.
+
+After a user-performed Beeper Desktop restart, the same read-only doctor passes
+identity, search and per-chat retrieval. The restart cleared the observed API
+failure. It still refuses a test because the diagnostic file is stale.
