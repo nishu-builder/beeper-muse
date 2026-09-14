@@ -8,6 +8,29 @@ connects your dedicated Muse chat in Beeper to your signed-in Muse browser tab.
 The maintainer does not operate a message relay, analytics service, or advertising
 service for this extension.
 
+## Chrome-only preview
+
+Version 0.6.0 connects directly from Chrome to `matrix.beeper.com` over HTTPS
+and WebSocket. It does not contact a localhost service. Its one-time registration
+setup uses Beeper's official bridge manager. The imported application-service
+credential stays in trusted extension storage and is never sent to the Muse
+page or Chrome Sync.
+
+IndexedDB stores the device access token, encrypted crypto database, its local
+passphrase, source IDs and hashes, pending encrypted Matrix transactions and
+outgoing batches, and pending Muse prompts. Completed prompt bodies and outgoing
+batch payloads are cleared after delivery. Deduplication receipts are retained.
+The operating system and browser profile backups can retain deleted data. The
+`unlimitedStorage` permission protects extension storage from Chrome's ordinary
+quota eviction; it does not protect against disk failure or removal of the
+extension. Uninstalling the extension deletes its local keys and work.
+
+The preview reads the same selected Muse conversation described below, including
+observed reactions and activity. It sends reactions as Matrix annotations and
+activity as a typing signal. The maintainer receives no messages, credentials,
+or telemetry. The remaining references to a local companion describe releases
+through 0.5.3.
+
 ## Information used
 
 - **Prompts and replies:** the local bridge receives new text messages from your

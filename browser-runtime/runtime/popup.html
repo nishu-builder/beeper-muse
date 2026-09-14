@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Beeper Muse</title>
+    <link rel="stylesheet" href="popup.css" />
+  </head>
+  <body>
+    <main>
+      <header>
+        <img src="icons/icon48.png" width="40" height="40" alt="" />
+        <div>
+          <h1>Beeper Muse</h1>
+          <p class="subtitle">Your Muse conversation, in Beeper.</p>
+        </div>
+      </header>
+      <p id="status" class="status" role="status" aria-live="polite">
+        Checking connection…
+      </p>
+      <section id="setup" hidden>
+        <h2>Connect Beeper</h2>
+        <p>
+          Import the private registration file from setup. It stays on this
+          Chrome profile.
+        </p>
+        <label for="registration">Beeper registration JSON</label
+        ><input id="registration" type="file" accept="application/json,.json" />
+        <p class="note">Never share this file or upload it to GitHub.</p>
+      </section>
+      <section id="controls" hidden>
+        <label for="history">Catch up when connecting</label
+        ><select id="history">
+          <option value="recent">Latest 20 loaded messages</option>
+          <option value="all">All messages loaded in Muse</option>
+          <option value="new">Only new messages</option>
+        </select>
+        <button id="connect" class="primary">Connect this Muse tab</button
+        ><button id="rescan">Catch up now</button
+        ><button id="disconnect">Disconnect tab</button>
+        <p id="progress" class="note"></p>
+        <p class="note">
+          Keep the Muse tab open and its composer empty. Chrome asks before
+          closing it after you interact with the page. Disconnect first to close
+          it without that warning.
+        </p>
+        <p class="note">
+          Messages, formatting, accessible images, reactions, and Muse typing
+          activity sync to Beeper. Approvals and other interactive controls stay
+          in Muse. Catch-up covers messages loaded on the page.
+        </p>
+        <div id="blocked"></div>
+        <details>
+          <summary>Connection</summary>
+          <button id="resume">Reconnect Beeper</button
+          ><button id="pause">Pause Beeper connection</button>
+          <p class="note">
+            Everything runs in Chrome. Closing Chrome pauses the bridge;
+            reopening it resumes delivery. Removing the extension deletes its
+            local encryption keys and saved work.
+          </p>
+        </details>
+      </section>
+      <footer>
+        <a
+          href="https://github.com/nishu-builder/beeper-muse/blob/main/docs/chrome-setup.md"
+          target="_blank"
+          rel="noreferrer"
+          >Setup guide</a
+        ><a
+          href="https://github.com/nishu-builder/beeper-muse/blob/main/PRIVACY.md"
+          target="_blank"
+          rel="noreferrer"
+          >Privacy</a
+        ><span>Chrome runtime preview</span>
+      </footer>
+    </main>
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

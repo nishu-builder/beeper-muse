@@ -8,6 +8,11 @@ bridge.
 [Setup guide](docs/setup.md) · [Extension download](https://github.com/nishu-builder/beeper-muse/releases/latest)
 · [Privacy](PRIVACY.md) · [Troubleshooting](docs/operations.md)
 
+**Chrome-only preview:** [setup instructions](docs/chrome-setup.md). Version
+0.6.0 bundles encryption and durable storage in Chrome; no companion runs during
+use. Live Chrome acceptance testing is still in progress. The instructions below
+are for the existing companion release.
+
 The source now includes version 0.5.3 structured message sync. Build
 both the local bridge and extension from this source to use them; the existing
 0.3.0 release ZIP does not include these changes. See [the component design](docs/architecture.md)

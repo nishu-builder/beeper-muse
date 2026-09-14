@@ -44,7 +44,9 @@ export function endpoint(registration: Registration): string {
   ) {
     throw new Error('Expected a Beeper homeserver URL.');
   }
-  if (!/^sh-muse-probe-[a-f0-9]{12}$/.test(registration.registrationID)) {
+  if (
+    !/^sh-muse-(?:probe|chrome)-[a-f0-9]{12}$/.test(registration.registrationID)
+  ) {
     throw new Error('Use a separate Chrome probe registration.');
   }
   if (!/^[\x21-\x7e]{16,4096}$/.test(registration.appserviceToken)) {
