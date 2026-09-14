@@ -335,3 +335,25 @@ sent, no user job was dismissed and no installed Beeper app code was changed.
 After a user-performed Beeper Desktop restart, the same read-only doctor passes
 identity, search and per-chat retrieval. The restart cleared the observed API
 failure. It still refuses a test because the diagnostic file is stale.
+
+## Live text and native status confirmation (0.8.10)
+
+After Desktop restart and renewed diagnostic-file permission, fresh 0.8.9 health
+showed both connections, idle composer and empty queue. A newly journaled text
+test returned its unique expected reply. Search and message-list API responses
+initially omitted sendStatus despite the successful round trip.
+
+The installed Desktop mapper drops status values lacking a timestamp; the
+bridge's status content had no ts. Version 0.8.10 supplies a persisted timestamp,
+bridge identity and bot sender. The extension updated automatically, and the
+same test then passed native SUCCESS with the Muse bot in deliveredToUsers. No
+resend was needed. See the documented
+[Beeper sendStatus fields](https://developers.beeper.com/desktop-api-reference/resources/messages/methods/list/).
+
+The chosen diagnostic file continued advancing across that update. The selected
+Muse tab did not resume: reconnect validation used the wrong Chrome document-ID
+format. The validator now accepts nonzero 32-character hex tokens and preserves
+exact document targeting. Synthetic tests cover valid upper/lowercase tokens,
+invalid lengths/characters and expired tickets. Live reconnect remains pending.
+Typing source/transport events were observed; client animations, avatar display
+and incoming photo submission are not yet verified.

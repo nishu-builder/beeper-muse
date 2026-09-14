@@ -28,6 +28,7 @@ async function harness(beforeEncrypt: () => Promise<void> = async () => {}) {
     inbox = await IndexedDBInbox.open(config, factory);
   const batches: Record<string, any>[] = [];
   const statuses: Record<string, any>[] = [];
+  const statusAttempts: { path: string; content: Record<string, any> }[] = [];
   const redactions: string[] = [];
   let statusFailure = false;
   let fail = false;
@@ -43,6 +44,11 @@ async function harness(beforeEncrypt: () => Promise<void> = async () => {}) {
       'Bearer synthetic-test-token',
     );
     if (url.pathname.includes('/send/com.beeper.message_send_status/')) {
+      assert.equal(url.searchParams.get('user_id'), config.bot);
+      statusAttempts.push({
+        path: url.pathname,
+        content: JSON.parse(String(init?.body)),
+      });
       if (statusFailure) throw Error('Synthetic status failure');
       statuses.push(JSON.parse(String(init?.body)));
       return Response.json({ event_id: '$status' });
@@ -104,6 +110,7 @@ async function harness(beforeEncrypt: () => Promise<void> = async () => {}) {
     state,
     batches,
     statuses,
+    statusAttempts,
     redactions,
     set statusFailure(value: boolean) {
       statusFailure = value;
@@ -823,6 +830,9 @@ test('native status stays pending until Muse confirms, and interrupted sends fai
   const h = await harness();
   await receivePhoto(h);
   assert.equal(h.statuses.at(-1)?.status, 'PENDING');
+  assert.ok(Number.isSafeInteger(h.statuses.at(-1)?.ts));
+  assert.ok(h.statuses.at(-1)!.ts > 0);
+  assert.equal(h.statuses.at(-1)?.network, 'muse://muse');
   assert.deepEqual(h.statuses.at(-1)?.delivered_to_users, []);
   await h.bridge.claim();
   assert.equal(h.statuses.at(-1)?.status, 'PENDING');
@@ -875,7 +885,39 @@ test('failed status requests retry independently without resubmitting the prompt
   h.statusFailure = false;
   await h.bridge.tick();
   assert.equal(h.statuses.at(-1)?.status, 'PENDING');
+  assert.ok(h.statusAttempts.length >= 2);
+  assert.ok(
+    h.statusAttempts.every(
+      (attempt) =>
+        attempt.path === h.statusAttempts[0]!.path &&
+        attempt.content.ts === h.statusAttempts[0]!.content.ts,
+    ),
+  );
   assert.equal((await h.bridge.claim()).job, null);
+  h.close();
+});
+
+test('legacy confirmed jobs receive timestamped status once without replaying a prompt', async () => {
+  const h = await harness();
+  await h.state.put('jobs', [
+    {
+      id: '$legacy',
+      prompt: 'Already delivered',
+      phase: 'done',
+      confirmed: true,
+      statusFingerprint: '$legacy-untimestamped-status',
+    },
+  ]);
+  await h.bridge.tick();
+  assert.equal(h.statuses.length, 1);
+  assert.equal(h.statuses[0]?.status, 'SUCCESS');
+  assert.ok(Number.isSafeInteger(h.statuses[0]?.ts));
+  assert.deepEqual(h.statuses[0]?.delivered_to_users, [config.bot]);
+  assert.equal(h.statuses[0]?.['m.relates_to'].event_id, '$legacy');
+  await h.bridge.tick();
+  assert.equal(h.statuses.length, 1);
+  assert.equal((await h.bridge.claim()).job, null);
+  assert.equal(h.batches.length, 0);
   h.close();
 });
 

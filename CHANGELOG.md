@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.10
+
+- Include a persisted timestamp and bridge identity in native delivery-status
+  events, sent as the Muse bot. Beeper Desktop can omit timestamp-free statuses
+  from its API even when a message made the round trip.
+- Preserve status timestamps and transaction IDs across retries. Repair saved
+  status metadata without resending the underlying prompts.
+- Accept Chrome's actual document-token format when restoring the selected Muse
+  tab after updates. Previously, valid reconnection records were discarded.
+- Check Desktop chat access before development-test uploads or sends.
+
 ## 0.8.9
 
 - Recognize composer image pickers that use filename extensions or no accept
