@@ -373,3 +373,15 @@ now waits rather than throwing an unrelated-message error. Different or multiple
 new user messages still fail attribution. Regression coverage uses a synthetic
 version of this observed layout. The submitted test remains held and its journal
 is retained; parser changes must not resubmit it.
+
+The 0.8.13 local update automatically reconnected and retained fresh diagnostic
+logging and the held submitted job. No replay occurred. The fix's new-attempt
+native SUCCESS and post-photo text checks await dismissal of that test.
+
+Read-only inspection also explained ID-01: the named Babar avatar is an autoplaying
+video, not an img element. Its aria-labelled data-hatch-avatar-interaction wrapper
+owns a video marked data-hatch-media-owner=avatar-layer and slot=current. The
+image-only avatar selector therefore cannot find it. Next: support a bounded,
+cached still frame from the uniquely identified current avatar, preserve original
+image support, and verify the resulting native chat avatar. Do not infer typing
+from avatar animation. No avatar implementation is claimed by this entry.
