@@ -62,7 +62,7 @@ Chrome, Muse, and Beeper.
 | User / assistant role                   | Owner Matrix identity / Muse bridge identity                      |
 | Text and allowed formatting             | `m.text`, plain-text fallback, sanitized `org.matrix.custom.html` |
 | Accessible image                        | Encrypted media upload and `m.image`                              |
-| Changed content with the same source ID | `m.replace` edit; removed image parts are redacted                |
+| Changed content with the same source ID | `m.replace` edit; explicit image-removal parity remains open      |
 | Observed reaction / removal             | `m.reaction` annotation / redaction                               |
 | Muse working / idle                     | Expiring typing notification / typing cleared                     |
 | Historical message                      | Notification-suppressed batch with read state                     |
@@ -78,8 +78,10 @@ Typing uses a lightweight activity observation, independent of transcript reads
 and composer availability. Every four seconds the connected worker asks the
 selected Muse tab for a fresh observation, so renewal does not rely on the page's
 background timers. The source recognizes visible Stop/Stop generating controls
-outside the transcript and explicit busy state scoped to the composer or named
-assistant header. Historical tool cards and whole-page loading are excluded. Working
+outside the transcript and explicit busy state scoped to the composer or current
+assistant message renderer. The latter is present in a previously captured Muse
+page. Avatar loading, older turns, nested tool/image loading and whole-page loading
+are excluded. Working
 state renews at most once every five seconds with a twelve-second Matrix expiry;
 idle clears it. The worker does not replay cached activity when the source tab
 stops responding. Chrome suspension and page freezing can still interrupt updates.
@@ -218,3 +220,18 @@ reply export does not reverse already confirmed delivery. Deterministic status
 transaction IDs and saved fingerprints allow retries without resending prompts.
 Legacy completed jobs are not relabeled. Native status display still needs client
 verification; source confirmation is a website observation rather than an API receipt.
+
+## Revision and reaction recovery
+
+Content hashes identify unchanged observations, not unique events. Each committed
+source revision has a durable increasing revision number. A text/image reversion
+or re-added reaction gets a fresh Matrix event ID; network retries reuse the exact
+journaled IDs and ciphertext. Original events retain their source time. Updates
+use strictly increasing observation times so clients can order edits correctly.
+
+Absent reaction observations preserve the last known set. Only an explicit valid
+array can add or remove reactions; malformed arrays are rejected in full. Reaction
+redactions are journaled with deterministic transaction IDs alongside message
+events, before sending. Pending mutations finish before a newer observation is
+compared with saved state, including when that observation reverts to older text
+or re-adds a reaction whose removal had an uncertain response.

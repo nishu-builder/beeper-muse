@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.8.5
+
+- Preserve known reactions when source observation is unknown; reject malformed
+  observations without treating them as removals.
+- Give re-added reactions and reverted text/images fresh event IDs. Keep original
+  message timestamps while ordering revisions by increasing observation times.
+- Journal reaction removals before sending and recover pending mutations before
+  comparing newer source content, including reversions after a lost response.
+- Detect busy state on the current assistant message renderer, based on previously
+  captured Muse markup. Exclude avatar loading and older/nested activity.
+- Live browser access and fresh diagnostics remain prerequisites for verifying
+  the interrupted upload, queued text, avatar and visible typing.
+
 ## 0.8.4
 
 - Add a persistent parity ledger covering reported reliability issues, native

@@ -244,15 +244,45 @@
       ...document.querySelectorAll('textarea[aria-label="Message"]'),
     ].find(visible);
     const busy = field?.closest('[aria-busy="true"]');
-    const header = assistantAvatar(document)?.closest('header,[role="banner"]');
+    const logs = [
+      ...document.querySelectorAll('[role="log"][aria-label="Chat messages"]'),
+    ].filter(visible);
+    const items =
+      logs.length === 1
+        ? [...logs[0]!.querySelectorAll('[data-message-item]')]
+        : [];
+    const latest = items.at(-1);
+    // Observed Muse markup puts aria-busy on the assistant message renderer,
+    // one wrapper below the item. Do not infer work from historical tool cards,
+    // loading images, an assistant avatar, or older turns still in the DOM.
+    const turn = latest?.getAttribute('data-message-turn-id');
+    const lastUser = items
+      .map((item) => item.getAttribute('data-message-role'))
+      .lastIndexOf('user');
+    const current =
+      latest?.getAttribute('data-message-role') === 'assistant'
+        ? items
+            .slice(lastUser + 1)
+            .filter(
+              (item) =>
+                item === latest ||
+                (!!turn && item.getAttribute('data-message-turn-id') === turn),
+            )
+        : [];
+    const assistantBusy = current.some(
+      (item) =>
+        item.getAttribute('data-message-role') === 'assistant' &&
+        [
+          ...item.querySelectorAll(
+            ':scope > [aria-busy="true"], :scope > div > [aria-busy="true"]',
+          ),
+        ].some(visible),
+    );
     return {
       stopButtons: Math.min(stopButtons, 100),
       composerBusy:
         !!busy && !busy.querySelector('[role="log"],[data-message-item]'),
-      assistantBusy:
-        !!header &&
-        (header.getAttribute('aria-busy') === 'true' ||
-          [...header.querySelectorAll('[aria-busy="true"]')].some(visible)),
+      assistantBusy,
     };
   }
   function activity(document: Document): Muse.Activity {

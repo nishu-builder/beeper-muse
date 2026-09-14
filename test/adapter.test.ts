@@ -141,8 +141,44 @@ test('typing recognizes current Stop variants and scoped busy regions, excluding
       'afterbegin',
       '<header aria-busy="true"><img alt="Babar" src="/avatar.png"></header>',
     );
-    assert.equal(await adapter.activity(), 'working');
+    assert.equal(
+      await adapter.activity(),
+      'idle',
+      'an avatar loading does not establish assistant work',
+    );
     f.document.querySelector('header')!.removeAttribute('aria-busy');
+    assert.equal(await adapter.activity(), 'idle');
+  } finally {
+    f.dom.window.close();
+  }
+});
+test('typing follows the current assistant renderer rather than older turns or nested loading widgets', async () => {
+  const f = fixture();
+  try {
+    const adapter = f.adapter.create(f.document);
+    const log = f.document.querySelector('[role="log"]')!;
+    // Structure follows the previously captured Muse message renderer. All
+    // identities/content are synthetic; the private page snapshot is not bundled.
+    log.innerHTML =
+      '<div data-message-item data-message-role="assistant" data-message-turn-id="old"><div class="opacity-100"><div aria-busy="true"><div data-chat-bubble-surface-position="single">Old task</div></div></div></div>' +
+      '<div data-message-item data-message-role="user">New prompt</div>' +
+      '<div data-message-item data-message-role="assistant" data-message-turn-id="current"><div class="opacity-100"><div aria-busy="false"><div data-chat-bubble-surface-position="single"><div class="hatch-chat-groupable-bubble"><img aria-busy="true" src="/loading.png"></div></div></div></div></div>';
+    assert.equal(await adapter.activity(), 'idle');
+    const renderer = log.lastElementChild!.querySelector('div[aria-busy]')!;
+    renderer.setAttribute('aria-busy', 'true');
+    assert.equal(await adapter.activity(), 'working');
+    log.insertAdjacentHTML(
+      'beforeend',
+      '<div data-message-item data-message-role="assistant" data-message-turn-id="current"><div><div aria-busy="false">Same turn status</div></div></div>',
+    );
+    assert.equal(await adapter.activity(), 'working');
+    renderer.setAttribute('aria-busy', 'false');
+    assert.equal(await adapter.activity(), 'idle');
+    renderer.setAttribute('aria-busy', 'true');
+    log.insertAdjacentHTML(
+      'beforeend',
+      '<div data-message-item data-message-role="user">A newer prompt</div>',
+    );
     assert.equal(await adapter.activity(), 'idle');
   } finally {
     f.dom.window.close();

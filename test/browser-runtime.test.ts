@@ -28,10 +28,12 @@ async function harness(beforeEncrypt: () => Promise<void> = async () => {}) {
     inbox = await IndexedDBInbox.open(config, factory);
   const batches: Record<string, any>[] = [];
   const statuses: Record<string, any>[] = [];
+  const redactions: string[] = [];
   let statusFailure = false;
   let fail = false;
   let outsider = false;
   let imageFailure = false;
+  let redactionFailure = false;
   let downloads = 0;
   let encryptions = 0;
   const api = new MatrixAPI(config, async (input, init) => {
@@ -62,8 +64,13 @@ async function harness(beforeEncrypt: () => Promise<void> = async () => {}) {
       });
     }
     if (url.pathname.includes('/receipt/')) return Response.json({});
-    if (url.pathname.includes('/redact/'))
+    if (url.pathname.includes('/redact/')) {
+      redactions.push(
+        decodeURIComponent(url.pathname.split('/redact/')[1]!.split('/')[0]!),
+      );
+      if (redactionFailure) throw Error('Synthetic lost redaction response');
       return Response.json({ event_id: '$redaction' });
+    }
     throw Error('Unexpected request in test');
   });
   const crypto = {
@@ -97,6 +104,7 @@ async function harness(beforeEncrypt: () => Promise<void> = async () => {}) {
     state,
     batches,
     statuses,
+    redactions,
     set statusFailure(value: boolean) {
       statusFailure = value;
     },
@@ -109,6 +117,9 @@ async function harness(beforeEncrypt: () => Promise<void> = async () => {}) {
     },
     set imageFailure(value: boolean) {
       imageFailure = value;
+    },
+    set redactionFailure(value: boolean) {
+      redactionFailure = value;
     },
     get downloads() {
       return downloads;
@@ -195,6 +206,161 @@ test('reaction-only changes use annotations without manufacturing a text edit', 
     h.batches[0]!.events[0].event_id,
   );
   h.close();
+});
+
+test('unknown reactions preserve known state; explicit removal and re-addition produce a new native reaction', async (t) => {
+  const h = await harness();
+  t.after(h.close);
+  const message = {
+    id: 'reaction-cycle',
+    role: 'assistant' as const,
+    text: 'A reply',
+    timestampMs: 123456,
+  };
+  const reaction = { actor: 'user' as const, key: 'synthetic reaction' };
+  await h.bridge.importMessages([{ ...message, reactions: [reaction] }]);
+  const first = h.batches[0]!.events.find((e: any) => e.type === 'm.reaction');
+  assert.equal((await h.bridge.importMessages([message])).added, 0);
+  assert.equal(h.redactions.length, 0);
+  await h.bridge.importMessages([{ ...message, text: 'An edited reply' }]);
+  assert.equal(
+    h.redactions.length,
+    0,
+    'unreadable reaction controls cannot erase an existing reaction during an edit',
+  );
+  await h.bridge.importMessages([message]);
+  await h.bridge.importMessages([{ ...message, reactions: [] }]);
+  assert.deepEqual(h.redactions, [first.event_id]);
+  await h.bridge.importMessages([{ ...message, reactions: [reaction] }]);
+  const readded = h.batches.at(-1)!.events[0];
+  assert.equal(readded.type, 'm.reaction');
+  assert.notEqual(readded.event_id, first.event_id);
+  assert.equal(
+    readded.content['m.relates_to'].event_id,
+    first.content['m.relates_to'].event_id,
+  );
+  assert.equal(readded.sender, config.owner);
+  assert.ok(readded.origin_server_ts > first.origin_server_ts);
+});
+
+test('malformed reaction observations cannot become an authoritative empty set', async (t) => {
+  const h = await harness();
+  t.after(h.close);
+  const message = {
+    id: 'malformed-reaction',
+    role: 'assistant' as const,
+    text: 'Reply',
+    reactions: [{ actor: 'assistant' as const, key: 'ack' }],
+  };
+  await h.bridge.importMessages([message]);
+  for (const reactions of [
+    null,
+    {},
+    ['wrong'],
+    [{ actor: 'other', key: 'ack' }],
+    [{ actor: 'user', key: '' }],
+    Array.from({ length: 33 }, () => ({ actor: 'user', key: 'x' })),
+  ]) {
+    await assert.rejects(
+      h.bridge.importMessages([{ ...message, reactions } as any]),
+    );
+  }
+  assert.equal(h.redactions.length, 0);
+  assert.equal(h.batches.length, 1);
+});
+
+test('an uncertain reaction removal is journaled and recovered before a source re-addition', async (t) => {
+  const h = await harness();
+  t.after(h.close);
+  const message = {
+    id: 'uncertain-removal',
+    role: 'assistant' as const,
+    text: 'Reply',
+    reactions: [{ actor: 'assistant' as const, key: 'ack' }],
+  };
+  await h.bridge.importMessages([message]);
+  const original = h.batches[0]!.events.find(
+    (e: any) => e.type === 'm.reaction',
+  ).event_id;
+  h.redactionFailure = true;
+  await assert.rejects(
+    h.bridge.importMessages([{ ...message, reactions: [] }]),
+  );
+  const pending = await h.state.get<{ redactions: unknown[] }>(
+    'delivery:' + message.id,
+  );
+  assert.equal(pending?.redactions.length, 1);
+  h.redactionFailure = false;
+  await h.bridge.importMessages([message]);
+  assert.deepEqual(h.redactions, [original, original]);
+  assert.equal(h.batches.at(-1)!.events[0].type, 'm.reaction');
+  assert.notEqual(h.batches.at(-1)!.events[0].event_id, original);
+  assert.equal(await h.state.get('delivery:' + message.id), null);
+});
+
+test('a source reverting after an uncertain edit recovers the pending batch then emits the reversion', async (t) => {
+  const h = await harness();
+  t.after(h.close);
+  const message = {
+    id: 'uncertain-edit',
+    role: 'assistant' as const,
+    text: 'Original',
+  };
+  await h.bridge.importMessages([message]);
+  h.fail = true;
+  await assert.rejects(
+    h.bridge.importMessages([{ ...message, text: 'Changed' }]),
+  );
+  const pending = h.batches.at(-1)!.events;
+  h.fail = false;
+  await h.bridge.importMessages([message]);
+  assert.deepEqual(h.batches[2]!.events, pending);
+  assert.equal(
+    h.batches[3]!.events[0].content.content['m.new_content'].body,
+    'Original',
+  );
+  assert.notEqual(h.batches[3]!.events[0].event_id, pending[0].event_id);
+  assert.equal(await h.state.get('delivery:' + message.id), null);
+});
+
+test('reverting text and image revisions uses new event IDs and times, while retries keep their exact payload', async (t) => {
+  const h = await harness();
+  t.after(h.close);
+  const message = {
+    id: 'revision-cycle',
+    role: 'assistant' as const,
+    text: 'Original',
+    timestampMs: 123456,
+  };
+  const image = (data: string) => ({
+    url: 'https://example.com/image.png',
+    mime: 'image/png',
+    data,
+  });
+  await h.bridge.importMessages([{ ...message, images: [image('AQID')] }]);
+  await h.bridge.importMessages([
+    { ...message, text: 'Changed', images: [image('BAUG')] },
+  ]);
+  await h.bridge.importMessages([{ ...message, images: [image('AQID')] }]);
+  const firstEdit = h.batches[1]!.events;
+  h.fail = true;
+  await assert.rejects(
+    h.bridge.importMessages([
+      { ...message, text: 'Changed', images: [image('BAUG')] },
+    ]),
+  );
+  const pending = h.batches.at(-1)!.events;
+  assert.notEqual(pending[0].event_id, firstEdit[0].event_id);
+  assert.notEqual(pending[1].event_id, firstEdit[1].event_id);
+  assert.ok(
+    pending[0].origin_server_ts > h.batches[2]!.events[0].origin_server_ts,
+  );
+  assert.equal(h.batches[0]!.events[0].origin_server_ts, message.timestampMs);
+  h.fail = false;
+  await h.bridge.importMessages([
+    { ...message, text: 'Changed', images: [image('BAUG')] },
+  ]);
+  assert.deepEqual(h.batches.at(-1)!.events, pending);
 });
 
 test('edits reference the original event; partial observations cannot overwrite it', async () => {
