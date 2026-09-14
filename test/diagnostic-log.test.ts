@@ -196,6 +196,7 @@ test('log controls save a chosen handle, flush automatically and stop writing on
       },
     },
     chrome: {
+      runtime: { sendMessage: async () => undefined },
       storage: { local: { get: async () => ({ diagnosticEvents: [] }) } },
     },
   };

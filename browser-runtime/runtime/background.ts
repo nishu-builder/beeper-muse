@@ -186,7 +186,14 @@ async function report() {
     }
   const progress = bridge
     ? await bridge.status()
-    : { queued: 0, blocked: 0, pending: 0, diagnosticFailures: [] };
+    : {
+        queued: 0,
+        claimed: 0,
+        blocked: 0,
+        held: 0,
+        pending: 0,
+        diagnosticFailures: [],
+      };
   const failureSignature = JSON.stringify(progress.diagnosticFailures);
   if (failureSignature !== reportedFailures) {
     reportedFailures = failureSignature;
@@ -217,6 +224,24 @@ async function handle(
 ) {
   await secure;
   if (sender.id !== chrome.runtime.id) throw Error('Invalid sender.');
+  if (
+    message.type === 'diagnostic-health' &&
+    sender.url === chrome.runtime.getURL(CONNECTION_PAGE)
+  ) {
+    const s = await report();
+    return {
+      at: Math.floor(Date.now() / 5000) * 5000,
+      version: chrome.runtime.getManifest().version,
+      build: __BEEPER_MUSE_BUILD_ID__,
+      beeperConnected: s.phase === 'connected',
+      museConnected: s.connected,
+      ready: s.health === 'ready',
+      queued: s.queued,
+      claimed: s.claimed || 0,
+      blocked: s.blocked,
+      pending: s.pending,
+    };
+  }
   if (applyingUpdate && message.type !== 'status')
     throw Error('Update in progress.');
   const popup =

@@ -140,3 +140,32 @@ updates and survives reload, inspect readiness without another photo send, fix
 and test the identified upload control behavior, and confirm message-status
 rendering in Beeper Desktop and mobile. A pending/failure protocol payload alone
 does not prove the client changed its “Sent” label.
+
+## Development loop (0.8.2)
+
+On September 14, 2026, the local repository checks passed with 165 JS/TS tests,
+all TypeScript checks, Go tests, both builds and formatting. Go race tests passed.
+New regressions cover target pinning, response validation, redirect refusal,
+failed send journals, uncertain-send replay prevention, stale build/log rejection,
+image-content verification, delivery versus reply evidence and queue continuation
+only after known pre-upload failures.
+
+Live Beeper Desktop observations:
+
+- The pinned Muse chat and its expected owner/bot participants were found.
+- Chat-detail and ordinary message-list routes still returned HTTP 500.
+- Chat-scoped message search succeeded. A live validation error established its
+  20-result limit; the driver was corrected to respect that limit and to reject
+  incomplete results.
+- The Desktop image-upload API accepted a synthetic 168-byte PNG and returned an
+  upload ID. This uploaded a test asset; it sent no conversation message.
+- `dev:doctor` verified the target and search, then correctly stopped because the
+  diagnostic file had not been selected. No text/photo round trip was initiated.
+- Supported browser inspection still returned `Debugger unattached`. Actual Muse
+  file-input compatibility remains unresolved.
+
+The cycle, automatic-reload heartbeat, live send path, native status rendering
+and both-direction image round trip are **not yet live-verified**. The next
+prerequisite is the one-time diagnostic file grant. Existing uncertain uploads
+must still be inspected before dismissing them; this version does not silently
+release or resend the user's previously interrupted photo.

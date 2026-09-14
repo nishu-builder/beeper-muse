@@ -102,9 +102,20 @@ message identifiers, raw exceptions, or page URLs. A read-only upload readiness
 check counts controls without submitting anything.
 
 You can choose one normal file in Chrome's save dialog for an automatically
-updated copy of that ring. The file handle and write grant stay in this Chrome
+updated copy of that ring, plus a heartbeat containing the extension version,
+source build fingerprint, connection/ready flags and queue counts. This heartbeat
+updates about every five seconds while the connection tab is running; it contains
+no account identifiers or message contents. The file handle and write grant stay in this Chrome
 profile; no new host permission, relay or companion is involved. The connection
 tab writes only while permission is granted. You may need to renew permission
 after a restart. Stopping file logging forgets the handle and stops updates,
 but does not delete the exported file or the internal diagnostic ring. File
 backups can retain copies. Share the file only with people you want to inspect it.
+
+The optional development driver runs separately when a maintainer invokes it.
+It uses a separately supplied Beeper Desktop API token on localhost, verifies
+one pinned chat and reads that chat's recent messages in memory. It can send
+synthetic test prompts and generated test images. Its private run journal stores
+that target's identifiers and synthetic prompts under `.local/`; sanitized
+reports exclude conversation contents. This tooling is not included in extension
+packages and does not run for ordinary users.

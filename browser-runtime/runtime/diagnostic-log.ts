@@ -135,10 +135,63 @@ export class DiagnosticLog {
     return this.chain;
   }
 }
-export function logFile(value: unknown) {
+export interface DiagnosticHealth {
+  at: number;
+  version: string;
+  build: string;
+  beeperConnected: boolean;
+  museConnected: boolean;
+  ready: boolean;
+  queued: number;
+  claimed: number;
+  blocked: number;
+  pending: number;
+}
+export function cleanHealth(value: unknown): DiagnosticHealth | undefined {
+  if (!value || typeof value !== 'object') return;
+  const v = value as Record<string, unknown>;
+  if (
+    typeof v.at !== 'number' ||
+    !Number.isSafeInteger(v.at) ||
+    v.at < 0 ||
+    typeof v.version !== 'string' ||
+    !/^\d{1,5}\.\d{1,5}\.\d{1,5}$/.test(v.version) ||
+    typeof v.build !== 'string' ||
+    !/^[a-f0-9]{64}$/.test(v.build)
+  )
+    return;
+  for (const key of ['beeperConnected', 'museConnected', 'ready'])
+    if (typeof v[key] !== 'boolean') return;
+  for (const key of ['queued', 'claimed', 'blocked', 'pending'])
+    if (
+      typeof v[key] !== 'number' ||
+      !Number.isSafeInteger(v[key]) ||
+      v[key] < 0 ||
+      v[key] > 10000
+    )
+      return;
+  return {
+    at: v.at,
+    version: v.version,
+    build: v.build,
+    beeperConnected: v.beeperConnected as boolean,
+    museConnected: v.museConnected as boolean,
+    ready: v.ready as boolean,
+    queued: v.queued as number,
+    claimed: v.claimed as number,
+    blocked: v.blocked as number,
+    pending: v.pending as number,
+  };
+}
+export function logFile(value: unknown, health?: unknown) {
   return (
     JSON.stringify(
-      { format: 1, application: 'Beeper Muse', events: cleanEntries(value) },
+      {
+        format: 1,
+        application: 'Beeper Muse',
+        events: cleanEntries(value),
+        ...(cleanHealth(health) ? { health: cleanHealth(health) } : {}),
+      },
       null,
       2,
     ) + '\n'

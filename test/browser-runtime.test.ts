@@ -712,3 +712,61 @@ test('failed status requests retry independently without resubmitting the prompt
   assert.equal((await h.bridge.claim()).job, null);
   h.close();
 });
+
+test('known pre-upload failures keep the photo failed but do not hold later text; uncertain uploads still hold', async () => {
+  for (const code of [
+    'image-input-missing',
+    'image-composer-missing',
+    'image-unavailable',
+    'image-download-failed',
+    'image-preview-timeout',
+    'image-input-changed',
+    'source-interrupted',
+  ]) {
+    const h = await harness();
+    try {
+      await receivePhoto(h);
+      await h.bridge.claim();
+      await h.bridge.block('$photo', code);
+      await h.bridge.receive(
+        JSON.stringify({
+          command: 'transaction',
+          txn_id: 'following-text',
+          id: 78,
+          events: [
+            {
+              type: 'm.room.message',
+              event_id: '$following',
+              room_id: room,
+              sender: config.owner,
+              origin_server_ts: 200,
+              content: { msgtype: 'm.text', body: 'Following text' },
+            },
+          ],
+        }),
+        () => {},
+      );
+      const safe = [
+        'image-input-missing',
+        'image-composer-missing',
+        'image-unavailable',
+        'image-download-failed',
+      ].includes(code);
+      assert.equal((await h.bridge.status()).held, safe ? 0 : 1);
+      assert.equal((await h.bridge.status()).blocked, 1);
+      const claimed = await h.bridge.claim();
+      assert.equal(claimed.job?.id, safe ? '$following' : undefined);
+      assert.equal(
+        h.statuses.find(
+          (s) =>
+            s['m.relates_to'].event_id === '$photo' &&
+            s.status === 'FAIL_PERMANENT',
+        )?.status,
+        'FAIL_PERMANENT',
+      );
+      assert.equal(h.downloads, 1, 'failed photo was never downloaded again');
+    } finally {
+      h.close();
+    }
+  }
+});

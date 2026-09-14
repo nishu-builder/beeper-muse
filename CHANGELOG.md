@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.8.2
+
+- Add a typed development driver with pinned-chat checks, synthetic text/photo
+  tests, persisted send records, read-only resume and sanitized result reports.
+- Add `dev:cycle` to run checks, stage the extension, wait for the exact running
+  build and test text, a photo and subsequent text. Unverified work stops the
+  cycle; it never automatically resends an uncertain prompt.
+- Include a content-free diagnostic heartbeat with the build fingerprint,
+  connection readiness and queue counts. File selection remains a one-time
+  Chrome grant; the product still needs no companion process.
+- Keep known pre-upload failures visible without holding subsequent messages.
+  Interrupted uploads still hold the queue until inspected and dismissed.
+- Incoming photo compatibility and client status rendering remain unverified.
+
 ## 0.8.1
 
 - Add a bounded, content-free diagnostic log with specific upload failure codes

@@ -94,7 +94,10 @@ async function refresh() {
     if (s.connected && beeperReady && s.health === 'draft')
       el('status').textContent =
         'Send or clear your draft in Muse to resume sending from Beeper.';
-    if (s.blocked && beeperReady)
+    if (s.blocked && !s.held && beeperReady)
+      el('status').textContent =
+        'An earlier photo could not be attached. Later messages can continue; review the failed photo below.';
+    if (s.held && beeperReady)
       el('status').textContent =
         'Sending to Muse paused. An interrupted message is holding the queue. Check it below, then dismiss it to continue.';
     if (s.update) el('status').textContent = s.update;

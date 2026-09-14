@@ -111,13 +111,14 @@ not be retrieved, not that the Beeper connection failed.
 From the popup choose **Diagnostic log**, then **Choose diagnostic log file** in
 the connection tab. Save the suggested `beeper-muse-diagnostics.json` in Downloads
 (or another location you choose). Chrome requires this file selection. The
-extension remembers the file handle and updates the same file when diagnostics
-change, normally within five seconds; background throttling can delay writes.
+extension remembers the file handle and updates the same file with a heartbeat
+about every five seconds; background throttling can delay writes.
 Keep the connection tab open. If Chrome revokes the grant, choose **Allow file
 updates**; the extension never prompts for file access in the background.
 
 This file contains the latest 200 diagnostic events: timestamps, extension
-versions, fixed stage/failure codes and bounded counts of upload controls. It
+versions, fixed stage/failure codes and bounded counts of upload controls. A
+heartbeat adds the source build fingerprint, readiness flags and queue counts. It
 contains no message text, photos, filenames, account/room/event IDs, credentials,
 raw exceptions or page addresses. An assistant with permission to read your files
 can inspect this selected file directly. No browser-profile access, local server
@@ -141,3 +142,10 @@ delivery. Success requires a matching source echo and a new Muse reply, not just
 a successful WebSocket or Send click. These remain website observations, not an
 official Muse server receipt. Beeper controls how its clients display the status;
 “Sent” can appear briefly for server acceptance before the bridge updates it.
+
+Known failures before the photo is attached (unsupported media, failed download,
+or a missing upload form/input) remain visible but do not hold later messages.
+A changed input, unfinished preview or interrupted submission is still uncertain
+and holds the queue. The bridge never automatically retries either category.
+For maintainer-driven checks and automatic updates, see the
+[development loop](development-loop.md).

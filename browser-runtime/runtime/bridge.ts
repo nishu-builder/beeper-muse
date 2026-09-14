@@ -16,6 +16,8 @@ export interface Job {
   id: string;
   prompt: string;
   phase: 'queued' | 'claimed' | 'done' | 'blocked';
+  // Only set for failures known to happen before touching Muse's composer.
+  safeToContinue?: boolean;
   image?: IncomingImage;
   error?: string;
   failureCode?: string;
@@ -324,6 +326,7 @@ export class BrowserBridge {
               id: event.event_id,
               prompt: body || 'Image',
               phase: 'blocked',
+              safeToContinue: true,
               failureCode: 'image-unavailable',
               error:
                 'Image unavailable. Use PNG, JPEG, GIF or WebP up to 5 MB.',
@@ -367,6 +370,8 @@ export class BrowserBridge {
       claimed: jobs.filter((j) => j.phase === 'claimed').length,
       queued: jobs.filter((j) => j.phase === 'queued').length,
       blocked: jobs.filter((j) => j.phase === 'blocked').length,
+      held: jobs.filter((j) => j.phase === 'blocked' && !j.safeToContinue)
+        .length,
       pending: (await this.inbox.pending(128)).length,
       room: this.room,
     };
@@ -380,7 +385,13 @@ export class BrowserBridge {
       if (this.paused) return { job: null };
       await this.api.members(this.room);
       const jobs = (await this.state.get<Job[]>('jobs')) || [];
-      if (jobs.some((j) => j.phase === 'claimed' || j.phase === 'blocked'))
+      if (
+        jobs.some(
+          (j) =>
+            j.phase === 'claimed' ||
+            (j.phase === 'blocked' && !j.safeToContinue),
+        )
+      )
         return { job: null };
       const job = jobs.find((j) => j.phase === 'queued');
       if (!job) return { job: null };
@@ -391,6 +402,7 @@ export class BrowserBridge {
         } catch {
           job.phase = 'blocked';
           job.failureCode = 'image-download-failed';
+          job.safeToContinue = true;
           job.error =
             'Image download or decryption failed. Check the original photo, dismiss this job, then send it again.';
           await this.state.put('jobs', jobs);
@@ -412,6 +424,13 @@ export class BrowserBridge {
       if (job && job.phase !== 'done') {
         job.phase = 'blocked';
         job.failureCode = failureCode(code);
+        job.safeToContinue = [
+          'image-composer-missing',
+          'image-input-missing',
+          'image-unavailable',
+          'image-download-failed',
+          'image-adapter-unavailable',
+        ].includes(job.failureCode);
         job.error = explanations[failureCode(code)];
         await this.state.put('jobs', jobs);
         await this.flushStatuses();

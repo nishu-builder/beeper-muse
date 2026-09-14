@@ -38,7 +38,10 @@ export function startLogControls() {
       if (!writer) return;
       const { diagnosticEvents } =
         await chrome.storage.local.get('diagnosticEvents');
-      await writer.write(diagnosticEvents);
+      const health = await chrome.runtime
+        .sendMessage({ type: 'diagnostic-health' })
+        .catch(() => undefined);
+      await writer.write(diagnosticEvents, health);
       status!.textContent =
         'Diagnostic file is updating. You can return to Muse.';
     } catch {

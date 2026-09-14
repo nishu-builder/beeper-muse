@@ -37,7 +37,10 @@ For local development updates, `npm run update:local` rebuilds and installs the
 current checkout. Once the update hook is installed, the extension waits for
 active work, reloads and reconnects Muse automatically. See the
 [one-time setup](docs/chrome-setup.md#update-without-losing-state). Store installs
-use Chrome's update service.
+use Chrome's update service. Maintainers can use the
+[repeatable development loop](docs/development-loop.md) to check the installed
+build and run synthetic messages through the actual integration without copying
+errors or resending tests manually.
 
 ## What syncs
 
