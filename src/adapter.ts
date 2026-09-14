@@ -463,6 +463,33 @@
     }
     return null;
   }
+  const imageNames: Record<string, string[]> = {
+    'image/png': ['image.png'],
+    'image/jpeg': ['image.jpg', 'image.jpeg'],
+    'image/gif': ['image.gif'],
+    'image/webp': ['image.webp'],
+  };
+  // HTML file inputs may declare MIME types, filename extensions or no filter.
+  // Keep this separate from locating the composer: an unrestricted picker
+  // elsewhere in the page must not become an upload target.
+  function acceptsImage(input: HTMLInputElement, mime: string, name: string) {
+    if (!imageNames[mime] || input.matches(':disabled')) return false;
+    const accept = input.accept.trim().toLowerCase();
+    if (!accept) return true;
+    return accept.split(',').some((part) => {
+      const token = part.trim();
+      return (
+        token === mime ||
+        token === 'image/*' ||
+        (/^\.[a-z0-9]+$/.test(token) && name.toLowerCase().endsWith(token))
+      );
+    });
+  }
+  function acceptsAnyImage(input: HTMLInputElement) {
+    return Object.entries(imageNames).some(([mime, names]) =>
+      names.some((name) => acceptsImage(input, mime, name)),
+    );
+  }
   function imageReadiness(document: Document): Muse.UploadReadiness {
     const fields = [
       ...document.querySelectorAll<HTMLTextAreaElement>(
@@ -482,15 +509,9 @@
       hasForm: !!field?.closest('form'),
       hasUploadRegion: !!form,
       pageFileInputs: Math.min(pageInputs.length, 100),
-      pageImageInputs: Math.min(
-        pageInputs.filter((e) => /image\//i.test(e.accept)).length,
-        100,
-      ),
+      pageImageInputs: Math.min(pageInputs.filter(acceptsAnyImage).length, 100),
       fileInputs: Math.min(inputs.length, 100),
-      imageInputs: Math.min(
-        inputs.filter((e) => !e.disabled && /image\//i.test(e.accept)).length,
-        100,
-      ),
+      imageInputs: Math.min(inputs.filter(acceptsAnyImage).length, 100),
       existingFiles: Math.min(
         inputs.reduce((n, e) => n + (e.files?.length || 0), 0),
         100,
@@ -523,9 +544,12 @@
         'image-composer-missing',
         'Muse image composer unavailable.',
       );
-    const inputs = [
+    const allInputs = [
       ...form.querySelectorAll<HTMLInputElement>('input[type="file"]'),
-    ].filter((e) => !e.disabled && /image\//i.test(e.accept));
+    ];
+    const inputs = allInputs.filter((e) =>
+      acceptsImage(e, image.mime, image.name),
+    );
     if (!inputs.length)
       throw uploadError(
         'image-input-missing',
@@ -533,7 +557,7 @@
       );
     if (
       inputs.length !== 1 ||
-      inputs[0]!.files?.length ||
+      allInputs.some((input) => input.files?.length) ||
       form.querySelector('img[src]')
     )
       throw uploadError(

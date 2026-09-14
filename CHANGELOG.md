@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.8.9
+
+- Recognize composer image pickers that use filename extensions or no accept
+  filter, alongside MIME types. Match the actual file type before staging it.
+- Reject disabled pickers, incompatible filters and multiple matching inputs.
+  Keep composer scoping, draft protection and preview confirmation unchanged.
+- Require the updated source script when reconnecting an existing Muse tab.
+
 ## 0.8.8
 
 - Keep the chosen diagnostic file updating when runtime health checks stall.
