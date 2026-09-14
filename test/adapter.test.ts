@@ -713,3 +713,105 @@ test('an attachment in another composer picker blocks photo staging', async () =
   assert.equal(inputs[1]!.files!.length, 1);
   f.dom.window.close();
 });
+
+test('a cleared or replaced image picker requires byte-identical preview evidence before Send', async () => {
+  for (const mode of [
+    'clear',
+    'replace',
+    'different-bytes',
+    'truncated',
+    'oversized',
+    'remote-preview',
+    'draft',
+    'changed-preview',
+    'new-file',
+  ] as const) {
+    const f = fixture(),
+      doc = f.document;
+    const region = doc.createElement('div');
+    const field = doc.querySelector('textarea')!,
+      send = doc.querySelector('button')!;
+    region.append(field, send);
+    doc.body.append(region);
+    const input = doc.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/png';
+    region.append(input);
+    let files: File[] = [];
+    Object.defineProperty(input, 'files', {
+      get: () => files,
+      set: (value: File[]) => {
+        files = value;
+      },
+    });
+    Object.defineProperty(f.dom.window, 'DataTransfer', {
+      value: class {
+        files: File[] = [];
+        items = { add: (file: File) => this.files.push(file) };
+      },
+    });
+    const bytes = colorPNG('RED');
+    let sends = 0,
+      fetches = 0;
+    send.onclick = () => {
+      sends++;
+    };
+    const preview = doc.createElement('img');
+    preview.src =
+      mode === 'remote-preview'
+        ? 'https://muse.ai/unknown.png'
+        : 'blob:https://muse.ai/staged';
+    Object.defineProperties(preview, {
+      complete: { value: true },
+      naturalWidth: { value: 64 },
+    });
+    input.onchange = () => {
+      files = [];
+      if (mode === 'replace') input.replaceWith(doc.createElement('input'));
+      if (mode === 'new-file')
+        files = [
+          new f.dom.window.File(['other'], 'other.png', { type: 'image/png' }),
+        ];
+      region.append(preview);
+    };
+    f.dom.window.fetch = async (url: unknown) => {
+      fetches++;
+      assert.equal(url, 'blob:https://muse.ai/staged');
+      if (mode === 'draft') field.value = 'User draft';
+      const body =
+        mode === 'different-bytes'
+          ? colorPNG('BLUE')
+          : mode === 'truncated'
+            ? bytes.subarray(0, -1)
+            : mode === 'oversized'
+              ? Buffer.concat([bytes, Buffer.from([0])])
+              : bytes;
+      return new Response(new Uint8Array(body)) as any;
+    };
+    const attempt = f.adapter.create(doc).submitImage!(
+      'Caption',
+      {
+        name: 'fixture.png',
+        mime: 'image/png',
+        data: bytes.toString('base64'),
+      },
+      async (ms: number) => {
+        if (mode === 'changed-preview' && ms === 150)
+          preview.src = 'blob:https://muse.ai/other';
+      },
+    );
+    if (mode === 'clear' || mode === 'replace') {
+      await attempt;
+      assert.equal(sends, 1);
+      assert.equal(fetches, 1);
+      assert.equal(field.value, 'Caption');
+    } else {
+      await assert.rejects(attempt);
+      assert.equal(sends, 0);
+      if (mode === 'draft') assert.equal(field.value, 'User draft');
+      if (mode === 'remote-preview' || mode === 'new-file')
+        assert.equal(fetches, 0);
+    }
+    f.dom.window.close();
+  }
+});

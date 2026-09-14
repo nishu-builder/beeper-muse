@@ -526,6 +526,38 @@
   function uploadError(code: string, message: string) {
     return Object.assign(new Error(message), { code });
   }
+  async function matchesLocalPreview(
+    url: string,
+    raw: string,
+  ): Promise<boolean> {
+    // A reset file picker is normal in React uploaders. Only trust its replacement
+    // preview when its actual bytes match our upload; names/dimensions are not proof.
+    if (!safeImageURL(url) || !/^(blob:|data:)/.test(url)) return false;
+    try {
+      const response = await fetch(url, {
+        credentials: 'omit',
+        redirect: 'error',
+        signal: AbortSignal.timeout(8000),
+      });
+      if (!response.ok || !response.body) return false;
+      const reader = response.body.getReader();
+      let offset = 0;
+      try {
+        while (true) {
+          const chunk = await reader.read();
+          if (chunk.done) return offset === raw.length;
+          if (offset + chunk.value.length > raw.length) return false;
+          for (const byte of chunk.value)
+            if (byte !== raw.charCodeAt(offset++)) return false;
+        }
+      } finally {
+        await reader.cancel();
+        reader.releaseLock();
+      }
+    } catch {
+      return false;
+    }
+  }
   async function submitImage(
     document: Document,
     prompt: string,
@@ -584,6 +616,18 @@
     const input = inputs[0]!;
     input.files = transfer.files;
     input.dispatchEvent(new win.Event('change', { bubbles: true }));
+    const selection = () => {
+      const files = [
+        ...form.querySelectorAll<HTMLInputElement>('input[type="file"]'),
+      ].flatMap((node) => [...(node.files || [])]);
+      return files.length === 0
+        ? 'cleared'
+        : files.length === 1 && input.isConnected && files[0] === file
+          ? 'retained'
+          : 'changed';
+    };
+    const previewNodes = () =>
+      [...form.querySelectorAll<HTMLImageElement>('img[src]')].filter(visible);
     const deadline = Date.now() + 60000;
     while (Date.now() < deadline) {
       await wait(250);
@@ -592,8 +636,8 @@
           'Image submission interrupted. Check Muse before retrying.',
         );
       if (
-        !input.isConnected ||
-        input.files?.[0] !== file ||
+        !form.isConnected ||
+        selection() === 'changed' ||
         composer(document) !== field ||
         field.value.trim()
       )
@@ -603,9 +647,7 @@
           'button[aria-label="Send"]',
         ),
       ].filter(visible);
-      const previews = [
-        ...form.querySelectorAll<HTMLImageElement>('img[src]'),
-      ].filter(visible);
+      const previews = previewNodes();
       if (
         previews.length === 1 &&
         previews[0]!.complete &&
@@ -614,6 +656,34 @@
         !send[0]!.disabled &&
         !form.querySelector('[aria-busy="true"],[role="progressbar"]')
       ) {
+        const preview = previews[0]!;
+        const previewURL = preview.currentSrc || preview.src;
+        const matchedBytes =
+          selection() === 'cleared' &&
+          (await matchesLocalPreview(previewURL, raw));
+        const unchanged = () => {
+          const current = previewNodes();
+          return (
+            active() &&
+            form.isConnected &&
+            composer(document) === field &&
+            current.length === 1 &&
+            current[0] === preview &&
+            (preview.currentSrc || preview.src) === previewURL &&
+            (selection() === 'retained' ||
+              (selection() === 'cleared' && matchedBytes)) &&
+            preview.complete &&
+            preview.naturalWidth > 0 &&
+            send[0]!.isConnected &&
+            !send[0]!.matches(':disabled') &&
+            !form.querySelector('[aria-busy="true"],[role="progressbar"]')
+          );
+        };
+        if (!unchanged() || field.value.trim())
+          throw uploadError(
+            'image-input-changed',
+            'The image preview could not be verified.',
+          );
         if (prompt) {
           const setter = Object.getOwnPropertyDescriptor(
             win.HTMLTextAreaElement.prototype,
@@ -624,8 +694,7 @@
           await wait(150);
         }
         if (
-          !active() ||
-          input.files?.[0] !== file ||
+          !unchanged() ||
           field.value !== prompt ||
           !send[0]!.isConnected ||
           send[0]!.disabled

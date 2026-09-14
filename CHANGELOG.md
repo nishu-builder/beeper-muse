@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.11
+
+- Handle cleared or replaced image pickers when a loaded local preview matches
+  the requested upload byte for byte. Reject mismatches and recheck the preview,
+  composer and caption before Send.
+- Record upload-control counts after image failures as well as before attempts.
+- Require the updated source adapter when reconnecting Muse. Held uploads remain
+  held until reviewed; updating does not retry them.
+
 ## 0.8.10
 
 - Include a persisted timestamp and bridge identity in native delivery-status
