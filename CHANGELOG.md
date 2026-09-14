@@ -2,6 +2,8 @@
 
 ## 0.8.5
 
+- Preserve source order when an earlier first delivery is still settling.
+
 - Preserve known reactions when source observation is unknown; reject malformed
   observations without treating them as removals.
 - Give re-added reactions and reverted text/images fresh event IDs. Keep original

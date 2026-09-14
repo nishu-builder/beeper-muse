@@ -27,9 +27,16 @@ The product remains Chrome-only. Maintainer test tools are optional.
   Muse tab is offline inside Beeper, not only in the extension. Open: investigate
   native bridge status and expiry; a disconnected browser cannot send a final
   notice reliably. Verify loss of tab, browser exit and recovery in both clients.
+  Code audit: status currently reports CONNECTED whenever the Beeper socket opens,
+  independent of Muse tab health, with a six-hour TTL. Provisioning also returns
+  CONNECTED unconditionally. Replace both with actual source health and bounded
+  expiry; do not promise a visible offline banner until tested in Beeper.
 - **HIS-04 — Messages arrive out of order:** user screenshot shows older content
   appearing after newer replies. Open: trace source order, settling, catch-up and
   native timeline insertion separately from timestamps. Do not invent source times.
+  0.8.5 now prevents later messages from overtaking an earlier first import while
+  it settles; regressions cover that case and nonblocking edits. Late-loaded
+  history and installed-client ordering remain open.
 - **RENDER-01 — Connector icon treated as a photograph:** the same screenshot
   shows the Messenger connector logo enlarged into a standalone image. Open:
   distinguish action-card decoration from conversation attachments and retain

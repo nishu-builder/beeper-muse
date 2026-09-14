@@ -274,3 +274,42 @@ test('partial history can be upgraded but never replaces a known rich snapshot',
   assert.equal((h.sent[0] as typeof partial).partial, true);
   assert.equal((h.sent[1] as typeof full).html, full.html);
 });
+
+test('later messages cannot overtake an earlier first delivery while it settles', async () => {
+  const h = harness();
+  const v = view(message('earlier', 'Partial'), message('later', 'Settled'));
+  await h.tracker.sync(v, 'all', () => true);
+  h.tick();
+  v.messages[0]!.text = 'Complete';
+  await h.tracker.sync(v, 'all', () => true);
+  assert.equal(h.sent.length, 0);
+  h.tick();
+  await h.tracker.sync(v, 'all', () => true);
+  assert.deepEqual(
+    h.sent.map((m) => m.id),
+    ['earlier', 'later'],
+  );
+});
+
+test('an unsettled edit does not block a later first delivery', async () => {
+  const h = harness();
+  const v = view(message('earlier'));
+  await h.tracker.sync(v, 'all', () => true);
+  h.tick();
+  await h.tracker.sync(v, 'all', () => true);
+  v.messages.push(message('later'));
+  await h.tracker.sync(v, 'all', () => true);
+  h.tick();
+  v.messages[0]!.text = 'Still editing';
+  await h.tracker.sync(v, 'all', () => true);
+  assert.deepEqual(
+    h.sent.map((m) => m.id),
+    ['earlier', 'later'],
+  );
+  h.tick();
+  await h.tracker.sync(v, 'all', () => true);
+  assert.deepEqual(
+    h.sent.map((m) => m.id),
+    ['earlier', 'later', 'earlier'],
+  );
+});

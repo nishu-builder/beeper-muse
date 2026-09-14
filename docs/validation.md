@@ -229,3 +229,15 @@ The browser tool continues to list the Muse tab but rejects page inspection with
 `Debugger unattached`. The selected diagnostic file remains stale at 0.8.2. No
 additional conversation test, held-job dismissal or photo retry was performed.
 The live-check goal remains open; the parity ledger records the remaining work.
+
+### Source-order regression follow-up
+
+The sync tracker could import a settled later message before an earlier first
+import that was still changing. A source-order barrier now holds later items
+until that earlier item settles. Edits to already imported messages retain their
+existing position and do not block later first deliveries. Both cases pass
+synthetic regressions. This does not establish native client ordering for older
+history first observed after newer messages were already imported.
+
+Full check after the source-order fix passed: 183 JS/TS tests, TypeScript,
+Go tests/build and formatting. Live diagnostics remain stale at version 0.8.2.
