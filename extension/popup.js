@@ -68,6 +68,9 @@ async function refresh() {
   )
     status.textContent =
       'Update and restart the local bridge to enable catch-up and new Muse messages.';
+  else if (result.connected && !result.activitySync)
+    status.textContent =
+      'Connected. Update and restart the bridge to enable typing indicators.';
   else if (result.rescanning)
     status.textContent =
       result.phase === 'claimed'

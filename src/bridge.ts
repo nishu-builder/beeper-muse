@@ -5,6 +5,7 @@ declare namespace MuseBridge {
     queued: number;
     museSync: boolean;
     sourceProtocol?: number;
+    activitySync: boolean;
   }
   interface Job {
     id: string;
@@ -18,6 +19,7 @@ declare namespace MuseBridge {
   }
   interface Transport {
     status(): Promise<Status>;
+    activity(activity: Muse.Activity): Promise<void>;
     importMessages(messages: Muse.Message[]): Promise<{ added: number }>;
     claim(): Promise<{ job: Job | null }>;
     complete(result: Completion): Promise<void>;
@@ -43,6 +45,7 @@ declare namespace MuseBridge {
     private async request(
       path: string,
       body?: unknown,
+      timeoutMs = 20000,
     ): Promise<Record<string, unknown>> {
       const token = await this.token();
       if (!token || !/^[a-f0-9]{64}$/.test(token))
@@ -55,7 +58,7 @@ declare namespace MuseBridge {
         },
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
         redirect: 'error',
-        signal: AbortSignal.timeout(20000),
+        signal: AbortSignal.timeout(timeoutMs),
       });
       if (!response.ok) throw Error('Bridge unavailable.');
       return record(await response.json());
@@ -72,9 +75,13 @@ declare namespace MuseBridge {
         phase: s.phase as MuseBridge.Status['phase'],
         queued: Number(s.queued),
         museSync: s.museSync === true,
+        activitySync: s.activitySync === true,
         sourceProtocol:
           typeof s.sourceProtocol === 'number' ? s.sourceProtocol : undefined,
       };
+    }
+    async activity(activity: Muse.Activity) {
+      await this.request('/v1/activity', { activity }, 3000);
     }
     async importMessages(messages: Muse.Message[]) {
       if ((await this.status()).sourceProtocol !== 2)

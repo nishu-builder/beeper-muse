@@ -8,6 +8,10 @@ const syncSource = await readFile(
   'utf8',
 );
 
+const activitySource = await readFile(
+  new URL('../extension/activity.js', import.meta.url),
+  'utf8',
+);
 const source = await readFile(
   new URL('../extension/content.js', import.meta.url),
   'utf8',
@@ -15,6 +19,7 @@ const source = await readFile(
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve));
 type Message = {
   type: string;
+  activity?: 'idle' | 'working';
   text?: string;
   messages?: Array<{ role: string; text: string }>;
 };
@@ -24,7 +29,11 @@ type Listener = (
   respond: (value: unknown) => void,
 ) => void;
 
-function harness(deferred = false, structured = false) {
+function harness(
+  deferred = false,
+  structured = false,
+  activityEnabled = false,
+) {
   let listener!: Listener;
   let resolveClaim!: (value: unknown) => void;
   let resolveExecution!: () => void;
@@ -41,13 +50,14 @@ function harness(deferred = false, structured = false) {
     string,
     (event: { preventDefault: () => void; returnValue?: boolean }) => void
   >();
+  const intervals: Array<() => void> = [];
   const timers: Array<{ fn: () => void; at: number }> = [];
   const messages: Message[] = [];
   const claim = new Promise((resolve) => {
     resolveClaim = resolve;
   });
   const job = { id: 'job', prompt: 'Synthetic prompt' };
-  runInNewContext(syncSource + '\n' + source, {
+  runInNewContext(activitySource + '\n' + syncSource + '\n' + source, {
     crypto: webcrypto,
     TextEncoder,
     document: {
@@ -68,7 +78,9 @@ function harness(deferred = false, structured = false) {
     },
     location: { origin: 'https://muse.ai', pathname: '/' },
     Date: { now: () => now },
-    setInterval: () => {},
+    setInterval: (fn: () => void) => {
+      intervals.push(fn);
+    },
     setTimeout: (fn: () => void, ms: number) => {
       timers.push({ fn, at: now + ms });
     },
@@ -87,6 +99,7 @@ function harness(deferred = false, structured = false) {
             return {
               ok: true,
               connected: true,
+              activitySync: activityEnabled,
               sourceProtocol: structured ? 2 : undefined,
             };
           if (message.type === 'claim')
@@ -127,6 +140,10 @@ function harness(deferred = false, structured = false) {
   });
   return {
     messages,
+    pulse: async () => {
+      intervals[0]!();
+      await flush();
+    },
     executed,
     events,
     focus: async () => {
@@ -251,7 +268,7 @@ test('readiness probes expose no draft or chat text', () => {
   ] as const) {
     h.view(view);
     const probe = h.signal('probe');
-    assert.equal(probe.protocol, 4);
+    assert.equal(probe.protocol, 5);
     assert.equal(probe.health, health);
     assert.deepEqual(Object.keys(probe).sort(), [
       'health',
@@ -283,4 +300,24 @@ test('structured results preserve the prompt echo and individual answers for nat
     ['user', 'assistant'],
   );
   assert.equal(result?.messages?.[1]?.text, 'Synthetic answer');
+});
+
+test('Muse working activity renews independently and clears when the tab disconnects', async () => {
+  const h = harness(false, false, true);
+  h.view({ busy: true });
+  h.signal('start');
+  await flush();
+  assert.deepEqual(
+    h.messages.filter((m) => m.type === 'activity').map((m) => m.activity),
+    ['working'],
+  );
+  assert.equal(h.submits, 0);
+  await h.advance(6000);
+  await h.pulse();
+  h.signal('stop');
+  await flush();
+  assert.deepEqual(
+    h.messages.filter((m) => m.type === 'activity').map((m) => m.activity),
+    ['working', 'working', 'idle'],
+  );
 });

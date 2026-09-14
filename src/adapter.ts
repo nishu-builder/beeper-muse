@@ -104,6 +104,7 @@
   function create(document: Document): Muse.Adapter {
     return {
       capabilities: {
+        activity: true,
         images: true,
         formatting: true,
         timestamps: true,
@@ -132,10 +133,12 @@
       ...document.querySelectorAll('[role="log"][aria-label="Chat messages"]'),
     ].filter(visible);
     if (logs.length !== 1) throw new Error('Open the main Muse chat.');
+    const busy = [
+      ...document.querySelectorAll('button[aria-label="Stop"]'),
+    ].some(visible);
     return {
-      busy: [...document.querySelectorAll('button[aria-label="Stop"]')].some(
-        visible,
-      ),
+      activity: busy ? 'working' : 'idle',
+      busy,
       draft: composer(document).value,
       messages: [
         ...logs[0]!.querySelectorAll('[data-message-item][data-message-id]'),

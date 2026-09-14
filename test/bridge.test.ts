@@ -49,6 +49,7 @@ test('local delivery transport validates status instead of reporting malformed s
     phase: 'idle',
     queued: 0,
     museSync: false,
+    activitySync: false,
     sourceProtocol: 2,
   });
   for (const { url, options } of h.requests) {

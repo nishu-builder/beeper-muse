@@ -3,6 +3,7 @@
   const muse = BeeperMuseDOM.create(document);
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   let polling = false;
+  let activityEnabled = false;
   let rescanPending = false;
   let stopped = false;
   let generation = 0;
@@ -34,6 +35,15 @@
       if (!result?.ok) throw new Error('Local connector request failed.');
       return result;
     });
+  const activity = new BeeperMuseActivity.Reporter((value) =>
+    activityEnabled
+      ? send({ type: 'activity', activity: value })
+      : Promise.resolve(),
+  );
+  const reportActivity = (view) =>
+    activity
+      .update(view?.activity || (view?.busy ? 'working' : 'idle'))
+      .catch(() => {});
   let tracker = new BeeperMuseSync.Tracker(send, undefined, muse.prepare);
   async function offerPopup() {
     if (
@@ -67,6 +77,9 @@
         await wait(1000);
         if (!active()) throw new Error('Tab disconnected.');
         const view = await muse.snapshot();
+        if (!active()) throw new Error('Tab disconnected.');
+        await reportActivity(view);
+        if (!active()) throw new Error('Tab disconnected.');
         if (view.draft.trim()) throw new Error('A new draft was entered.');
         const answer = BeeperMuseSync.responseAfter(before, job.prompt, view);
         if (view.busy || !answer || answer !== previous) {
@@ -121,6 +134,8 @@
       throw new Error('Response timed out or the tab was disconnected.');
     } catch {
       await send({ type: 'block', id: job.id }).catch(() => {});
+    } finally {
+      await reportActivity(null);
     }
   }
   async function poll() {
@@ -136,6 +151,7 @@
     try {
       const connected = await send({ type: 'connected' });
       if (stopped || generation !== current) return;
+      activityEnabled = connected.activitySync === true;
       guardClosing(connected.connected);
       if (!connected.connected) return;
       if (rescanPending) {
@@ -143,6 +159,9 @@
         rescanPending = false;
       }
       const view = await muse.snapshot();
+      if (stopped || generation !== current) return;
+      await reportActivity(view);
+      if (stopped || generation !== current) return;
       if (connected.museSync) {
         try {
           await tracker.sync(
@@ -160,6 +179,7 @@
       if (result.job)
         await execute(result.job, current, connected.sourceProtocol);
     } catch {
+      await reportActivity(null);
       /* Keep private data and server failures out of page logs. */
     } finally {
       polling = false;
@@ -168,7 +188,7 @@
   chrome.runtime.onMessage.addListener((message, _sender, respond) => {
     if (message.type === 'probe') {
       respond({
-        protocol: 4,
+        protocol: 5,
         health: health(),
         progress: tracker.progress,
         rescanning: rescanPending,
@@ -184,19 +204,37 @@
     if (message.type === 'stop') {
       stopped = true;
       generation++;
+      void reportActivity(null);
       guardClosing(false);
-      respond({ protocol: 4 });
+      respond({ protocol: 5 });
     }
     if (message.type === 'start') {
       stopped = false;
       tracker = new BeeperMuseSync.Tracker(send, undefined, muse.prepare);
       const state = health();
       guardClosing(state !== 'unavailable');
-      respond({ protocol: 4, health: state });
+      respond({ protocol: 5, health: state });
       void poll();
     }
   });
+  let pulsing = false;
+  async function pulseActivity() {
+    if (pulsing || stopped || !closeGuard || !activityEnabled) return;
+    pulsing = true;
+    const current = generation;
+    try {
+      const view = await muse.snapshot();
+      if (stopped || current !== generation || !closeGuard) return;
+      await reportActivity(view);
+    } catch {
+      await reportActivity(null);
+    } finally {
+      pulsing = false;
+    }
+  }
+  setInterval(() => void pulseActivity(), 2000);
   document.addEventListener('visibilitychange', () => void offerPopup());
+  window.addEventListener('pagehide', () => void reportActivity(null));
   window.addEventListener('focus', () => void offerPopup());
   void offerPopup();
   setInterval(() => void poll(), 2000);

@@ -11,6 +11,7 @@ export const extensionFiles = [
   'manifest.json',
   'adapter.js',
   'sync.js',
+  'activity.js',
   'background.js',
   'bridge.js',
   'content.js',
