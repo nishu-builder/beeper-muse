@@ -270,3 +270,10 @@ Depth over 100, more than 10,000 visited nodes or output over 200,000 characters
 falls back to the supplied plain body. Oversized input is rejected before parsing.
 The parser repairs incomplete HTML from bounded source snapshots; it does not
 execute source code or load remote content. Native client support still varies.
+
+Native delivery-status events include a persisted transition timestamp in
+`content.ts`, the `muse://muse` bridge identity and the Muse bot as sender. The
+timestamp describes the status report, not the original Muse message time.
+Retries keep the same timestamp and transaction ID; upgrading old saved status
+metadata never resubmits its prompt. Desktop's API can omit timestamp-free
+statuses, so a reply round trip and native delivery are checked separately.

@@ -126,7 +126,7 @@ test('reconnection injects only packaged scripts into the selected Muse main fra
 test('invalid and expired reconnect tickets cannot select a tab', () => {
   const ticket = {
     tabID: 4,
-    documentID: '11111111-1111-1111-1111-111111111111',
+    documentID: 'ABCDEF0123456789ABCDEF0123456789',
     expires: 2000,
   };
   for (const value of [
@@ -135,12 +135,19 @@ test('invalid and expired reconnect tickets cannot select a tab', () => {
     { ...ticket, tabID: '4' },
     { ...ticket, documentID: undefined },
     { ...ticket, documentID: 'invalid' },
+    { ...ticket, documentID: '0'.repeat(32) },
+    { ...ticket, documentID: '11111111-1111-1111-1111-111111111111' },
+    { ...ticket, documentID: 'G'.repeat(32) },
+    { ...ticket, documentID: '1'.repeat(31) },
+    { ...ticket, documentID: '1'.repeat(33) },
     { ...ticket, expires: 500 },
     { ...ticket, expires: Infinity },
     { ...ticket, expires: 999999 },
   ])
     assert.equal(resumeTicket(value, 1000), undefined);
   assert.deepEqual(resumeTicket(ticket, 1000), ticket);
+  const lower = { ...ticket, documentID: ticket.documentID.toLowerCase() };
+  assert.deepEqual(resumeTicket(lower, 1000), lower);
 });
 
 test('a failed update check never restarts an active source', async () => {

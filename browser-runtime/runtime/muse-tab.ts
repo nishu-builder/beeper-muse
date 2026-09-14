@@ -49,7 +49,10 @@ export function resumeTicket(
     Number.isInteger(v.tabID) &&
     v.tabID > 0 &&
     typeof v.documentID === 'string' &&
-    /^[a-f0-9-]{36}$/.test(v.documentID) &&
+    // Chromium serializes its document token as 32 hex characters, not a
+    // hyphenated UUID. Preserve the exact token when targeting the document.
+    /^[a-f0-9]{32}$/i.test(v.documentID) &&
+    !/^0{32}$/.test(v.documentID) &&
     typeof v.expires === 'number' &&
     Number.isFinite(v.expires) &&
     v.expires >= now &&

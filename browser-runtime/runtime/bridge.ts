@@ -28,6 +28,7 @@ export interface Job {
   confirmed?: boolean;
   skipped?: boolean;
   statusFingerprint?: string;
+  statusEvent?: { fingerprint: string; timestamp: number };
 }
 interface SourceRecord {
   revision?: number;
@@ -523,6 +524,7 @@ export class BrowserBridge {
             ? 'Skipped. Delivery to Muse was not confirmed.'
             : 'Delivery to Muse was not confirmed. Check the interrupted message in Beeper Muse.';
       const content = {
+        network: 'muse://muse',
         status,
         message,
         'm.relates_to': { rel_type: 'm.reference', event_id: job.id },
@@ -534,6 +536,12 @@ export class BrowserBridge {
       const fingerprint = await eventID(this.room, JSON.stringify(content));
       if (job.statusFingerprint === fingerprint) continue;
       try {
+        // Persist once per transition: retries must use the same timestamp and
+        // transaction ID. Beeper Desktop omits statuses without content.ts.
+        if (job.statusEvent?.fingerprint !== fingerprint) {
+          job.statusEvent = { fingerprint, timestamp: Date.now() };
+          await this.state.put('jobs', jobs);
+        }
         await this.api.members(this.room);
         await this.api.request(
           'PUT',
@@ -541,7 +549,8 @@ export class BrowserBridge {
             enc(this.room) +
             '/send/com.beeper.message_send_status/' +
             enc(fingerprint),
-          content,
+          { ...content, ts: job.statusEvent.timestamp },
+          this.api.config.bot,
         );
         job.statusFingerprint = fingerprint;
         await this.state.put('jobs', jobs);

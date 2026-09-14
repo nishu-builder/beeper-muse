@@ -10,16 +10,14 @@ The product remains Chrome-only. Maintainer test tools are optional.
 
 ## Current priorities
 
-1. Complete the live iteration loop. The chosen log confirmed 0.8.9 but stopped
-   at 22:04:35 UTC. The user subsequently connected Muse; current Desktop account
-   status is connected, but source readiness and queue counts need fresh evidence.
-   Desktop get-chat recovered after the user restarted Beeper Desktop. The
-   earlier send record remains open; do not replay it. Restore diagnostic updates
-   before the photo cycle.
-2. Verify incoming photo delivery. The last fresh queue had no held or queued
-   jobs; current counts and the earlier photo's outcome are unknown. No job was
-   dismissed by this agent. Earlier readiness found one composer file input but
-   no recognized image input; 0.8.9 expands standard accept-filter handling.
+1. Complete the live iteration loop. Beeper Desktop's API recovered after restart.
+   Fresh 0.8.9 diagnostics allowed a new text test; its round trip passed. After
+   the 0.8.10 status fix, that same test also reports native delivery. Automatic
+   reload and diagnostic-file retention were observed; selected-tab recovery
+   exposed a document-token validation bug, now fixed and awaiting live retest.
+2. Verify incoming photo delivery. Fresh 0.8.9 diagnostics recognize the composer
+   image picker with an empty queue. No photo test has yet run. The earlier user
+   photo's outcome remains unknown; no user job was dismissed.
 3. Verify the new Babar avatar synchronization and diagnose missing typing indicators.
 4. Verify both-direction photos and native delivery status end to end.
 5. Work through the rendering/type inventory below; inspect actual source support
@@ -270,3 +268,30 @@ After the user quit and reopened Beeper Desktop, the same driver's identity,
 message-search and per-chat retrieval checks all passed. Restarting cleared this
 API failure; the underlying cause is still unknown. The diagnostic file remains
 stale, so current Muse readiness and queue state are not yet established.
+
+## September 14 follow-up: live text delivery and update recovery
+
+With fresh 0.8.9 diagnostics, idle source and empty queue, a new uniquely marked
+text test reached Muse and returned the expected reply in Beeper. The previous
+HTTP-500 test journal was archived as unverified after read-only observation; its
+prompt was not replayed. The new test initially lacked native delivery evidence.
+
+Installed Desktop source shows its status mapper requires a timestamp from
+`content.ts`; our status events omitted it. Version 0.8.10 persists a timestamp
+per status transition, sends the event as the Muse bot with its bridge identity,
+and keeps transaction IDs/timestamps stable across retries. Saved confirmed jobs
+receive corrected status metadata without another prompt submission. After the
+automatic local update, the **same text test passed both round trip and native
+delivery** through the Desktop API. Visible Desktop/mobile status rendering is
+still unverified.
+
+The automatic update kept the diagnostic file updating but lost the selected Muse
+connection. The reconnect validator expected a 36-character hyphenated UUID;
+[Chromium's document-token parser](https://github.com/chromium/chromium/blob/main/extensions/browser/extension_api_frame_id_map.cc)
+accepts 32 hex characters. The corrected validator preserves the exact token and
+still rejects malformed, zero and expired tickets. Live selected-tab recovery
+and the photo cycle remain to be verified.
+
+The live text attempt emitted typing-accepted and typing-cleared diagnostics.
+Those establish source/transport activity, not a visible typing animation.
+Avatar-source-missing remains in fresh logs; Babar's avatar is still open.
