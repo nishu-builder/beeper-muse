@@ -1,0 +1,47 @@
+{
+  "manifest_version": 3,
+  "name": "Beeper Muse",
+  "version": "0.6.0",
+  "description": "Your Muse conversation, in Beeper. Setup instructions on GitHub.",
+  "minimum_chrome_version": "127",
+  "permissions": [
+    "storage",
+    "alarms",
+    "activeTab",
+    "declarativeNetRequestWithHostAccess",
+    "unlimitedStorage"
+  ],
+  "host_permissions": [
+    "https://muse.ai/*",
+    "https://matrix.beeper.com/*",
+    "wss://matrix.beeper.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://muse.ai/*"],
+      "js": ["adapter.js", "sync.js", "activity.js", "content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "homepage_url": "https://github.com/nishu-builder/beeper-muse",
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'none'"
+  }
+}

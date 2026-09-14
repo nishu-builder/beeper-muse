@@ -1,13 +1,19 @@
 # Browser runtime
 
-Decision: move toward an extension-only bridge. Status: typed source boundaries
-and an isolated Chrome authentication probe are implemented. Probe 0.1.3 has
-confirmed an authenticated connection in the user's Chrome session: HTTP 101,
-followed by a Beeper protocol ping response, with no companion process. A typed
-IndexedDB transaction inbox is implemented and tested, but is not connected to
-the probe. Encrypted message processing, runtime integration, and migration
-remain unfinished.
-The released runtime still needs the companion.
+Decision: move toward an extension-only bridge. PR #12 is merged. The Chrome
+handshake is verified, and the runtime now integrates a service worker,
+Rust/WASM crypto, durable transaction intake, an encrypted outbox, a Muse prompt
+queue, native sender identities, formatting, encrypted images, edits, reactions,
+typing, and quiet history imports. Independent live API tests created the room,
+uploaded device keys, delivered an encrypted event, fetched it, and decrypted its
+expected content. Further live API tests confirmed native owner identity and
+accepted encrypted image delivery, reaction add/remove, and typing updates. The
+installed Chrome worker and both-direction chat flow still
+need a live acceptance run. See [Chrome setup](chrome-setup.md).
+
+The released companion runtime remains available. The Chrome preview creates a
+new registration/chat; it does not migrate the old Go crypto database or repair
+the old room's historical ordering.
 
 ## Components
 
@@ -33,7 +39,7 @@ which supports persistent IndexedDB storage. That establishes a plausible route,
 not compatibility with Beeper's application-service extensions or the existing
 Go crypto database.
 
-## Work needed before switching
+## Architecture and acceptance requirements
 
 1. **Registration and transport.** Implement Beeper registration in extension UI,
    then connect directly to its application-service WebSocket. Preserve the Muse
@@ -145,7 +151,8 @@ origin, and diagnostic tab. A Web Lock permits only one connection test at a tim
 
 This experiment requires keeping its diagnostic tab open for at most 15 seconds.
 It does not establish a production background runtime; encryption, durability,
-and a supported document lifecycle still need implementation and verification.
+and a supported document lifecycle were not part of that probe. The runtime
+integration below replaces the document with a service worker.
 
 Probe 0.1.3 removes `Origin` from this narrowly scoped appservice handshake.
 A native API control using the same isolated registration returned HTTP 101 and
@@ -156,7 +163,7 @@ three authentication headers verified, HTTP 101, and a Beeper protocol reply.
 This closes the document-based handshake investigation. Background lifecycle
 and message delivery are separate remaining work.
 
-## Durable transaction inbox
+## Durable transaction inbox (PR #12 foundation)
 
 `browser-runtime/inbox.ts` implements the first browser persistence boundary.
 It retains complete transaction payloads, including encrypted room events,
@@ -187,3 +194,28 @@ These are automated storage tests, not a live Chrome storage/restart test.
 The diagnostic does not import this module and still acknowledges no transactions.
 Do not enable intake on a live registration until a durable crypto/event consumer
 is connected and recovery is verified.
+
+## Runtime integration after PR #12
+
+`browser-runtime/runtime` contains the Matrix client, crypto boundary, persistent
+state, delivery engine, worker lifecycle, and popup. The existing source adapter
+and tracker are bundled unchanged. The worker restricts requests to the selected
+Muse tab's top frame; account credentials and Matrix room IDs are not sent to it.
+
+The worker uses the verified header rule, 20-second protocol heartbeats, a
+30-second recovery alarm, and bounded reconnection backoff. A registration
+conflict requires explicit reconnection. Startup recovers pending crypto events
+and encrypted batches, and marks interrupted prompt claims for user review.
+The runtime checks room membership before admitting prompts and sending batches.
+
+The inbox is now connected to a consumer: it saves before acknowledging, feeds
+crypto updates before decrypting room events, and keeps transactions pending
+when a room key is missing. Later key updates can unblock earlier events.
+Outgoing ciphertext and deterministic event IDs are saved before batch send.
+Read-only diagnostics report queue counts, not credentials or response bodies.
+
+The public build bundles the WASM artifact and its license, with no native host,
+localhost permission, or private registration. Chrome's `unlimitedStorage`
+permission covers extension IndexedDB and prevents ordinary quota eviction.
+It does not substitute for backups. Packaging and live worker restart behavior
+remain acceptance checks before promoting this preview to the store release.
