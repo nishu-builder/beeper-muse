@@ -290,3 +290,27 @@ observations do not hold the update guard; actual message operations still do.
 Source preparation and reload operations are never retried because of an
 observation timeout. Live update recovery remains unverified: the selected export
 is still stale at 0.8.2 and no held user work was modified.
+
+## Fresh runtime and first automated send (0.8.9 work)
+
+The user renewed file updates. The chosen export now reports the exact staged
+0.8.8 fingerprint, both connections ready, and zero queued/claimed/blocked/pending
+jobs. Desktop's current account status is connected. Browser DOM inspection still
+fails with Debugger unattached.
+
+A journaled text test through Desktop's send API returned HTTP 500. Logs identify
+a sendMessage tool execution failure; the read-only getChat endpoint independently
+returns TOOL_EXECUTION_ERROR. Message search and listing work. The same run was
+observed for 45 seconds without a matching message/reply or native delivery result.
+Its send outcome remains unverified and its journal was retained without replay.
+The photo and subsequent text scenarios have not been sent.
+
+Current source diagnostics locate one composer file input that the image/*-only
+filter fails to recognize. Version 0.8.9 handles standard MIME, filename-extension
+and unrestricted filters, with synthetic rejection tests for incompatible MIME,
+PDF/SVG-only inputs, disabled fieldsets and ambiguous multiple pickers. These tests
+are not evidence of a successful live image submission.
+
+Staging the new local package was followed by the diagnostic file ceasing to
+advance after 21:50:15 UTC. Automatic reload and file-grant retention therefore
+remain unverified; disk package contents do not establish the running version.

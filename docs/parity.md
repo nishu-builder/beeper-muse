@@ -10,12 +10,14 @@ The product remains Chrome-only. Maintainer test tools are optional.
 
 ## Current priorities
 
-1. Restore a reliable local iteration loop: fresh diagnostics, the correct running
-   build, and an idle selected Muse tab. The diagnostic file stopped updating
-   after the 0.8.3 update attempt; last observed runtime was 0.8.2.
-2. Resolve the earlier interrupted incoming photo without resending it or attaching
-   it to the queued text. The last live heartbeat had one held photo and one queued
-   text. The user has not confirmed that the held job was dismissed.
+1. Complete the live iteration loop. Fresh 0.8.8 diagnostics now confirm the exact
+   build, both connections, an idle composer and an empty queue. The first Desktop
+   API text test returned HTTP 500; its send record is retained and must not be
+   replayed. Resolve the Desktop send/get-chat failure before the photo cycle.
+2. Verify incoming photo delivery. The current live queue has no held or queued
+   jobs; the earlier photo's outcome is unknown. No job was dismissed by this
+   agent. Fresh readiness finds one composer file input but no recognized image
+   input; 0.8.9 expands standard accept-filter handling without guessing selectors.
 3. Verify the new Babar avatar synchronization and diagnose missing typing indicators.
 4. Verify both-direction photos and native delivery status end to end.
 5. Work through the rendering/type inventory below; inspect actual source support
@@ -207,3 +209,36 @@ The selected live log still ends at 0.8.2. Newer files on disk do not establish 
 running build. No uncertain image was retried, no held job dismissed and no live
 conversation test sent. Fresh runtime evidence, source inspection and the rest of
 the parity inventory remain required.
+
+## September 14 follow-up: live diagnostics restored and upload filters
+
+After the user enabled file updates, the chosen export refreshed to the exact
+0.8.8 build. Both connections are ready; queued, claimed, blocked and pending counts
+are zero. Native Desktop account status also changed from disconnected to connected.
+The earlier held photo is no longer present in queue counts; that does not establish
+whether it was delivered or dismissed. No existing user job was modified here.
+
+The first live driver text send returned HTTP 500 / TOOL_EXECUTION_ERROR. Desktop
+logs show the sendMessage tool failed, and getChat independently returns the same
+error class. Chat listing and message search still work. A 45-second read-only
+observation found no matching round trip or delivery confirmation. The test's
+private send record remains open; no resend or photo test was attempted.
+
+Fresh source-readiness evidence reports one file input in the isolated composer
+region, zero MIME-recognized image inputs and no existing preview. The old adapter
+required the substring image/ and did not support standard extension-only or empty
+accept filters. 0.8.9 matches MIME, image/* and filename-extension filters against
+the actual image, accepts unrestricted composer pickers, and rejects incompatible
+or disabled inputs. Tests cover these filters, ambiguity and unchanged draft and
+preview protections. Actual photo submission still needs live verification.
+
+Avatar-source-missing is now visible in current logs. Browser DOM inspection still
+returns Debugger unattached, so the avatar selector and full rendering inventory
+remain open. Fresh diagnostics are restored; the broader development loop is not
+yet a passed end-to-end test.
+
+During the automatic update attempt, the chosen log stopped advancing again after
+21:50:15 UTC (last runtime 0.8.8). The update's completion and file-grant retention
+are unverified. A fresh connection-page status is needed to distinguish lost file
+permission from a stopped or duplicate connection document. Do not treat the last
+healthy snapshot as current readiness.

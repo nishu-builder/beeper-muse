@@ -468,8 +468,15 @@ test('image submission rejects unrelated file pickers without touching them', as
   );
   f.dom.window.close();
 });
-for (const tag of ['form', 'div'])
-  test(`image upload in a ${tag} waits for a loaded preview and preserves an existing draft`, async () => {
+for (const [tag, accept] of [
+  ['form', 'image/*'],
+  ['div', 'image/*'],
+  ['div', '.png,.jpg,.jpeg'],
+  ['div', 'IMAGE/PNG'],
+  ['div', ''],
+  ['div', 'application/pdf, .PNG'],
+] as const)
+  test(`image upload in a ${tag} with ${accept || 'no accept filter'} waits for a loaded preview and preserves an existing draft`, async () => {
     const f = fixture(),
       doc = f.document,
       form = doc.createElement(tag);
@@ -481,8 +488,9 @@ for (const tag of ['form', 'div'])
     assert.equal(facts.hasForm, tag === 'form');
     const input = doc.createElement('input');
     input.type = 'file';
-    input.accept = 'image/*';
+    input.accept = accept;
     form.append(input);
+    assert.equal(f.adapter.create(doc).imageReadiness!().imageInputs, 1);
     let files: File[] = [];
     Object.defineProperty(input, 'files', {
       get: () => files,
@@ -639,5 +647,69 @@ test('structured source text preserves table boundaries, continued lists and cod
   assert.match(message.text, /2\. Second\n  - Nested\n3\. Third/);
   assert.match(message.text, /```\n  const x = 1;\n    return x;\n```/);
   assert.match(message.text, /\nAfter$/);
+  f.dom.window.close();
+});
+
+test('image selection respects exact file type, disabled controls and picker ambiguity', async () => {
+  for (const inputMarkup of [
+    '<input type="file" accept="image/jpeg">',
+    '<input type="file" accept=".jpg">',
+    '<input type="file" accept="application/pdf">',
+    '<input type="file" accept="application/image/png">',
+    '<input type="file" accept="image/svg+xml">',
+    '<fieldset disabled><input type="file" accept="image/*"></fieldset>',
+    '<input type="file"><input type="file" accept=".png">',
+  ]) {
+    const f = fixture(),
+      doc = f.document,
+      region = doc.createElement('div');
+    region.append(doc.querySelector('textarea')!, doc.querySelector('button')!);
+    region.insertAdjacentHTML('beforeend', inputMarkup);
+    doc.body.append(region);
+    await assert.rejects(
+      f.adapter.create(doc).submitImage!(
+        '',
+        { name: 'photo.png', mime: 'image/png', data: 'iVBORw0KGgo=' },
+        async () => {},
+      ),
+      (e: unknown) =>
+        ['image-input-missing', 'image-composer-ambiguous'].includes(
+          (e as { code: string }).code,
+        ),
+    );
+    for (const input of region.querySelectorAll<HTMLInputElement>('input'))
+      assert.equal(input.files!.length, 0);
+    f.dom.window.close();
+  }
+});
+
+test('an attachment in another composer picker blocks photo staging', async () => {
+  const f = fixture(),
+    doc = f.document,
+    region = doc.createElement('div');
+  region.append(doc.querySelector('textarea')!, doc.querySelector('button')!);
+  region.insertAdjacentHTML(
+    'beforeend',
+    '<input type="file" accept="image/png"><input type="file" accept="application/pdf">',
+  );
+  doc.body.append(region);
+  const inputs = region.querySelectorAll<HTMLInputElement>('input');
+  Object.defineProperty(inputs[1]!, 'files', {
+    value: [
+      new f.dom.window.File(['synthetic'], 'existing.pdf', {
+        type: 'application/pdf',
+      }),
+    ],
+  });
+  await assert.rejects(
+    f.adapter.create(doc).submitImage!(
+      '',
+      { name: 'photo.png', mime: 'image/png', data: 'iVBORw0KGgo=' },
+      async () => {},
+    ),
+    (e: unknown) => (e as { code: string }).code === 'image-composer-ambiguous',
+  );
+  assert.equal(inputs[0]!.files!.length, 0);
+  assert.equal(inputs[1]!.files!.length, 1);
   f.dom.window.close();
 });
