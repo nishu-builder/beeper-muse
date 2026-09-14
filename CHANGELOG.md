@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.12
+
+- Locate the complete Muse composer so attachment previews and Send controls in
+  sibling containers can be observed. Preserve draft and transcript guards.
+- Live inspection confirmed the previous upload region was too narrow; successful
+  photo delivery remains under verification.
+
 ## 0.8.11
 
 - Handle cleared or replaced image pickers when a loaded local preview matches

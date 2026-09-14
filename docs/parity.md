@@ -17,8 +17,9 @@ The product remains Chrome-only. Maintainer test tools are optional.
    during the 0.8.10 → 0.8.11 update; the held photo job stayed held.
 2. Verify incoming photo delivery. A fresh 0.8.10 photo test staged an attachment
    but stopped at image-input-changed before Send; native failure was verified.
-   The test remains held. 0.8.11 supports reset pickers with byte-identical local
-   preview evidence; live verification and the subsequent text test remain open.
+   After user dismissal, a new 0.8.11 test timed out before Send and is held.
+   Live DOM inspection now works in a new Muse tab. Version 0.8.12 corrects the
+   composer boundary; live photo and subsequent text verification remain open.
 3. Verify the new Babar avatar synchronization and diagnose missing typing indicators.
 4. Verify both-direction photos and native delivery status end to end.
 5. Work through the rendering/type inventory below; inspect actual source support
@@ -47,8 +48,8 @@ The product remains Chrome-only. Maintainer test tools are optional.
   distinguish action-card decoration from conversation attachments and retain
   useful card text/context without making inactive controls appear actionable.
 
-Browser inspection still returned `Debugger unattached` after the user reconnected
-Computer use. No live UI verification was obtained from that reconnect.
+Earlier browser inspection returned `Debugger unattached` after reconnect.
+A newly opened Muse tab now supports live DOM inspection; see the latest entry.
 
 ## User-reported issues
 
@@ -73,8 +74,8 @@ Computer use. No live UI verification was obtained from that reconnect.
 ## Message and rendering inventory
 
 This inventory combines the user's screenshots, reports and current code. It is
-**not yet an exhaustive inspection of the current Muse UI**: supported browser
-inspection repeatedly returns `Debugger unattached`. Unknown rows must be checked
+**not yet an exhaustive inspection of the current Muse UI**. Browser inspection
+now works in a newly opened Muse tab. Unknown rows must be checked
 in the source before implementation is presented as parity.
 
 | Type / rendering                                   | Evidence that Muse supports it                                                 | Beeper target / current gap                                                                                                                                                                                             |
@@ -324,3 +325,29 @@ verifies selected-document recovery and continuing file logging for this update;
 it does not establish why the first upload changed its picker or prove a photo
 was submitted. The user has been asked to dismiss only the synthetic test job
 before another test; no dismissal or resend was automated.
+
+## September 14 follow-up: actual composer boundary (0.8.12)
+
+The user's dismissal was confirmed in fresh diagnostics. A new journaled 0.8.11
+photo attempt reached upload-start, then timed out after 60 seconds. Readiness
+found one picker, no selected file, no preview and no Send button in the monitored
+region. Native failure was confirmed; no successful submission or response was
+observed. This new synthetic job is held, and no subsequent text was sent.
+
+A newly opened Muse tab restored supported browser DOM inspection. The live
+composer has an explicit data-hatch-composer-chrome wrapper. Its inner container
+holds the picker and textarea, while action controls are siblings outside that
+inner container. The old discovery stopped at the inner container. Version 0.8.12
+uses the explicit wrapper, rejects transcript/shared-composer boundaries, and
+retains the older bounded fallback. Synthetic tests cover sibling previews/actions
+and rejection of a marked transcript ancestor. This fixes an observed boundary
+error; it does not prove why Muse cleared the upload or establish live delivery.
+Avatar and typing verification, the full rendering inventory and both-direction
+photo acceptance remain open. No held job was dismissed automatically.
+
+The automatic local update is live: fresh 0.8.12 diagnostics confirm the exact
+packaged build, both connections, continued file logging and the held job. The
+corrected region now reports two image elements and one Send control where the
+old region reported zero of each. These counts do not identify the images, but
+they confirm the boundary changed actual observation. Inspect and remove only
+leftover synthetic test attachments before dismissing that test and trying again.

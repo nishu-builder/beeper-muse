@@ -442,9 +442,23 @@
       }),
     };
   }
-  // Muse's current composer is not a native form. Stay within the smallest
-  // ancestor containing its own file input, never the transcript or page root.
+  // Current Muse puts its picker beside the textarea, but previews and actions
+  // elsewhere in this explicit composer. Older layouts use the bounded fallback.
   function uploadRegion(field: HTMLTextAreaElement): HTMLElement | null {
+    const marked = field.closest<HTMLElement>(
+      '[data-hatch-composer-chrome="true"]',
+    );
+    if (marked) {
+      if (
+        marked === field.ownerDocument.body ||
+        marked === field.ownerDocument.documentElement ||
+        marked.matches('[role="log"],[data-message-item]') ||
+        marked.querySelector('[role="log"],[data-message-item]') ||
+        marked.querySelectorAll('textarea').length !== 1
+      )
+        return null;
+      return marked;
+    }
     for (
       let region = field.parentElement;
       region;

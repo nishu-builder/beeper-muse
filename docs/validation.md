@@ -376,3 +376,21 @@ source and continued writing fresh diagnostics. Both connections report ready;
 the held photo job remains held. New upload readiness finds no existing files or
 previews. No manual reconnect was required for this update, and no held job was
 replayed. Another photo test awaits dismissal of the synthetic failed job.
+
+## Live composer inspection and boundary regression (0.8.12)
+
+After confirmed user dismissal, a new 0.8.11 photo attempt failed with
+image-preview-timeout and native failure. No photo delivery was verified.
+Supported browser inspection worked in a newly opened Muse tab: the picker and
+textarea share an inner container, while action controls sit elsewhere in the
+explicit composer wrapper. The adapter previously watched only the inner region.
+The wrapper fix has synthetic sibling-preview/Send and shared-transcript rejection
+coverage. The new failed test remains held; successful live upload and post-photo
+text remain pending.
+
+The automatic local update is live: fresh 0.8.12 diagnostics confirm the exact
+packaged build, both connections, continued file logging and the held job. The
+corrected region now reports two image elements and one Send control where the
+old region reported zero of each. These counts do not identify the images, but
+they confirm the boundary changed actual observation. Inspect and remove only
+leftover synthetic test attachments before dismissing that test and trying again.

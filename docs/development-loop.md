@@ -147,8 +147,8 @@ banners and original Muse timestamps remain **unverified** unless separately
 observed. A successful API response does not prove those UI behaviors.
 
 Browser inspection uses the supported browser tooling when it is available.
-The present `Debugger unattached` failure still prevents inspecting Muse's actual
-upload controls. Neither the driver nor the diagnostic file bypasses browser
+A newly opened Muse tab restored DOM inspection after earlier `Debugger unattached`
+failures. Neither the driver nor the diagnostic file bypasses browser
 access restrictions. Log counts can identify a missing form/input, but they do
 not establish the correct selectors by themselves.
 
