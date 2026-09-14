@@ -81,10 +81,11 @@ try {
   for (const name of [
     'manifest.json',
     'popup.html',
-    'popup.js',
     'popup.css',
     'transport.js',
     'probe/background.js',
+    'probe/page.js',
+    'request-observation.js',
   ]) {
     await mkdir(join(directory, name, '..'), { recursive: true });
     await cp(join(root, 'dist/browser-probe', name), join(directory, name));

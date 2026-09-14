@@ -104,7 +104,8 @@ The extension has no content scripts or localhost permission. A temporary
 [Chrome request-header rule](https://developer.chrome.com/docs/extensions/reference/api/declarativeNetRequest)
 sets the three appservice headers only on the exact WebSocket URL initiated by
 this extension ID. Credentials never appear in URLs. The rule is removed when
-the test ends and on worker initialization. Raw server responses and credentials
+the test ends, the diagnostic tab closes, or Chrome starts. Cleanup uses the
+same ownership lock as the page, so a worker wakeup cannot clear a live test. Raw server responses and credentials
 are not shown in the popup.
 
 `npm run build:browser-probe` produces public code in `dist/browser-probe` without
@@ -125,3 +126,17 @@ Explicit WebSocket host permissions have historically had different Chrome Web
 Store validation behavior; see the [Chromium report](https://groups.google.com/a/chromium.org/g/chromium-extensions/c/P1PbbBGvydo).
 This remains an unpacked experiment. The production runtime must validate its
 permission flow and store packaging before release.
+
+Probe 0.1.2 runs the WebSocket from a dedicated extension document. The 0.1.1
+worker test accepted its permission and rule setup but failed the handshake in
+Chrome; worker request interception remains a suspected cause, not an established
+one. The document test also checks Chrome's hypothetical rule match and observes
+handshake metadata via [webRequest](https://developer.chrome.com/docs/extensions/reference/api/webRequest).
+Only verification flags, numeric status codes, and bounded network error codes
+reach the UI. Headers, credentials, URLs, and message bodies are never displayed.
+Observers and authentication rules are scoped to the exact endpoint, extension
+origin, and diagnostic tab. A Web Lock permits only one connection test at a time.
+
+This experiment requires keeping its diagnostic tab open for at most 15 seconds.
+It does not establish a production background runtime; encryption, durability,
+and a supported document lifecycle still need implementation and verification.

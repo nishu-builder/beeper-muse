@@ -17,6 +17,7 @@ export interface HeaderRule {
     isUrlFilterCaseSensitive: boolean;
     initiatorDomains: string[];
     resourceTypes: ['websocket'];
+    tabIds?: number[];
   };
 }
 export interface Rules {

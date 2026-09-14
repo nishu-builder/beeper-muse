@@ -1,10 +1,10 @@
 {
   "manifest_version": 3,
   "name": "Beeper Muse Chrome connection test",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Development test for a direct Beeper appservice connection.",
   "minimum_chrome_version": "127",
-  "permissions": ["declarativeNetRequestWithHostAccess"],
+  "permissions": ["declarativeNetRequestWithHostAccess", "webRequest"],
   "host_permissions": [
     "https://matrix.beeper.com/*",
     "wss://matrix.beeper.com/*"
@@ -13,9 +13,7 @@
     "service_worker": "probe/background.js",
     "type": "module"
   },
-  "action": {
-    "default_popup": "popup.html"
-  },
+  "action": {},
   "content_security_policy": {
     "extension_pages": "script-src 'self'; object-src 'none'"
   }
