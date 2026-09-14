@@ -120,3 +120,30 @@ your draft. Rich-content fidelity is bounded by what the webpage exposes.
 
 See [runtime protocol details](browser-runtime.md), [security](../SECURITY.md),
 [privacy](../PRIVACY.md), and [validation](validation.md).
+
+## Updates and reconnection
+
+`updates.ts` coordinates both Chrome's `onUpdateAvailable` event and local
+completed-build markers. Only an unpacked (`management.getSelf().installType`)
+installation reads `dev-update.json`. The worker's compiled source fingerprint
+is compared with the marker; public ZIPs omit local build metadata. The build
+and copy command exits after a staged folder replacement, with a per-destination
+writer lock. It preserves private files and leaves the old installation intact
+if staging fails. A failed final rename attempts to restore the previous folder.
+An interrupted rename can leave a `.previous-*` backup requiring local recovery;
+never delete an update lock without checking that its writer has stopped.
+
+Pending updates prevent new claims. The updater waits for claimed jobs, ongoing
+handlers and the content script's current poll/activity to finish. The content
+script stops its observers only at a safe boundary; the worker stops the socket
+and waits for its durable inbox and serialized delivery work before reloading.
+A short-lived local ticket stores only the selected tab ID, Chrome document ID and expiry. After the
+new runtime connects, it validates the ticket and main Muse URL and injects its
+packaged scripts into that tab's isolated main frame using `scripting`. Restoration targets that exact document ID; navigation or a new browser session
+cannot redirect it to another page with a reused tab ID. It does
+not refresh or navigate Muse, select another tab, or erase IndexedDB. Old scripts
+remove their timers/listeners when their extension context is invalidated.
+
+Chrome may delay store updates while the connection page and worker stay active;
+explicit safe reloads apply an already-downloaded update. This mechanism cannot
+bypass store review, permission prompts, browser shutdown or frozen pages.

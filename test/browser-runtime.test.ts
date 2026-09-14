@@ -465,3 +465,28 @@ test('Desktop provisioning bypasses message persistence and encryption', async (
     h.close();
   }
 });
+
+test('update checkpoint waits for durable delivery and preserves saved state', async () => {
+  let release!: () => void;
+  const pending = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const h = await harness(() => pending);
+  await h.state.put('test-saved-key', 'synthetic-key');
+  const delivery = h.bridge.importMessages([
+    { id: 'update-in-flight', role: 'assistant', text: 'Synthetic reply' },
+  ]);
+  let finished = false;
+  const checkpoint = h.bridge.checkpoint().then(() => {
+    finished = true;
+  });
+  await new Promise((resolve) => setImmediate(resolve));
+  assert.equal(finished, false);
+  release();
+  await delivery;
+  await checkpoint;
+  assert.equal(h.batches.length, 1);
+  assert.equal(await h.state.get('test-saved-key'), 'synthetic-key');
+  assert.equal((await h.bridge.status()).claimed, 0);
+  h.close();
+});

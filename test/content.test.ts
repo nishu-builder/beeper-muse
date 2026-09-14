@@ -57,7 +57,8 @@ function harness(
     resolveClaim = resolve;
   });
   const job = { id: 'job', prompt: 'Synthetic prompt' };
-  runInNewContext(activitySource + '\n' + syncSource + '\n' + source, {
+  let disposedTimers = 0;
+  const context = {
     crypto: webcrypto,
     TextEncoder,
     document: {
@@ -65,6 +66,7 @@ function harness(
         return visibility;
       },
       addEventListener: () => {},
+      removeEventListener: () => {},
     },
     window: {
       addEventListener: (
@@ -78,6 +80,9 @@ function harness(
     },
     location: { origin: 'https://muse.ai', pathname: '/' },
     Date: { now: () => now },
+    clearInterval: () => {
+      disposedTimers++;
+    },
     setInterval: (fn: () => void) => {
       intervals.push(fn);
     },
@@ -86,7 +91,9 @@ function harness(
     },
     chrome: {
       runtime: {
+        id: 'synthetic-extension',
         onMessage: {
+          removeListener: () => {},
           addListener: (fn: Listener) => {
             listener = fn;
           },
@@ -138,8 +145,13 @@ function harness(
       },
       responseAfter: () => 'Synthetic answer',
     },
-  });
+  };
+  runInNewContext(activitySource + '\n' + syncSource + '\n' + source, context);
   return {
+    reinstall: () => runInNewContext(source, context),
+    get disposedTimers() {
+      return disposedTimers;
+    },
     messages,
     pulse: async () => {
       intervals[0]!();
@@ -269,7 +281,7 @@ test('readiness probes expose no draft or chat text', () => {
   ] as const) {
     h.view(view);
     const probe = h.signal('probe');
-    assert.equal(probe.protocol, 6);
+    assert.equal(probe.protocol, 7);
     assert.equal(probe.health, health);
     assert.deepEqual(Object.keys(probe).sort(), [
       'health',
@@ -355,5 +367,35 @@ test('worker pulses renew and clear typing without tab timers or a readable tran
   h.signal('activity-pulse');
   await flush();
   assert.deepEqual(activities(), ['working', 'working', 'idle']);
+  assert.equal(h.submits, 0);
+});
+
+test('update preparation waits for a claimed prompt and Muse activity, preserving drafts', async () => {
+  const h = harness(true);
+  h.signal('start');
+  await flush();
+  assert.equal(h.signal('prepare-update').ready, false);
+  h.signal('stop');
+  h.claim();
+  await flush();
+  h.view({ busy: true });
+  assert.equal(h.signal('prepare-update').ready, false);
+  h.view({ unavailable: true });
+  assert.equal(h.signal('prepare-update').ready, false);
+  h.view({ draft: 'Keep my draft' });
+  assert.equal(h.signal('prepare-update').ready, true);
+  assert.equal(h.events.has('beforeunload'), false);
+  assert.equal(h.submits, 0);
+});
+
+test('reinjecting the content script disposes old timers and cannot revive its pending claim', async () => {
+  const h = harness(true);
+  h.signal('start');
+  await flush();
+  h.reinstall();
+  assert.equal(h.disposedTimers, 2);
+  assert.equal(h.events.has('beforeunload'), false);
+  h.claim();
+  await flush();
   assert.equal(h.submits, 0);
 });

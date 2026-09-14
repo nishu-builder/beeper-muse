@@ -1,5 +1,6 @@
 (() => {
   'use strict';
+  globalThis.__beeperMuseContent?.dispose();
   const muse = BeeperMuseDOM.create(document);
   const wait = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
   let polling = false;
@@ -30,11 +31,16 @@
       return 'unavailable';
     }
   }
-  const send = (message) =>
-    chrome.runtime.sendMessage(message).then((result) => {
+  const send = async (message) => {
+    if (!chrome.runtime.id) {
+      dispose();
+      throw new Error('Extension updated.');
+    }
+    return chrome.runtime.sendMessage(message).then((result) => {
       if (!result?.ok) throw new Error('Local connector request failed.');
       return result;
     });
+  };
   const activity = new BeeperMuseActivity.Reporter((value) =>
     activityEnabled
       ? send({ type: 'activity', activity: value })
@@ -185,7 +191,24 @@
       polling = false;
     }
   }
-  chrome.runtime.onMessage.addListener((message, _sender, respond) => {
+  const listener = (message, _sender, respond) => {
+    if (message.type === 'prepare-update') {
+      let ready = false;
+      try {
+        ready =
+          !polling &&
+          !pulsing &&
+          health() !== 'busy' &&
+          health() !== 'unavailable';
+      } catch {}
+      if (ready) {
+        stopped = true;
+        generation++;
+        guardClosing(false);
+      }
+      respond({ ok: true, ready });
+      return;
+    }
     if (message.type === 'activity-pulse') {
       respond({ ok: true });
       void pulseActivity();
@@ -193,7 +216,7 @@
     }
     if (message.type === 'probe') {
       respond({
-        protocol: 6,
+        protocol: 7,
         health: health(),
         progress: tracker.progress,
         rescanning: rescanPending,
@@ -211,17 +234,18 @@
       generation++;
       void reportActivity(null);
       guardClosing(false);
-      respond({ protocol: 6 });
+      respond({ protocol: 7 });
     }
     if (message.type === 'start') {
       stopped = false;
       tracker = new BeeperMuseSync.Tracker(send, undefined, muse.prepare);
       const state = health();
       guardClosing(state !== 'unavailable');
-      respond({ protocol: 6, health: state });
+      respond({ protocol: 7, health: state });
       void poll();
     }
-  });
+  };
+  chrome.runtime.onMessage.addListener(listener);
   let pulsing = false;
   async function pulseActivity() {
     if (pulsing || stopped || !closeGuard || !activityEnabled) return;
@@ -241,10 +265,31 @@
       pulsing = false;
     }
   }
-  setInterval(() => void pulseActivity(), 2000);
-  document.addEventListener('visibilitychange', () => void offerPopup());
-  window.addEventListener('pagehide', () => void reportActivity(null));
-  window.addEventListener('focus', () => void offerPopup());
+  const pulseTimer = setInterval(() => {
+    if (!chrome.runtime.id) dispose();
+    else void pulseActivity();
+  }, 2000);
+  const pollTimer = setInterval(() => void poll(), 2000);
+  const offerListener = () => void offerPopup();
+  const hideListener = () => void reportActivity(null);
+  document.addEventListener('visibilitychange', offerListener);
+  window.addEventListener('pagehide', hideListener);
+  window.addEventListener('focus', offerListener);
+  function dispose() {
+    stopped = true;
+    generation++;
+    guardClosing(false);
+    clearInterval(pulseTimer);
+    clearInterval(pollTimer);
+    try {
+      chrome.runtime.onMessage.removeListener(listener);
+    } catch {
+      /* Old extension context. */
+    }
+    document.removeEventListener('visibilitychange', offerListener);
+    window.removeEventListener('pagehide', hideListener);
+    window.removeEventListener('focus', offerListener);
+  }
+  globalThis.__beeperMuseContent = { dispose };
   void offerPopup();
-  setInterval(() => void poll(), 2000);
 })();

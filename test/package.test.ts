@@ -17,6 +17,8 @@ test('release ZIP is reproducible, readable by unzip, and excludes private files
   const privateValue = 'private-pairing-must-not-ship';
   await writeFile(join(source, 'local-config.json'), privateValue);
   await writeFile(join(source, 'pairing-code.txt'), privateValue);
+  await writeFile(join(source, 'dev-update.json'), privateValue);
+  await writeFile(join(source, 'build-info.json'), privateValue);
   const zip = await packageExtension(source);
   assert.deepEqual(await packageExtension(source), zip);
   const path = join(temp, 'extension.zip');
@@ -42,6 +44,10 @@ test('release ZIP is reproducible, readable by unzip, and excludes private files
   );
   assert.ok(manifest.permissions.includes('unlimitedStorage'));
   assert.ok(!manifest.permissions.includes('nativeMessaging'));
+  assert.ok(manifest.permissions.includes('scripting'));
+  assert.ok(!manifest.permissions.includes('management'));
+  assert.ok(!names.includes('dev-update.json'));
+  assert.ok(!names.includes('build-info.json'));
   assert.ok(
     manifest.host_permissions.every(
       (h: string) => !h.includes('127.0.0.1') && !h.includes('localhost'),

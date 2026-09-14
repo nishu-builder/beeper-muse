@@ -47,3 +47,8 @@ lockfiles and review their licenses. A normal ready-for-review PR should explain
 the problem, resulting behavior, validation and material limitations. Keep
 community discussions constructive. Report security issues privately through
 [the security policy](SECURITY.md).
+
+Use `npm run update:local` to build and install into `.local/chrome-extension`.
+After the one-time manual installation of 0.7.2+, local builds reload when idle
+and reconnect the selected Muse tab. The command exits; no watcher or companion
+is needed. Do not run concurrent builds against the same `dist` directory.
