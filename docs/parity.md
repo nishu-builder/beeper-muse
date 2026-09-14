@@ -27,10 +27,12 @@ The product remains Chrome-only. Maintainer test tools are optional.
   Muse tab is offline inside Beeper, not only in the extension. Open: investigate
   native bridge status and expiry; a disconnected browser cannot send a final
   notice reliably. Verify loss of tab, browser exit and recovery in both clients.
-  Code audit: status currently reports CONNECTED whenever the Beeper socket opens,
-  independent of Muse tab health, with a six-hour TTL. Provisioning also returns
-  CONNECTED unconditionally. Replace both with actual source health and bounded
-  expiry; do not promise a visible offline banner until tested in Beeper.
+  **Implemented, not live verified (0.8.6):** native bridge status and provisioning
+  now use fresh selected-tab health, with a 90-second TTL instead of six hours.
+  Closed/stopped/discarded/unavailable sources report TRANSIENT_DISCONNECT.
+  Socket heartbeats cannot refresh stale source status. Tests cover expiry,
+  timeouts, selection changes and delayed responses after detach. Visible banners,
+  server expiry and browser-exit behavior remain open in both clients.
 - **HIS-04 — Messages arrive out of order:** user screenshot shows older content
   appearing after newer replies. Open: trace source order, settling, catch-up and
   native timeline insertion separately from timestamps. Do not invent source times.
@@ -153,3 +155,15 @@ Next independently actionable rendering gap: headings/table structure and readab
 plain-text fallbacks. The current formatter strips those tags. Corrected the
 architecture table’s earlier claim about removed-image redaction: source deletion
 semantics have not been established, and that behavior is not implemented.
+
+## September 14 follow-up: source connection status
+
+0.8.6 checks only the selected Muse tab every 20 seconds, with a five-second probe
+limit and immediate invalidation on detach/navigation/transport loss. A ready
+composer alone is insufficient: the source script must also be active and use the
+current protocol. Busy or draft state remains connected, without implying delivery.
+Fresh evidence lasts 30 seconds in provisioning; native status has a 90-second TTL.
+The connection transport no longer renews an old status on its own. No message is
+added to the conversation for a status transition. The user-selected log is still
+stale and Muse browser inspection still returns `Debugger unattached`; actual
+client rendering, the held photo and remaining parity items are not closed.

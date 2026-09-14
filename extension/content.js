@@ -293,8 +293,9 @@
     }
     if (message.type === 'probe') {
       respond({
-        protocol: 11,
+        protocol: 12,
         health: health(),
+        active: !stopped && closeGuard,
         progress: tracker.progress,
         rescanning: rescanPending,
       });
@@ -311,14 +312,14 @@
       generation++;
       void reportActivity(null);
       guardClosing(false);
-      respond({ protocol: 11 });
+      respond({ protocol: 12 });
     }
     if (message.type === 'start') {
       stopped = false;
       tracker = new BeeperMuseSync.Tracker(send, undefined, muse.prepare);
       const state = health();
       guardClosing(state !== 'unavailable');
-      respond({ protocol: 11, health: state });
+      respond({ protocol: 12, health: state });
       checkUpload();
       void poll();
     }

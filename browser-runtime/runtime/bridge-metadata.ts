@@ -19,7 +19,9 @@ export function museBridgeInfo(config: Configuration) {
   };
 }
 export interface BridgeState {
-  state_event: 'CONNECTED';
+  state_event: 'CONNECTED' | 'TRANSIENT_DISCONNECT';
+  error?: string;
+  message?: string;
   timestamp: number;
   ttl: number;
   source: 'bridge';
@@ -35,10 +37,22 @@ export function connectedBridgeState(
   return {
     state_event: 'CONNECTED',
     timestamp: Math.floor(now / 1000),
-    ttl: 21600,
+    ttl: 90,
     source: 'bridge',
     user_id: owner,
     remote_id: MUSE_LOGIN_ID,
     remote_name: 'Muse browser',
+  };
+}
+
+export function disconnectedBridgeState(
+  owner: string,
+  now = Date.now(),
+): BridgeState {
+  return {
+    ...connectedBridgeState(owner, now),
+    state_event: 'TRANSIENT_DISCONNECT',
+    error: 'muse-tab-unavailable',
+    message: 'Muse is disconnected. Open Chrome and connect your Muse tab.',
   };
 }

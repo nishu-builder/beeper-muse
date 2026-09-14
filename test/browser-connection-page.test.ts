@@ -177,7 +177,7 @@ test('bundled connection page uses tab-scoped socket headers and relays only wor
       state_event: 'CONNECTED',
       source: 'bridge',
       timestamp: 1700000000,
-      ttl: 21600,
+      ttl: 90,
       user_id: '@test:beeper.com',
       remote_id: 'browser',
       remote_name: 'Muse browser',

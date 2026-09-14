@@ -152,3 +152,27 @@ test('consumer failure never manufactures an ACK', async (t) => {
   assert.equal(states.at(-1), 'error');
   await socket.stop();
 });
+
+test('transport heartbeats never renew cached source liveness', async (t) => {
+  harness(t);
+  t.mock.timers.enable({
+    apis: ['setTimeout', 'setInterval', 'Date'],
+    now: 1700000000000,
+  });
+  const { connectedBridgeState } =
+    await import('../browser-runtime/runtime/bridge-metadata.ts');
+  const socket = new DocumentSocket(
+    registration,
+    async () => {},
+    () => {},
+    () => {},
+  );
+  await socket.start();
+  const port = new Port();
+  socket.accept(port.asChrome());
+  socket.publishBridgeState(connectedBridgeState('@fixture:beeper.com'));
+  t.mock.timers.tick(3600000);
+  assert.equal(port.sent.filter((m) => m.type === 'bridge-state').length, 1);
+  assert.ok(port.sent.some((m) => m.type === 'pulse'));
+  await socket.stop();
+});

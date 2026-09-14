@@ -1,5 +1,6 @@
 /// <reference path="../../src/muse.d.ts" />
 import { AvatarSync } from './avatar.js';
+import { SourceConnectionHealth } from './source-connection.js';
 import { explanations, failureCode } from './diagnostic-log.js';
 import { incomingImage, type IncomingImage } from './media.js';
 import { IndexedDBInbox, receiveTransaction } from '../inbox.js';
@@ -54,6 +55,7 @@ interface Delivery {
 const SOURCE = 'beeper-muse-chrome';
 const enc = encodeURIComponent;
 export class BrowserBridge {
+  readonly sourceConnection = new SourceConnectionHealth();
   private chain: Promise<unknown> = Promise.resolve();
   private intake: Promise<unknown> = Promise.resolve();
   private paused = false;
@@ -64,6 +66,7 @@ export class BrowserBridge {
   }
   pause() {
     this.paused = true;
+    this.sourceConnection.observe(false);
   }
   resume() {
     this.paused = false;
@@ -250,7 +253,11 @@ export class BrowserBridge {
       typeof parsed === 'object' &&
       parsed.command === 'http_proxy'
     ) {
-      send(await provisioningResponse(parsed, this.api));
+      send(
+        await provisioningResponse(parsed, this.api, () =>
+          this.sourceConnection.state(this.api.config.owner),
+        ),
+      );
       return;
     }
     // Persist/acknowledge in arrival order without waiting for image uploads or

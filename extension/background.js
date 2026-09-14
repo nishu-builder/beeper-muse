@@ -45,7 +45,7 @@ async function tabReport(tabID, type = 'probe') {
   try {
     const result = await chrome.tabs.sendMessage(tabID, { type });
     if (
-      [6, 7, 8, 9, 10, 11].includes(result?.protocol) &&
+      [6, 7, 8, 9, 10, 11, 12].includes(result?.protocol) &&
       ['ready', 'busy', 'draft', 'unavailable'].includes(result.health)
     )
       return {

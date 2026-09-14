@@ -1,4 +1,8 @@
-import { connectedBridgeState, MUSE_LOGIN_ID } from './bridge-metadata.js';
+import {
+  disconnectedBridgeState,
+  MUSE_LOGIN_ID,
+  type BridgeState,
+} from './bridge-metadata.js';
 import type { MatrixAPI } from './matrix.js';
 
 // Read-only subset of mautrix bridgev2 provisioning, carried over the existing
@@ -6,6 +10,8 @@ import type { MatrixAPI } from './matrix.js';
 export async function provisioningResponse(
   frame: Record<string, unknown>,
   api: MatrixAPI,
+  currentState: () => BridgeState = () =>
+    disconnectedBridgeState(api.config.owner),
 ): Promise<string> {
   const respond = (status: number, body: unknown) =>
     JSON.stringify({
@@ -89,7 +95,7 @@ export async function provisioningResponse(
   }
   if (path.endsWith('/logins'))
     return respond(200, { login_ids: [MUSE_LOGIN_ID] });
-  const state = connectedBridgeState(api.config.owner);
+  const state = currentState();
   return respond(200, {
     network: {
       displayname: 'Muse',
