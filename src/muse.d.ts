@@ -14,6 +14,9 @@ declare namespace Muse {
   interface UploadReadiness {
     composers: number;
     hasForm: boolean;
+    hasUploadRegion: boolean;
+    pageFileInputs: number;
+    pageImageInputs: number;
     fileInputs: number;
     imageInputs: number;
     existingFiles: number;

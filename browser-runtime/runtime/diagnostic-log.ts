@@ -1,7 +1,7 @@
 // Closed vocabulary: no exception strings, message text, identifiers or URLs.
 export const explanations = {
   'image-composer-missing':
-    'Muse has no recognized image upload form. The photo was not attached.',
+    'Muse has no recognized image upload controls beside its message box. The photo was not attached.',
   'image-input-missing':
     'Muse has no recognized image file input in its message form. The photo was not attached.',
   'image-composer-ambiguous':
@@ -44,6 +44,9 @@ const events = new Set<string>([
 const fields = [
   'composers',
   'hasForm',
+  'hasUploadRegion',
+  'pageFileInputs',
+  'pageImageInputs',
   'fileInputs',
   'imageInputs',
   'existingFiles',

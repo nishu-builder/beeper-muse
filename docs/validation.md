@@ -169,3 +169,19 @@ and both-direction image round trip are **not yet live-verified**. The next
 prerequisite is the one-time diagnostic file grant. Existing uncertain uploads
 must still be inspected before dismissing them; this version does not silently
 release or resend the user's previously interrupted photo.
+
+## First diagnostic-file observation (0.8.3 work)
+
+The selected diagnostic file updated successfully and reported the exact 0.8.2
+build, both connections ready, one interrupted image and one queued text message.
+The upload-readiness event showed one composer and `hasForm: false`. Previous
+file/preview counts were scoped to that absent form; zero counts therefore did
+not establish that the page had no upload input or staged image.
+
+The adapter now considers the smallest composer ancestor with upload controls,
+rejecting page roots and regions containing transcript messages or multiple
+textareas. Synthetic tests cover both native forms and form-free containers,
+while preserving existing drafts and requiring a loaded preview. Additional
+content-free counts distinguish a missing region from a missing page file input.
+The older interrupted attempt remains held because current readiness cannot
+prove whether that historical attempt reached Muse.

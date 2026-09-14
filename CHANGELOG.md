@@ -1,5 +1,16 @@
 # Changelog
 
+## 0.8.3
+
+- Support a bounded message composer container without requiring a native HTML
+  form. Diagnostic evidence showed the live Muse composer has no enclosing form.
+- Keep upload discovery out of the transcript and page root; unrelated file
+  pickers must remain untouched. Add regression coverage for form-free uploads.
+- Include bounded page/file-input counts and recognized-container presence in
+  the optional diagnostic log. These counts contain no page content.
+- Preserve existing interrupted jobs for inspection. This update does not retry
+  the previous photo or establish that the live photo round trip now succeeds.
+
 ## 0.8.2
 
 - Add a typed development driver with pinned-chat checks, synthetic text/photo

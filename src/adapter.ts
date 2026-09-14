@@ -275,19 +275,50 @@
       }),
     };
   }
+  // Muse's current composer is not a native form. Stay within the smallest
+  // ancestor containing its own file input, never the transcript or page root.
+  function uploadRegion(field: HTMLTextAreaElement): HTMLElement | null {
+    for (
+      let region = field.parentElement;
+      region;
+      region = region.parentElement
+    ) {
+      if (
+        region === field.ownerDocument.body ||
+        region === field.ownerDocument.documentElement ||
+        region.matches('[role="log"],[data-message-item]') ||
+        region.querySelector('[role="log"],[data-message-item]') ||
+        region.querySelectorAll('textarea').length !== 1
+      )
+        return null;
+      if (region.matches('form') || region.querySelector('input[type="file"]'))
+        return region;
+    }
+    return null;
+  }
   function imageReadiness(document: Document): Muse.UploadReadiness {
     const fields = [
       ...document.querySelectorAll<HTMLTextAreaElement>(
         'textarea[aria-label="Message"]',
       ),
     ].filter(visible);
-    const form = fields.length === 1 ? fields[0]!.closest('form') : null;
+    const field = fields.length === 1 ? fields[0]! : null;
+    const form = field ? uploadRegion(field) : null;
+    const pageInputs = [
+      ...document.querySelectorAll<HTMLInputElement>('input[type="file"]'),
+    ];
     const inputs = [
       ...(form?.querySelectorAll<HTMLInputElement>('input[type="file"]') || []),
     ];
     return {
       composers: Math.min(fields.length, 100),
-      hasForm: !!form,
+      hasForm: !!field?.closest('form'),
+      hasUploadRegion: !!form,
+      pageFileInputs: Math.min(pageInputs.length, 100),
+      pageImageInputs: Math.min(
+        pageInputs.filter((e) => /image\//i.test(e.accept)).length,
+        100,
+      ),
       fileInputs: Math.min(inputs.length, 100),
       imageInputs: Math.min(
         inputs.filter((e) => !e.disabled && /image\//i.test(e.accept)).length,
@@ -316,7 +347,7 @@
   ) {
     const initial = snapshot(document),
       field = composer(document),
-      form = field.closest('form');
+      form = uploadRegion(field);
     if (!active() || initial.busy || initial.draft.trim())
       throw uploadError('image-draft', 'Muse is busy or has a draft.');
     // A profile/avatar picker elsewhere in the page must never receive a photo.

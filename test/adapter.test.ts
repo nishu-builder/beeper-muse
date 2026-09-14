@@ -321,65 +321,68 @@ test('image submission rejects unrelated file pickers without touching them', as
   );
   f.dom.window.close();
 });
-test('image upload waits for a loaded preview and preserves an existing draft', async () => {
-  const f = fixture(),
-    doc = f.document,
-    form = doc.createElement('form');
-  const field = doc.querySelector('textarea')!,
-    send = doc.querySelector('button')!;
-  form.append(field, send);
-  doc.body.append(form);
-  const input = doc.createElement('input');
-  input.type = 'file';
-  input.accept = 'image/*';
-  form.append(input);
-  let files: File[] = [];
-  Object.defineProperty(input, 'files', {
-    get: () => files,
-    set: (value: File[]) => {
-      files = value;
-    },
-  });
-  Object.defineProperty(f.dom.window, 'DataTransfer', {
-    value: class {
-      files: File[] = [];
-      items = { add: (file: File) => this.files.push(file) };
-    },
-  });
-  let sends = 0;
-  send.onclick = () => {
-    sends++;
-  };
-  input.onchange = () => {
-    const preview = doc.createElement('img');
-    preview.src = 'blob:https://muse.ai/synthetic';
-    Object.defineProperties(preview, {
-      complete: { value: true },
-      naturalWidth: { value: 10 },
+for (const tag of ['form', 'div'])
+  test(`image upload in a ${tag} waits for a loaded preview and preserves an existing draft`, async () => {
+    const f = fixture(),
+      doc = f.document,
+      form = doc.createElement(tag);
+    const field = doc.querySelector('textarea')!,
+      send = doc.querySelector('button')!;
+    form.append(field, send);
+    doc.body.append(form);
+    const facts = f.adapter.create(doc).imageReadiness!();
+    assert.equal(facts.hasForm, tag === 'form');
+    const input = doc.createElement('input');
+    input.type = 'file';
+    input.accept = 'image/*';
+    form.append(input);
+    let files: File[] = [];
+    Object.defineProperty(input, 'files', {
+      get: () => files,
+      set: (value: File[]) => {
+        files = value;
+      },
     });
-    form.append(preview);
-  };
-  field.value = 'private draft';
-  await assert.rejects(
-    f.adapter.create(doc).submitImage!(
-      '',
+    Object.defineProperty(f.dom.window, 'DataTransfer', {
+      value: class {
+        files: File[] = [];
+        items = { add: (file: File) => this.files.push(file) };
+      },
+    });
+    let sends = 0;
+    send.onclick = () => {
+      sends++;
+    };
+    input.onchange = () => {
+      const preview = doc.createElement('img');
+      preview.src = 'blob:https://muse.ai/synthetic';
+      Object.defineProperties(preview, {
+        complete: { value: true },
+        naturalWidth: { value: 10 },
+      });
+      form.append(preview);
+    };
+    field.value = 'private draft';
+    await assert.rejects(
+      f.adapter.create(doc).submitImage!(
+        '',
+        { name: 'photo.png', mime: 'image/png', data: 'iVBORw0KGgo=' },
+        async () => {},
+      ),
+      /draft/,
+    );
+    assert.equal(files.length, 0);
+    field.value = '';
+    await f.adapter.create(doc).submitImage!(
+      'Caption',
       { name: 'photo.png', mime: 'image/png', data: 'iVBORw0KGgo=' },
       async () => {},
-    ),
-    /draft/,
-  );
-  assert.equal(files.length, 0);
-  field.value = '';
-  await f.adapter.create(doc).submitImage!(
-    'Caption',
-    { name: 'photo.png', mime: 'image/png', data: 'iVBORw0KGgo=' },
-    async () => {},
-  );
-  assert.equal(sends, 1);
-  assert.equal(field.value, 'Caption');
-  assert.equal(files[0]!.name, 'photo.png');
-  f.dom.window.close();
-});
+    );
+    assert.equal(sends, 1);
+    assert.equal(field.value, 'Caption');
+    assert.equal(files[0]!.name, 'photo.png');
+    f.dom.window.close();
+  });
 test('snapshot retains local and embedded image previews and excludes foreign blobs', () => {
   const f = fixture();
   f.document.querySelector('[data-message-id]')!.innerHTML =
@@ -431,7 +434,7 @@ test('photo attribution requires an image echo and rejects interleaved user mess
   f.dom.window.close();
 });
 
-test('image readiness reports only control counts and diagnoses a missing form before staging a photo', async () => {
+test('image readiness reports only control counts and diagnoses a missing upload region before staging a photo', async () => {
   const f = fixture();
   f.document.querySelector('textarea')!.value = 'PRIVATE draft';
   const adapter = f.adapter.create(f.document);
@@ -447,6 +450,33 @@ test('image readiness reports only control counts and diagnoses a missing form b
       async () => {},
     ),
     (e: unknown) => (e as { code: string }).code === 'image-composer-missing',
+  );
+  f.dom.window.close();
+});
+
+test('form-free discovery refuses a shared transcript ancestor', async () => {
+  const f = fixture();
+  const region = f.document.createElement('div');
+  region.append(...f.document.body.childNodes);
+  region.insertAdjacentHTML(
+    'beforeend',
+    '<input type="file" accept="image/*">',
+  );
+  f.document.body.append(region);
+  const a = f.adapter.create(f.document);
+  assert.equal(a.imageReadiness().hasUploadRegion, false);
+  assert.equal(a.imageReadiness().pageImageInputs, 1);
+  await assert.rejects(
+    a.submitImage(
+      '',
+      { name: 'test.png', mime: 'image/png', data: 'iVBORw0KGgo=' },
+      async () => {},
+    ),
+    /composer/,
+  );
+  assert.equal(
+    region.querySelector<HTMLInputElement>('input')!.files!.length,
+    0,
   );
   f.dom.window.close();
 });
