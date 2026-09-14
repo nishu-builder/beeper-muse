@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.8.8
+
+- Keep the chosen diagnostic file updating when runtime health checks stall.
+  Record collection freshness separately from connection state and queue counts;
+  unavailable health is never reported as an empty, ready queue.
+- Record bounded update stages and elapsed time even when a health read is stuck.
+  Limit each diagnostic channel to one outstanding read.
+- Keep authenticated read-only diagnostics out of the update work guard while
+  preserving guards for message handling and source preparation.
+- Refuse development sends when collection is inconsistent, stale or reports an
+  update in progress. File grants and uncertain-message protections are unchanged.
+- Live update recovery and the earlier interrupted photo remain unverified.
+
 ## 0.8.7
 
 - Preserve headings, tables, continued ordered lists, code language and other

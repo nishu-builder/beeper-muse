@@ -54,6 +54,16 @@ and outstanding work. It saves a sanitized report in `.local/dev-doctor.json`.
 Missing logging, a stale build, a draft or an interrupted job stops a test before
 anything is added to the queue.
 
+From 0.8.8, the file also records a separate `collection` heartbeat: whether event
+storage and runtime health answered, the connection page's version/build, and a
+bounded update stage with elapsed time. Each read is observed for three seconds;
+a pending read is not restarted on every collection. A fresh collection with
+unavailable health means the file writer is alive, not that syncing is healthy.
+Previous known events remain available when event storage fails, with collection
+marked incomplete. `dev:doctor` shows both freshness checks and refuses test sends
+while runtime health is unavailable or an update is pending. This does not bypass
+Chrome's file permission or prove that a build reload completed.
+
 `dev:cycle` requires the full build prerequisites described in
 [Contributing](../CONTRIBUTING.md). It runs repository checks, installs the local
 build, waits up to 90 seconds for its exact fingerprint in the diagnostic file,

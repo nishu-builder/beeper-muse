@@ -1,3 +1,4 @@
+import { updateStages, type UpdateSnapshot } from './updates.js';
 // Closed vocabulary: no exception strings, message text, identifiers or URLs.
 export const explanations = {
   'image-composer-missing':
@@ -151,6 +152,63 @@ export class DiagnosticLog {
     return this.chain;
   }
 }
+export interface DiagnosticCollection {
+  at: number;
+  version: string;
+  build: string;
+  events: 'available' | 'unavailable';
+  health: 'available' | 'unavailable';
+  update?: UpdateSnapshot;
+}
+function identity(value: Record<string, unknown>) {
+  return (
+    typeof value.at === 'number' &&
+    Number.isSafeInteger(value.at) &&
+    value.at >= 0 &&
+    typeof value.version === 'string' &&
+    /^\d{1,5}\.\d{1,5}\.\d{1,5}$/.test(value.version) &&
+    typeof value.build === 'string' &&
+    /^[a-f0-9]{64}$/.test(value.build)
+  );
+}
+export function cleanCollection(
+  value: unknown,
+): DiagnosticCollection | undefined {
+  if (!value || typeof value !== 'object') return;
+  const v = value as Record<string, unknown>;
+  if (
+    !identity(v) ||
+    (v.events !== 'available' && v.events !== 'unavailable') ||
+    (v.health !== 'available' && v.health !== 'unavailable')
+  )
+    return;
+  return {
+    at: v.at as number,
+    version: v.version as string,
+    build: v.build as string,
+    events: v.events as DiagnosticCollection['events'],
+    health: v.health as DiagnosticCollection['health'],
+    ...(cleanUpdate(v.update) ? { update: cleanUpdate(v.update) } : {}),
+  };
+}
+export function cleanUpdate(value: unknown): UpdateSnapshot | undefined {
+  if (!value || typeof value !== 'object') return;
+  const v = value as Record<string, unknown>;
+  if (
+    !updateStages.includes(v.stage as UpdateSnapshot['stage']) ||
+    typeof v.pending !== 'boolean' ||
+    typeof v.elapsedMs !== 'number' ||
+    !Number.isSafeInteger(v.elapsedMs) ||
+    v.elapsedMs < 0 ||
+    v.elapsedMs > 86400000
+  )
+    return;
+  return {
+    stage: v.stage as UpdateSnapshot['stage'],
+    pending: v.pending,
+    elapsedMs: v.elapsedMs,
+  };
+}
 export interface DiagnosticHealth {
   at: number;
   version: string;
@@ -162,20 +220,12 @@ export interface DiagnosticHealth {
   claimed: number;
   blocked: number;
   pending: number;
+  update?: UpdateSnapshot;
 }
 export function cleanHealth(value: unknown): DiagnosticHealth | undefined {
   if (!value || typeof value !== 'object') return;
   const v = value as Record<string, unknown>;
-  if (
-    typeof v.at !== 'number' ||
-    !Number.isSafeInteger(v.at) ||
-    v.at < 0 ||
-    typeof v.version !== 'string' ||
-    !/^\d{1,5}\.\d{1,5}\.\d{1,5}$/.test(v.version) ||
-    typeof v.build !== 'string' ||
-    !/^[a-f0-9]{64}$/.test(v.build)
-  )
-    return;
+  if (!identity(v)) return;
   for (const key of ['beeperConnected', 'museConnected', 'ready'])
     if (typeof v[key] !== 'boolean') return;
   for (const key of ['queued', 'claimed', 'blocked', 'pending'])
@@ -187,9 +237,9 @@ export function cleanHealth(value: unknown): DiagnosticHealth | undefined {
     )
       return;
   return {
-    at: v.at,
-    version: v.version,
-    build: v.build,
+    at: v.at as number,
+    version: v.version as string,
+    build: v.build as string,
     beeperConnected: v.beeperConnected as boolean,
     museConnected: v.museConnected as boolean,
     ready: v.ready as boolean,
@@ -197,15 +247,23 @@ export function cleanHealth(value: unknown): DiagnosticHealth | undefined {
     claimed: v.claimed as number,
     blocked: v.blocked as number,
     pending: v.pending as number,
+    ...(cleanUpdate(v.update) ? { update: cleanUpdate(v.update) } : {}),
   };
 }
-export function logFile(value: unknown, health?: unknown) {
+export function logFile(
+  value: unknown,
+  health?: unknown,
+  collection?: unknown,
+) {
   return (
     JSON.stringify(
       {
         format: 1,
         application: 'Beeper Muse',
         events: cleanEntries(value),
+        ...(cleanCollection(collection)
+          ? { collection: cleanCollection(collection) }
+          : {}),
         ...(cleanHealth(health) ? { health: cleanHealth(health) } : {}),
       },
       null,

@@ -1,3 +1,4 @@
+import { RuntimeWork, isConnectionDiagnostic } from './runtime-work.js';
 import { DiagnosticLog, failureCode } from './diagnostic-log.js';
 import { Updates, localUpdate } from './updates.js';
 import { ensureMuseTab, isMuseURL, resumeTicket } from './muse-tab.js';
@@ -30,7 +31,7 @@ const startup = new StartupProgress((stage) => {
 let retryAt = 0;
 let failures = 0;
 let applyingUpdate = false;
-let handling = 0;
+const work = new RuntimeWork();
 let restoring: Promise<void> | undefined;
 const museTabs = {
   get: (id: number) => chrome.tabs.get(id),
@@ -245,6 +246,7 @@ async function report() {
     phase: conflict ? 'conflict' : enabled === false ? 'paused' : phase,
     failure,
     update: updates.message,
+    updateProgress: updates.snapshot(),
     startup: startup.snapshot(),
     starting: !!starting,
     retrySeconds: Math.max(0, Math.ceil((retryAt - Date.now()) / 1000)),
@@ -266,9 +268,14 @@ async function handle(
   await secure;
   if (sender.id !== chrome.runtime.id) throw Error('Invalid sender.');
   if (
-    message.type === 'diagnostic-health' &&
-    sender.url === chrome.runtime.getURL(CONNECTION_PAGE)
+    isConnectionDiagnostic(
+      message.type,
+      sender,
+      chrome.runtime.id,
+      chrome.runtime.getURL(CONNECTION_PAGE),
+    )
   ) {
+    if (message.type === 'diagnostic-progress') return updates.snapshot();
     const s = await report();
     return {
       at: Math.floor(Date.now() / 5000) * 5000,
@@ -281,6 +288,7 @@ async function handle(
       claimed: s.claimed || 0,
       blocked: s.blocked,
       pending: s.pending,
+      update: s.updateProgress,
     };
   }
   if (applyingUpdate && message.type !== 'status')
@@ -499,11 +507,14 @@ async function handle(
 }
 chrome.runtime.onMessage.addListener(
   (message: Record<string, unknown>, sender, respond) => {
-    handling++;
-    void handle(message, sender)
-      .finally(() => {
-        handling--;
-      })
+    const observation = isConnectionDiagnostic(
+      message.type,
+      sender,
+      chrome.runtime.id,
+      chrome.runtime.getURL(CONNECTION_PAGE),
+    );
+    void work
+      .run(() => handle(message, sender), observation)
       .then(respond, () =>
         respond({
           ok: false,
@@ -662,7 +673,7 @@ const updates = new Updates({
       : undefined;
   },
   async ready() {
-    if (starting || handling || applyingUpdate || restoring) return false;
+    if (starting || work.active || applyingUpdate || restoring) return false;
     return !bridge || (await bridge.status()).claimed === 0;
   },
   async prepareSource() {
@@ -681,7 +692,11 @@ const updates = new Updates({
   async apply() {
     applyingUpdate = true;
     try {
-      if (handling || starting || (bridge && (await bridge.status()).claimed))
+      if (
+        work.active ||
+        starting ||
+        (bridge && (await bridge.status()).claimed)
+      )
         throw Error('Work started while preparing update.');
       const { tabID } = await chrome.storage.session.get('tabID');
       if (typeof tabID === 'number' && Number.isInteger(tabID)) {

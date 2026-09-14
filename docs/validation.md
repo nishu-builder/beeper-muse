@@ -273,3 +273,20 @@ has no fresh heartbeat. These tests do not establish an exhaustive current Muse
 inventory or prove the installed Beeper clients render all allowed tags.
 
 Full checks passed with 196 JS/TS tests, TypeScript, Go tests/build and formatting.
+
+## Diagnostic collection and account warning (0.8.8)
+
+The user supplied a Desktop disconnected banner. A read-only Desktop account query
+confirmed that the named account is the extension's current registration and
+returned the source-disconnected status text. This establishes a visible native
+warning; it does not establish why source health was lost or verify recovery,
+mobile rendering or server-side expiry.
+
+Synthetic regression tests cover a never-resolving health request with continued
+file heartbeat, one outstanding read per channel, late completion, retained
+sanitized events after storage failure, independent update progress and strict
+preflight refusal for missing health or pending updates. Authenticated diagnostic
+observations do not hold the update guard; actual message operations still do.
+Source preparation and reload operations are never retried because of an
+observation timeout. Live update recovery remains unverified: the selected export
+is still stale at 0.8.2 and no held user work was modified.

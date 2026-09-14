@@ -159,3 +159,57 @@ test('a failed update check never restarts an active source', async () => {
   await updates.tick();
   assert.equal(recovered, 0);
 });
+
+test('progress remains observable while preparation or application is pending without restarting either', async () => {
+  let now = 1000,
+    prepares = 0,
+    applies = 0;
+  let prepared!: () => void, applied!: () => void;
+  const preparation = new Promise<void>((resolve) => {
+    prepared = resolve;
+  });
+  const application = new Promise<void>((resolve) => {
+    applied = resolve;
+  });
+  const updates = new Updates(
+    {
+      candidate: async () => 'next',
+      ready: async () => true,
+      prepareSource: async () => {
+        prepares++;
+        await preparation;
+        return true;
+      },
+      apply: async () => {
+        applies++;
+        await application;
+      },
+      recover: async () => {},
+    },
+    () => now,
+  );
+  const tick = updates.tick();
+  await flush();
+  now += 10000;
+  assert.deepEqual(updates.snapshot(), {
+    stage: 'waiting-source',
+    elapsedMs: 10000,
+    pending: true,
+  });
+  await updates.tick();
+  assert.equal(prepares, 1);
+  assert.equal(applies, 0);
+  prepared();
+  await flush();
+  assert.deepEqual(updates.snapshot(), {
+    stage: 'applying',
+    elapsedMs: 0,
+    pending: true,
+  });
+  now += 5000;
+  await updates.tick();
+  assert.equal(updates.snapshot().elapsedMs, 5000);
+  assert.equal(applies, 1);
+  applied();
+  await tick;
+});

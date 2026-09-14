@@ -112,7 +112,11 @@ You can choose one normal file in Chrome's save dialog for an automatically
 updated copy of that ring, plus a heartbeat containing the extension version,
 source build fingerprint, connection/ready flags and queue counts. This heartbeat
 updates about every five seconds while the connection tab is running; it contains
-no account identifiers or message contents. The file handle and write grant stay in this Chrome
+no account identifiers or message contents. A separate collection heartbeat records
+whether diagnostic reads answered, the connection page's version/build, and a fixed
+update stage, bounded elapsed time and pending flag. Missing runtime health is
+marked unavailable rather than replaced with guessed connection or queue state.
+The file handle and write grant stay in this Chrome
 profile; no new host permission, relay or companion is involved. The connection
 tab writes only while permission is granted. You may need to renew permission
 after a restart. Stopping file logging forgets the handle and stops updates,
