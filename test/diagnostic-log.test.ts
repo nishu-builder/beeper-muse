@@ -228,3 +228,32 @@ test('log controls save a chosen handle, flush automatically and stop writing on
   assert.equal(writes, 1);
   assert.equal(values.get('handle'), null);
 });
+
+test('source diagnostics retain bounded counts without message data', () => {
+  const result = cleanEntries([
+    {
+      time: 123,
+      version: '0.8.16',
+      code: 'source-readiness',
+      facts: {
+        sourceMessages: 20,
+        sourceImages: 2,
+        sourcePartial: 0,
+        syncChecked: 19,
+        syncWaiting: 1,
+        syncPolling: true,
+        messages: ['PRIVATE'],
+        url: 'PRIVATE',
+      },
+    },
+  ]);
+  assert.deepEqual(result[0]?.facts, {
+    sourceMessages: 20,
+    sourceImages: 2,
+    sourcePartial: 0,
+    syncChecked: 19,
+    syncWaiting: 1,
+    syncPolling: true,
+  });
+  assert.ok(!JSON.stringify(result).includes('PRIVATE'));
+});

@@ -48,6 +48,8 @@ const events = new Set<string>([
   'beeper-error',
   'startup-failed',
   'activity-readiness',
+  'source-readiness',
+  'source-import-failed',
   'activity-unavailable',
   'typing-accepted',
   'typing-cleared',
@@ -70,6 +72,15 @@ const fields = [
   'stopButtons',
   'composerBusy',
   'assistantBusy',
+  'sourceMessages',
+  'sourceTailImages',
+  'sourceTailPartial',
+  'sourceTailWidgets',
+  'sourceImages',
+  'sourcePartial',
+  'syncChecked',
+  'syncWaiting',
+  'syncPolling',
 ] as const;
 export interface LogEntry {
   time: number;

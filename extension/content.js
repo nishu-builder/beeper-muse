@@ -169,6 +169,17 @@
                   muse.prepare,
                 )
               : undefined;
+          const deliveredMessages = messages ? [] : undefined;
+          for (const message of messages || []) {
+            if (message.role !== 'user' && !BeeperMuseSync.mediaReady(message))
+              break;
+            deliveredMessages.push(message);
+          }
+          const deliveredSources = messages
+            ? sources.filter((source) =>
+                deliveredMessages.some((m) => m.id === source.id),
+              )
+            : sources;
           // Retrying a result is safe: the relay accepts it idempotently. Never
           // repeat a claim or a Muse send after an uncertain network result.
           for (let attempt = 0; attempt < 3; attempt++) {
@@ -178,11 +189,11 @@
                 type: 'result',
                 id: job.id,
                 text: answer,
-                sources,
-                messages,
+                sources: deliveredSources,
+                messages: deliveredMessages,
               });
               diagnostic('reply-delivered');
-              tracker.remember(sources);
+              tracker.remember(deliveredSources);
               return;
             } catch {
               if (attempt === 2)
@@ -244,6 +255,7 @@
           );
         } catch {
           // Import failures must not prevent a queued Beeper prompt from running.
+          diagnostic('source-import-failed');
         }
       }
       if (stopped || current !== generation) return;
@@ -294,7 +306,7 @@
     }
     if (message.type === 'probe') {
       respond({
-        protocol: 19,
+        protocol: 20,
         health: health(),
         active: !stopped && closeGuard,
         progress: tracker.progress,
@@ -313,14 +325,14 @@
       generation++;
       void reportActivity(null);
       guardClosing(false);
-      respond({ protocol: 19 });
+      respond({ protocol: 20 });
     }
     if (message.type === 'start') {
       stopped = false;
       tracker = new BeeperMuseSync.Tracker(send, undefined, muse.prepare);
       const state = health();
       guardClosing(state !== 'unavailable');
-      respond({ protocol: 19, health: state });
+      respond({ protocol: 20, health: state });
       checkUpload();
       void poll();
     }
@@ -335,6 +347,31 @@
       if (Date.now() - activityCheckedAt >= 30000 && muse.activityReadiness) {
         try {
           diagnostic('activity-readiness', muse.activityReadiness());
+          const view = await muse.snapshot();
+          diagnostic('source-readiness', {
+            sourceMessages: Math.min(100, view.messages.length),
+            sourceTailImages: Math.min(
+              100,
+              view.messages
+                .slice(-3)
+                .reduce((n, m) => n + (m.images?.length || 0), 0),
+            ),
+            sourceTailPartial: view.messages.slice(-3).filter((m) => m.partial)
+              .length,
+            sourceTailWidgets: view.messages.slice(-3).filter((m) => m.widget)
+              .length,
+            sourceImages: Math.min(
+              100,
+              view.messages.reduce((n, m) => n + (m.images?.length || 0), 0),
+            ),
+            sourcePartial: Math.min(
+              100,
+              view.messages.filter((m) => m.partial).length,
+            ),
+            syncChecked: Math.min(100, tracker.progress.checked),
+            syncWaiting: Math.min(100, tracker.progress.waiting),
+            syncPolling: polling,
+          });
         } catch {}
         activityCheckedAt = Date.now();
       }

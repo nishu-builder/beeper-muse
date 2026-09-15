@@ -283,6 +283,13 @@ test('a generated image must belong to the marked reply, not another message', (
     assess(run, [{ ...reply, attachments: [{ type: 'img' }] }]).roundTrip,
     true,
   );
+  assert.equal(
+    assess(run, [
+      reply,
+      { ...reply, id: 'marked-image', attachments: [{ type: 'img' }] },
+    ]).roundTrip,
+    true,
+  );
 });
 test('synthetic PNG color matches the private expectation and is absent from the photo prompt', () => {
   for (const color of ['RED', 'BLUE'] as const) {

@@ -84,7 +84,7 @@ test('only the selected active Muse source can report connected', async () => {
   let connected = true;
   let selected: number | undefined = 1;
   let tab = { url: 'https://muse.ai/', discarded: false };
-  let probe = { protocol: 19, health: 'ready', active: true };
+  let probe = { protocol: 20, health: 'ready', active: true };
   const api = {
     beeperConnected: () => connected,
     selectedTab: async () => selected,
@@ -105,7 +105,7 @@ test('only the selected active Muse source can report connected', async () => {
   assert.equal(await readSourceConnection(api), false);
   probe = { protocol: 11, health: 'ready', active: true };
   assert.equal(await readSourceConnection(api), false);
-  probe = { protocol: 19, health: 'ready', active: false };
+  probe = { protocol: 20, health: 'ready', active: false };
   assert.equal(await readSourceConnection(api), false);
   probe.active = true;
   tab.discarded = true;

@@ -43,7 +43,7 @@ export function newRun(target: Target, scenario: Scenario): Run {
       scenario === 'image'
         ? `Inspect the attached image. Reply only with ${marker}: followed by its dominant color in uppercase. If no image arrived, reply ${marker}:MISSING.`
         : scenario === 'receive-image'
-          ? `Create a small plain square image for this integration test. Include ${marker} in your accompanying reply.`
+          ? `Generate and display an actual picture of a small orange cat holding a blue umbrella. Use ${marker} as the generated image description and accompanying caption. Show the generated picture inline; a metadata file does not complete this image test.`
           : `Integration test. Reply with exactly ${marker}.`,
     phase: 'prepared',
   };
@@ -174,7 +174,8 @@ export function assess(run: Run, messages: Message[]) {
   );
   const reply = replies.find((m) =>
     run.scenario === 'receive-image'
-      ? plain(m.text || '').includes(run.expected)
+      ? plain(m.text || '').includes(run.expected) &&
+        !!m.attachments?.some((a) => a.type === 'img')
       : plain(m.text || '') === run.expected,
   );
   const duplicate = new Set(own.map((m) => m.id)).size > 1;

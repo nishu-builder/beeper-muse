@@ -36,6 +36,7 @@ function harness(
   photo = false,
   uploadSupported = true,
   profile?: () => Promise<unknown>,
+  replyImage = false,
 ) {
   let listener!: Listener;
   let resolveClaim!: (value: unknown) => void;
@@ -173,7 +174,18 @@ function harness(
                     : {}),
                 },
                 ...(reply
-                  ? [{ id: 'a', role: 'assistant', text: 'Synthetic answer' }]
+                  ? [
+                      {
+                        id: 'a',
+                        role: 'assistant',
+                        text: 'Synthetic answer',
+                        ...(replyImage
+                          ? {
+                              images: [{ url: 'blob:https://muse.ai/pending' }],
+                            }
+                          : {}),
+                      },
+                    ]
                   : []),
               ]
             : [],
@@ -354,7 +366,7 @@ test('readiness probes expose no draft or chat text', () => {
   ] as const) {
     h.view(view);
     const probe = h.signal('probe');
-    assert.equal(probe.protocol, 19);
+    assert.equal(probe.protocol, 20);
     assert.equal(probe.health, health);
     assert.deepEqual(Object.keys(probe).sort(), [
       'active',
@@ -540,4 +552,22 @@ test('source health distinguishes a stopped connector from an available composer
   h.signal('stop');
   assert.equal(h.signal('probe').health, 'ready');
   assert.equal(h.signal('probe').active, false);
+});
+
+test('reply completion leaves an unprepared image for background retry rather than marking it delivered', async () => {
+  const h = harness(false, true, false, false, true, undefined, true);
+  h.signal('start');
+  await flush();
+  await h.advance(6000);
+  await h.executed;
+  const result = h.messages.find((m) => m.type === 'result');
+  assert.ok(result);
+  assert.deepEqual(
+    Array.from(result.messages || [], (m) => m.role),
+    ['user'],
+  );
+  assert.equal(
+    h.messages.some((m) => m.type === 'block'),
+    false,
+  );
 });

@@ -117,6 +117,12 @@
       throw Error('Source result exceeds the message limit.');
     return out;
   }
+  function mediaReady(message: Muse.Message) {
+    return (message.images || []).every(
+      (image) =>
+        !!image.data && /^image\/(png|jpeg|gif|webp)$/.test(image.mime || ''),
+    );
+  }
   class Tracker implements Muse.SyncTracker {
     private initialized = false;
     private baseline = { ids: '', at: 0 };
@@ -132,6 +138,10 @@
     get progress(): Muse.SyncProgress {
       return { ...this.current };
     }
+    private mediaRetries = new Map<
+      string,
+      { hash: string; attempts: number; after: number; placeholder?: boolean }
+    >();
     private seen = new Map<string, string>();
     private pending = new Map<string, Muse.Source & { at: number }>();
     private firstSeen = new Map<string, { at: number; historical: boolean }>();
@@ -155,6 +165,7 @@
       for (const source of sources) {
         this.seen.set(source.id, source.hash);
         this.pending.delete(source.id);
+        this.mediaRetries.delete(source.id);
       }
     }
     async sync(
@@ -251,6 +262,13 @@
         if (!active()) return;
         // Keep requests bounded even when both messages contain long Unicode text.
         const batch = ready.slice(i, i + 1);
+        const item = batch[0]!;
+        const retry = this.mediaRetries.get(item.source.id);
+        if (retry?.hash === item.source.hash && this.now() < retry.after) {
+          this.current.waiting += retry.placeholder ? 1 : ready.length - i;
+          if (retry.placeholder) continue;
+          return;
+        }
         const prepared = await Promise.all(
           batch.map(async ({ message }) => {
             const first = this.firstSeen.get(message.id)!;
@@ -262,6 +280,29 @@
           }),
         );
         if (!active()) return;
+        if (!prepared.every(mediaReady)) {
+          const attempts =
+            retry?.hash === item.source.hash ? retry.attempts + 1 : 1;
+          const placeholder =
+            retry?.hash === item.source.hash && retry.placeholder;
+          // After bounded attempts, publish the runtime's honest unavailable-image
+          // fallback so one inaccessible attachment cannot freeze the transcript.
+          // Keep retrying its media; do not remember it as fully delivered.
+          if (attempts >= 3 && !placeholder) {
+            await this.send({ type: 'import', messages: prepared });
+            if (!active()) return;
+          }
+          this.mediaRetries.set(item.source.id, {
+            hash: item.source.hash,
+            placeholder: placeholder || attempts >= 3,
+            attempts: Math.min(attempts, 6),
+            after:
+              this.now() + Math.min(30000, 1000 * 2 ** Math.min(attempts, 5)),
+          });
+          this.current.waiting += attempts >= 3 ? 1 : ready.length - i;
+          if (attempts >= 3) continue;
+          return;
+        }
         await this.send({
           type: 'import',
           messages: prepared,
@@ -278,5 +319,6 @@
     responseAfter,
     promptEcho,
     prepareBatch,
+    mediaReady,
   };
 })();
