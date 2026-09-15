@@ -756,3 +756,16 @@ and FAQ expansion. The Pages workflow deploys only the public site directory.
 Website refinement: removed the closing slogans and decorative FAQ underline.
 The illustration now shows the same sample image in a computer Muse tab and
 Beeper on desktop and phone. Integration acceptance remains unchanged.
+
+## September 15 extension visual update
+
+0.8.21 applies the website theme to the Chrome-only popup and connection page,
+and links to the GitHub Pages site. Store artwork uses example content only.
+Styling does not close any message-parity acceptance item. Store submission
+is blocked by browser access to the editor and missing publishing credentials.
+
+Theme validation: setup, connected, and interrupted popup states and the
+connection page were inspected using static example-state previews. All 241
+TypeScript tests passed on Node 24. Store artboards were rendered in Chrome at
+1280 × 800, with a 440 × 280 promotional tile. Installed-theme verification
+remains separate from preview rendering; queued work was not replayed.

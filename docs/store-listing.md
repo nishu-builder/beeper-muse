@@ -2,23 +2,25 @@
 
 Item: **Beeper Muse** (`bchjpmhhlhpcokhlmbpbiibehfjdgnme`).
 Category: Productivity / Communication. Language: English. Free, public.
-Target package: **0.8.1**, Chrome-only. Verify the actual dashboard status before
+Target package: **0.8.21**, Chrome-only. Verify the actual dashboard status before
 claiming the update is submitted or published.
 
 ## Description
 
 Use Muse from a dedicated chat in Beeper.
 
-Setup instructions: https://github.com/nishu-builder/beeper-muse
+Setup instructions: https://nishu-builder.github.io/beeper-muse/
 
 ## URLs and artwork
 
-- Homepage/setup: <https://github.com/nishu-builder/beeper-muse>
+- Homepage/setup: <https://nishu-builder.github.io/beeper-muse/>
 - Detailed setup: <https://github.com/nishu-builder/beeper-muse/blob/main/docs/chrome-setup.md>
 - Support: <https://github.com/nishu-builder/beeper-muse/issues>
 - Privacy: <https://github.com/nishu-builder/beeper-muse/blob/main/PRIVACY.md>
 - Icon: `extension/icons/icon128.png`
-- Architecture illustration: `docs/store/chrome-only.png` (1280 × 800)
+- Overview illustration: `docs/store/overview.png` (1280 × 800)
+- Extension UI illustration: `docs/store/extension.png` (1280 × 800)
+- Small promotional tile: `docs/store/tile.png` (440 × 280)
 
 Remove the old companion pairing screenshot. The new illustration describes the
 Chrome-only architecture with synthetic text; it is not a screenshot or live
@@ -74,3 +76,15 @@ Send `Reply with exactly: MUSE_CONNECTED` in Beeper's Muse chat and check the re
 Test disconnect, pause/reconnect and a repeated catch-up. Interactive approvals
 stay in Muse. The release remains experimental; the public validation document
 states live-test limits. Never supply a maintainer's personal credentials.
+
+## 0.8.21 visual update
+
+Use the cream, ink, and lime artwork listed above. Replace the older blue
+Chrome-only illustration in the gallery. These are illustrations using example
+content, not screenshots of a personal conversation. The overview shows Muse
+in a computer tab connected to Beeper on desktop and phone. Keep the short
+description above and set the listing website to the GitHub Pages URL.
+
+The package, artwork, and copy being prepared here do not establish a published
+store update. The dashboard is inaccessible through current browser tooling,
+and publishing credentials are missing; submission remains a separate step.

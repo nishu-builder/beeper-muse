@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.21
+
+- Match the website in the popup and connection tab: cream backgrounds,
+  monospaced headings, outlined controls, and lime action buttons.
+- Link the extension homepage and both screens to the GitHub Pages website.
+- Add matching store artwork with example content and updated listing links.
+
 ## 0.8.20
 
 - Preserve a deferred Muse image's timeline position with an explicit loading

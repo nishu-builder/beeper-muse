@@ -28,6 +28,23 @@ test('release ZIP is reproducible, readable by unzip, and excludes private files
     .trim()
     .split('\n');
   assert.deepEqual(names.sort(), [...extensionFiles].sort());
+  // Check references, not just the allowlist: a new stylesheet can otherwise
+  // work in a local build but silently disappear from the public ZIP.
+  for (const page of names.filter((name) => name.endsWith('.html'))) {
+    const html = execFileSync('unzip', ['-p', path, page], {
+      encoding: 'utf8',
+    });
+    for (const match of html.matchAll(
+      /<(?:script|link|img)\b[^>]*\b(?:src|href)="([^"]+)"/g,
+    )) {
+      const asset = new URL(match[1], 'https://extension.test/' + page);
+      if (asset.origin === 'https://extension.test')
+        assert.ok(
+          names.includes(asset.pathname.slice(1)),
+          `${page} references missing packaged asset ${match[1]}`,
+        );
+    }
+  }
   const extracted = execFileSync('unzip', ['-p', path], {
     maxBuffer: 64 * 1024 * 1024,
   });

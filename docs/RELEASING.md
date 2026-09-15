@@ -94,3 +94,18 @@ The configured publisher/item IDs must belong to the account that authorized it.
 submission on future release tags. Only Google's authorization/upload responses
 can establish validity. It does not submit an existing tag or alter the listing.
 Missing secrets leave publishing disabled; GitHub packages can still be released.
+
+### Preview and refresh the website theme
+
+Run `node scripts/preview-theme.mjs`, then serve `.local/theme-preview` with
+a local HTTP server. The connected, setup, interrupted, and connection-page
+previews reuse the shipped HTML/CSS with scripts removed and example state.
+They do not contact Beeper or Muse and do not verify a live connection.
+
+Open `overview.html` and `extension.html` in Chrome and capture each artboard
+at 1280 × 800 into `docs/store/overview.png` and `docs/store/extension.png`.
+Capture `tile.html` at 440 × 280 into `docs/store/tile.png`. The fixed artboards
+include the current website diagram and extension layout; keep their example
+content and illustration labels. Browser screenshots, not production account
+screenshots, are the source of these images. Inspect dimensions and framing
+before uploading the files described in `docs/store-listing.md`.
