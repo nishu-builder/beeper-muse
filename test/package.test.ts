@@ -37,11 +37,13 @@ test('release ZIP is reproducible, readable by unzip, and excludes private files
     for (const match of html.matchAll(
       /<(?:script|link|img)\b[^>]*\b(?:src|href)="([^"]+)"/g,
     )) {
-      const asset = new URL(match[1], 'https://extension.test/' + page);
+      const reference = match[1];
+      assert.ok(reference, 'HTML asset reference must be nonempty');
+      const asset = new URL(reference, 'https://extension.test/' + page);
       if (asset.origin === 'https://extension.test')
         assert.ok(
           names.includes(asset.pathname.slice(1)),
-          `${page} references missing packaged asset ${match[1]}`,
+          `${page} references missing packaged asset ${reference}`,
         );
     }
   }
