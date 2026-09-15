@@ -4,6 +4,7 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Beeper Muse — Chrome-only</title>
+    <link rel="stylesheet" href="theme.css" />
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
@@ -15,7 +16,9 @@
           <p class="subtitle">Chrome-only <span id="version"></span></p>
         </div>
       </header>
-      <p class="intro">Connect Muse to Beeper directly from Chrome.</p>
+      <p class="intro">
+        Your Muse chat in Beeper. The bridge runs locally in Chrome.
+      </p>
       <dl class="connections" aria-label="Connections">
         <div>
           <dt>Beeper</dt>
@@ -49,7 +52,7 @@
           <option value="all">All messages loaded in Muse</option>
           <option value="new">Only new messages</option>
         </select>
-        <button id="rescan">Catch up now</button>
+        <button id="rescan" class="primary">Catch up now</button>
         <p id="progress" class="note"></p>
         <p class="note">
           Keep your Muse tab and the Beeper Muse connection tab open. Leave the
@@ -73,6 +76,12 @@
       </section>
       <footer>
         <a
+          href="https://nishu-builder.github.io/beeper-muse/"
+          target="_blank"
+          rel="noreferrer"
+          >Website</a
+        >
+        <a
           href="https://github.com/nishu-builder/beeper-muse/blob/main/docs/chrome-setup.md"
           target="_blank"
           rel="noreferrer"
@@ -82,7 +91,7 @@
           target="_blank"
           rel="noreferrer"
           >Privacy</a
-        ><span>Preview · Runs entirely in Chrome</span>
+        >
       </footer>
     </main>
     <script type="module" src="popup.js"></script>

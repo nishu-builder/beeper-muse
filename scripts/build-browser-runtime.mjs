@@ -61,6 +61,7 @@ for (const name of [
   'manifest.json',
   'popup.html',
   'popup.css',
+  'theme.css',
   'connection.html',
   'connection.css',
 ])

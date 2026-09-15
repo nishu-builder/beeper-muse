@@ -1,0 +1,145 @@
+* {
+  box-sizing: border-box;
+}
+html,
+body {
+  margin: 0;
+  background: #fffdf4;
+  color: #20221e;
+  font-family: Arial, Helvetica, sans-serif;
+}
+body {
+  position: relative;
+  width: 1280px;
+  height: 800px;
+  overflow: hidden;
+  padding: 56px 70px;
+}
+header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font:
+    700 20px Consolas,
+    'Liberation Mono',
+    monospace;
+  letter-spacing: -1px;
+}
+header img {
+  width: 32px;
+  height: 32px;
+}
+h1,
+h2 {
+  font-family: Consolas, 'Liberation Mono', monospace;
+  font-weight: 600;
+  letter-spacing: -2px;
+}
+h1 {
+  font-size: 48px;
+  line-height: 1.15;
+  margin: 32px 0 16px;
+}
+p {
+  font-size: 20px;
+  line-height: 1.6;
+  margin: 0;
+  color: #64655b;
+}
+.url {
+  position: absolute;
+  bottom: 35px;
+  left: 70px;
+  font:
+    14px Consolas,
+    'Liberation Mono',
+    monospace;
+}
+.caption {
+  position: absolute;
+  bottom: 35px;
+  right: 70px;
+  font:
+    11px Consolas,
+    'Liberation Mono',
+    monospace;
+  color: #64655b;
+}
+iframe {
+  border: 0;
+  display: block;
+  background: #fffdf4;
+}
+.diagram {
+  width: 1100px;
+  height: 530px;
+  margin: 12px auto 0;
+  transform: scale(0.9);
+  transform-origin: top center;
+}
+.extension-copy {
+  width: 550px;
+  margin-top: 80px;
+}
+.extension-copy h1 {
+  font-size: 48px;
+}
+.extension-copy p {
+  max-width: 460px;
+}
+.local-label {
+  display: inline-block;
+  background: #e3ff73;
+  border: 1px solid #20221e;
+  border-radius: 4px;
+  font:
+    14px Consolas,
+    'Liberation Mono',
+    monospace;
+  padding: 12px 18px;
+  margin-top: 28px;
+}
+.popup-frame {
+  position: absolute;
+  top: 45px;
+  right: 130px;
+  width: 305px;
+  height: 674px;
+  border: 1px solid #20221e;
+  border-radius: 8px;
+  box-shadow: 5px 6px 0 #e7e7dc;
+  overflow: hidden;
+}
+.popup-frame iframe {
+  width: 360px;
+  height: 800px;
+  transform: scale(0.84);
+  transform-origin: top left;
+}
+.tile {
+  width: 440px;
+  height: 280px;
+  padding: 26px 30px;
+}
+.tile header {
+  font-size: 16px;
+}
+.tile header img {
+  width: 26px;
+  height: 26px;
+}
+.tile h1 {
+  font-size: 32px;
+  letter-spacing: -1.5px;
+  margin: 30px 0 24px;
+}
+.tile .local-label {
+  font-size: 11px;
+  padding: 8px 10px;
+  margin: 0;
+}
+.tile .url {
+  left: 30px;
+  bottom: 20px;
+  font-size: 10px;
+}

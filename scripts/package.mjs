@@ -16,6 +16,7 @@ export const extensionFiles = [
   'content.js',
   'popup.html',
   'popup.css',
+  'theme.css',
   'popup.js',
   'connection.html',
   'connection.css',

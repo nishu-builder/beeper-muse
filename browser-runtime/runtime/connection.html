@@ -5,13 +5,19 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Beeper Muse connection</title>
     <link rel="icon" href="icons/icon32.png" />
+    <link rel="stylesheet" href="theme.css" />
     <link rel="stylesheet" href="connection.css" />
   </head>
   <body>
     <main>
-      <img src="icons/icon48.png" width="48" height="48" alt="" />
-      <h1>Beeper Muse connection</h1>
-      <p id="connection-status" role="status">
+      <header>
+        <img src="icons/icon48.png" width="40" height="40" alt="" />
+        <div>
+          <h1>Beeper Muse</h1>
+          <p class="subtitle">Chrome connection</p>
+        </div>
+      </header>
+      <p id="connection-status" class="status" role="status">
         Starting the Chrome connection…
       </p>
       <p id="connection-stage"></p>
@@ -42,6 +48,24 @@
           File logging is off until you choose a file.
         </p>
       </section>
+      <footer>
+        <a
+          href="https://nishu-builder.github.io/beeper-muse/"
+          target="_blank"
+          rel="noreferrer"
+          >Website</a
+        ><a
+          href="https://github.com/nishu-builder/beeper-muse/blob/main/docs/chrome-setup.md"
+          target="_blank"
+          rel="noreferrer"
+          >Setup guide</a
+        ><a
+          href="https://github.com/nishu-builder/beeper-muse/blob/main/PRIVACY.md"
+          target="_blank"
+          rel="noreferrer"
+          >Privacy</a
+        >
+      </footer>
     </main>
     <script type="module" src="connection.js"></script>
   </body>
