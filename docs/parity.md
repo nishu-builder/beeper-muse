@@ -133,4 +133,5 @@ release packaging passed on Node 24. The 21 removed tests belonged to the retire
 companion. ZIP checks cover manifest and HTML asset references and private-file
 exclusion. The production dependency audit reported no vulnerabilities.
 Documentation file targets were checked; installed message behavior was not
-retested because this cleanup changes no runtime logic. CI is pending.
+retested because this cleanup changes no runtime logic. GitHub runs the same
+checks on Linux and macOS before merge.
