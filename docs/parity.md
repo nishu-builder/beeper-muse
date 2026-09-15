@@ -769,3 +769,9 @@ connection page were inspected using static example-state previews. All 241
 TypeScript tests passed on Node 24. Store artboards were rendered in Chrome at
 1280 × 800, with a 440 × 280 promotional tile. Installed-theme verification
 remains separate from preview rendering; queued work was not replayed.
+
+Installed update observation: the existing local extension automatically reloaded
+to 0.8.21. Its selected diagnostic file reported Beeper and Muse connected,
+ready, and zero queued, claimed, blocked, or pending jobs. This verifies update
+and reconnection, not a new message-delivery test or a live popup screenshot.
+The Chrome Web Store listing has not been changed or submitted.
