@@ -638,3 +638,9 @@ A further installed-runtime generated-image test passed automatically without
 rescan, duplicate or native delivery failure. Although the other Muse tab was
 being used, diagnostic observations still reported the selected source visible.
 This is another visible-source pass, not background-tab acceptance.
+
+A subsequent native Desktop screenshot visibly confirms the new generated cat
+image and the blue replacement image in the conversation, with Babar's elephant
+avatar in the header. The replacement is marked Edited and remains after the
+generated-image exchange. This adds actual client rendering evidence to the
+attachment API checks above; it does not change the background-tab limitation.
