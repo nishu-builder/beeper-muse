@@ -167,3 +167,11 @@ messages do not need to be reset.
 
 The final upload into Muse still needs live verification. A connected status
 only confirms the Beeper connection, not a successful image upload.
+
+### Images waiting for Muse
+
+Muse can leave a generated image loading while its tab is hidden. Beeper Muse
+shows a loading message in its place so later messages can continue in order.
+Open the connected Muse tab to let it finish loading; the image replaces that
+message automatically. Do not resend the prompt. Keeping Chrome running does
+not guarantee that Muse will finish rendering images in a hidden tab.

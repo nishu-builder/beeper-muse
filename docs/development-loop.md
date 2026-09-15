@@ -180,3 +180,10 @@ check also reads the pinned chat timeline and matches the unique marker on the
 image attachment's own filename/description. A separate caption next to an
 unmarked image is insufficient. This is native attachment delivery evidence;
 visual quality and background Muse rendering still need separate observation.
+
+When the supported browser tool exposes a CDP capability, restoring natural
+focus with `Emulation.setFocusEmulationEnabled({ enabled: false })` may release
+inspection's visibility override without restarting Chrome. Confirm using fresh
+`sourceVisible=false` and `sourceTabActive=false` diagnostics; an accepted command
+alone is not evidence. Later browser inspection can enable the override again.
+This is test tooling only and is not part of the extension.

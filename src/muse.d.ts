@@ -53,6 +53,8 @@ declare namespace Muse {
     text: string;
     html?: string;
     images?: Image[];
+    /** An observed image presentation has not exposed any image bytes/URL yet. */
+    imageState?: 'loading';
     timestampMs?: number;
     observedAtMs?: number;
     /** Incomplete text fallback: may create missing history, never overwrite a known message. */

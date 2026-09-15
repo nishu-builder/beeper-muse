@@ -643,7 +643,12 @@ export class BrowserBridge {
     const revision = (saved?.revision || 0) + 1;
     const contentFingerprint = await eventID(
       this.room,
-      JSON.stringify([message.text, message.html, message.images]),
+      JSON.stringify([
+        message.text,
+        message.html,
+        message.images,
+        ...(message.imageState ? [message.imageState] : []),
+      ]),
     );
     const fingerprint = await eventID(
       this.room,
@@ -690,7 +695,10 @@ export class BrowserBridge {
           return 'Image unavailable. Open Muse to view it.';
         }
       });
-    const fallback = missingImages.join('\n');
+    const fallback =
+      message.imageState === 'loading' && !saved?.images?.['0']
+        ? 'Image is still loading in Muse. Open your Muse tab to finish loading it.'
+        : missingImages.join('\n');
     const content: Record<string, unknown> = {
       msgtype: 'm.text',
       body: [message.text, fallback].filter(Boolean).join('\n\n') || 'Image',
@@ -713,7 +721,7 @@ export class BrowserBridge {
       saved?.primaryImage === true ||
       (!saved?.originalImage &&
         !saved?.images?.['0'] &&
-        message.images?.length === 1 &&
+        (message.images?.length === 1 || message.imageState === 'loading') &&
         !message.text.trim());
     const firstImage = message.images?.[0];
     const firstBytes = firstImage?.data?.replace(/^data:[^,]+,/, '');

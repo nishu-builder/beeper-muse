@@ -671,6 +671,12 @@
             text: text(bubble, role),
             html: clean.innerHTML.slice(0, 128000),
             images,
+            ...(images.length === 0 &&
+            e.querySelector(
+              '[data-testid="hatch-chat-attachment-presentation-image"] [data-visualcompletion="loading-state"]',
+            )
+              ? { imageState: 'loading' as const }
+              : {}),
             reactions: reactions(e),
             ...(Number.isFinite(timestampMs) &&
             timestampMs >= 946684800000 &&
