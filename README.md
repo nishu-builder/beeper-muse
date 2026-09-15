@@ -78,8 +78,12 @@ distinguishes implementation from verification in Desktop and mobile.
 
 Muse images can appear as native encrypted images in Beeper, including local
 previews and images selected through responsive loading. Retrieval is limited to
-PNG, JPEG, GIF and WebP, 2 MB per image and 4 MB per message. Inaccessible HTTP
-images remain links; inaccessible local previews show an explanation.
+PNG, JPEG, GIF and WebP. Images that fit the 2 MB per-image and 4 MB per-message
+transfer limits keep their original bytes. Larger still PNG/JPEG images (up to
+20 MB downloaded) are compressed to WebP, at most 2048 pixels on the longest side.
+Oversized animations are not flattened. Inaccessible HTTP images remain links;
+inaccessible local previews show an explanation. Muse can defer rendering images
+in background tabs; those images can only sync once Muse exposes them in the page.
 
 **Beeper-to-Muse photo uploads are a preview.** Send one PNG, JPEG, GIF or WebP
 photo up to 5 MB in the dedicated Beeper chat, optionally with a caption. The

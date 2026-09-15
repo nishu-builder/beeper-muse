@@ -173,7 +173,11 @@ try {
       const until = Date.now() + 45000;
       let last = '';
       do {
-        const messages = await desktop.messages(target, run.startedAt - 1000);
+        const messages = await desktop.messages(
+          target,
+          run.startedAt - 1000,
+          run.scenario === 'receive-image',
+        );
         const result = assess(run, messages);
         let log: ReturnType<typeof diagnostics> | undefined;
         try {

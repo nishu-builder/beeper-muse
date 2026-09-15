@@ -90,6 +90,67 @@
     });
     return clone;
   }
+  // Preserve original bytes when they fit. Oversized still images get a bounded
+  // WebP preview; never silently flatten GIF/WebP animations or animated PNGs.
+  async function compactImage(
+    bytes: Uint8Array<ArrayBuffer>,
+    mime: string,
+    limit: number,
+  ) {
+    if (!['image/png', 'image/jpeg'].includes(mime) || limit < 16384)
+      throw Error('Image too large');
+    if (mime === 'image/png') {
+      const view = new DataView(
+        bytes.buffer,
+        bytes.byteOffset,
+        bytes.byteLength,
+      );
+      for (let offset = 8; offset + 12 <= bytes.length;) {
+        const length = view.getUint32(offset);
+        const kind = String.fromCharCode(
+          ...bytes.subarray(offset + 4, offset + 8),
+        );
+        if (kind === 'acTL') throw Error('Animated image too large');
+        if (kind === 'IDAT' || length > bytes.length - offset - 12) break;
+        offset += length + 12;
+      }
+    }
+    const bitmap = await createImageBitmap(new Blob([bytes], { type: mime }));
+    try {
+      if (
+        !bitmap.width ||
+        !bitmap.height ||
+        bitmap.width * bitmap.height > 64000000
+      )
+        throw Error('Image dimensions too large');
+      const ratio = Math.min(1, 2048 / Math.max(bitmap.width, bitmap.height));
+      for (const scale of [1, 0.75, 0.5, 0.25]) {
+        const canvas = new OffscreenCanvas(
+          Math.max(1, Math.round(bitmap.width * ratio * scale)),
+          Math.max(1, Math.round(bitmap.height * ratio * scale)),
+        );
+        try {
+          const context = canvas.getContext('2d');
+          if (!context) throw Error('Image conversion unavailable');
+          context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+          const blob = await canvas.convertToBlob({
+            type: 'image/webp',
+            quality: 0.9,
+          });
+          if (blob.size > 0 && blob.size <= limit && blob.type === 'image/webp')
+            return {
+              bytes: new Uint8Array(await blob.arrayBuffer()),
+              mime: blob.type,
+            };
+        } finally {
+          canvas.width = canvas.height = 1;
+        }
+      }
+      throw Error('Image too large');
+    } finally {
+      bitmap.close();
+    }
+  }
   async function prepare(
     message: Muse.Message,
     imageLimit = 2 * 1024 * 1024,
@@ -107,9 +168,7 @@
           redirect: 'error',
           signal: AbortSignal.timeout(8000),
         });
-        const mime = (response.headers.get('content-type') || '').split(
-          ';',
-        )[0]!;
+        let mime = (response.headers.get('content-type') || '').split(';')[0]!;
         if (!response.ok || !response.body) throw Error('Image unavailable');
         if (
           !['image/png', 'image/jpeg', 'image/gif', 'image/webp'].includes(mime)
@@ -125,7 +184,7 @@
             const chunk = await reader.read();
             if (chunk.done) break;
             size += chunk.value.length;
-            if (size > Math.min(remaining, imageLimit)) {
+            if (size > 20 * 1024 * 1024) {
               failure = 'image-too-large';
               throw Error('Image too large');
             }
@@ -135,17 +194,25 @@
           await reader.cancel();
           reader.releaseLock();
         }
-        const bytes = new Uint8Array(size);
+        let bytes = new Uint8Array(size);
         let offset = 0;
         for (const chunk of chunks) {
           bytes.set(chunk, offset);
           offset += chunk.length;
         }
+        const limit = Math.min(remaining, imageLimit);
+        if (size > limit) {
+          failure = 'image-too-large';
+          const compact = await compactImage(bytes, mime, limit);
+          bytes = compact.bytes;
+          mime = compact.mime;
+          report('image-compressed');
+        }
         let binary = '';
         for (let i = 0; i < bytes.length; i += 8192)
           binary += String.fromCharCode(...bytes.subarray(i, i + 8192));
         images.push({ ...image, data: btoa(binary), mime });
-        remaining -= size;
+        remaining -= bytes.length;
         report('image-prepared');
       } catch {
         report(failure);
@@ -171,6 +238,7 @@
       snapshot: () => snapshot(document),
       activity: () => activity(document),
       activityReadiness: () => activityReadiness(document),
+      mediaReadiness: () => mediaReadiness(document),
       profile: async () => {
         const image = assistantAvatar(document);
         if (!image) return;
@@ -381,6 +449,63 @@
     } finally {
       canvas.width = canvas.height = 0;
     }
+  }
+  function mediaReadiness(document: Document): Muse.MediaReadiness {
+    const logs = [
+      ...document.querySelectorAll('[role="log"][aria-label="Chat messages"]'),
+    ].filter(visible);
+    const tail =
+      logs.length === 1
+        ? [
+            ...logs[0]!.querySelectorAll(
+              '[data-message-item][data-message-id]',
+            ),
+          ].slice(-3)
+        : [];
+    const count = (selector: string) =>
+      Math.min(
+        100,
+        tail.reduce((n, item) => n + item.querySelectorAll(selector).length, 0),
+      );
+    return {
+      sourceVisible: document.visibilityState === 'visible',
+      sourceFocused: document.hasFocus(),
+      tailImageBusy: count(
+        '[data-testid="hatch-chat-attachment-presentation-image"] [aria-busy="true"]',
+      ),
+      tailImageChildNodes: count(
+        '[data-testid="hatch-chat-attachment-presentation-image"] *',
+      ),
+      tailImageNodes: count('img'),
+      tailImagePresentations: count(
+        '[data-testid="hatch-chat-attachment-presentation-image"]',
+      ),
+      tailIframes: count('iframe'),
+      tailWidgetsOnscreen: tail.filter((e) => {
+        const r = e.getBoundingClientRect();
+        return (
+          e.hasAttribute('data-message-has-presentation') &&
+          r.height > 0 &&
+          r.bottom > 0 &&
+          r.top < (document.defaultView?.innerHeight || 0)
+        );
+      }).length,
+      tailWidgetsSized: tail.filter(
+        (e) => e.hasAttribute('data-message-has-presentation') && visible(e),
+      ).length,
+      tailCanvases: count('canvas'),
+      tailVideos: count('video'),
+      tailFileCards: count(
+        '[data-pel-impression="sandbox_file_card_impression"]',
+      ),
+      tailGeneratedControls: count(
+        'button[aria-label^="Open generated image"]',
+      ),
+      tailGeneratedImages: count(
+        'button[aria-label^="Open generated image"] img',
+      ),
+      tailDeferred: count('[data-message-accessibility-surrogate="true"]'),
+    };
   }
   function activityReadiness(document: Document): Muse.ActivityReadiness {
     const stopButtons = [

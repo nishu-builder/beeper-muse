@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.8.17
+
+- Compress oversized still PNG/JPEG images to bounded WebP previews instead of
+  rejecting ordinary generated images above 2 MB. Originals that fit are unchanged;
+  oversized animations retain the unavailable-image fallback.
+- Fix automatic image verification for native attachments whose description is
+  exposed as a filename, including image-only messages omitted by search.
+- Add content-free diagnostics for selected-tab visibility and media readiness.
+
 ## 0.8.16
 
 - Match animated Muse avatars with a bounded, cached still frame from the named assistant.

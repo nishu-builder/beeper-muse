@@ -154,3 +154,9 @@ not establish the correct selectors by themselves.
 
 See [validation](validation.md) for actual observations rather than treating the
 existence of this harness as a passed live integration test.
+
+Image-only replies may be absent from Desktop message search. The receive-image
+check also reads the pinned chat timeline and matches the unique marker on the
+image attachment's own filename/description. A separate caption next to an
+unmarked image is insufficient. This is native attachment delivery evidence;
+visual quality and background Muse rendering still need separate observation.

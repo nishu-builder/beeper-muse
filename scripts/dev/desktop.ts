@@ -13,7 +13,7 @@ export interface Message {
   timestamp: string;
   text?: string;
   isSender?: boolean;
-  attachments?: { type: string }[];
+  attachments?: { type: string; fileName?: string }[];
   sendStatus?: { status: string; deliveredToUsers?: string[] };
 }
 export function object(value: unknown): Record<string, unknown> {
@@ -109,7 +109,11 @@ export class Desktop {
       );
     }
   }
-  async messages(target: Target, after: number): Promise<Message[]> {
+  async messages(
+    target: Target,
+    after: number,
+    includeMedia = false,
+  ): Promise<Message[]> {
     const query = new URLSearchParams({
       chatIDs: target.chatID,
       dateAfter: new Date(after).toISOString(),
@@ -121,7 +125,32 @@ export class Desktop {
       throw new DevError(
         'Message search is incomplete; narrow the test window.',
       );
-    return data.items.map((value) => {
+    // Desktop search omits image-only messages. Read the pinned timeline as
+    // well for media checks, then correlate its own filename, never adjacency.
+    const values = [...data.items];
+    if (includeMedia) {
+      const timeline = await this.request(
+        '/chats/' + encodeURIComponent(target.chatID) + '/messages',
+      );
+      if (!Array.isArray(timeline.items))
+        throw new DevError('Invalid chat timeline.');
+      for (const value of timeline.items) {
+        const message = object(value);
+        if (message.chatID !== target.chatID)
+          throw new DevError('Timeline returned a different chat.');
+        if (
+          typeof message.timestamp !== 'string' ||
+          !Number.isFinite(Date.parse(message.timestamp))
+        )
+          throw new DevError('Timeline returned an invalid timestamp.');
+        if (
+          Date.parse(message.timestamp) >= after &&
+          !values.some((v) => object(v).id === message.id)
+        )
+          values.push(value);
+      }
+    }
+    return values.map((value) => {
       const m = object(value);
       if (
         m.chatID !== target.chatID ||
@@ -145,6 +174,9 @@ export class Desktop {
           ? {
               attachments: m.attachments.map((a) => ({
                 type: String(object(a).type),
+                ...(typeof object(a).fileName === 'string'
+                  ? { fileName: object(a).fileName as string }
+                  : {}),
               })),
             }
           : {}),
