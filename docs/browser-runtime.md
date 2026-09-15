@@ -4,6 +4,26 @@ This document describes the current Chrome implementation.
 For the component overview, see [architecture](architecture.md). For installation,
 see [setup](chrome-setup.md).
 
+## Protocol compatibility
+
+Beeper Muse uses Beeper's existing Matrix-based bridge interface:
+
+- **Matrix:** application-service transactions, native room events and encrypted
+  messaging follow the [Matrix APIs](https://spec.matrix.org/v1.15/application-service-api/).
+- **Beeper/mautrix extensions:** the connection uses appservice WebSocket v3,
+  bridge status and the read-only provisioning endpoints described below.
+  These extend Matrix; WebSocket transport is not part of the standard Matrix
+  Application Service API.
+- **Registration:** [bbctl](https://github.com/beeper/bridge-manager) creates the
+  Beeper registration. It is a setup tool, not a separate messaging protocol,
+  and does not need to remain running.
+
+This implements the parts needed for one Muse conversation, not every Matrix
+or bridgev2 feature. It is a TypeScript implementation, not a bundled mautrix-go
+bridge. The Muse side currently reads and operates the signed-in webpage; it
+does not use an official Muse messaging API. Protocol compatibility does not
+imply endorsement or full feature parity.
+
 ## Registration and room identity
 
 One-time setup uses Beeper's official `bbctl` to obtain an application-service

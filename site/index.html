@@ -307,10 +307,23 @@
               </p>
             </details>
             <details>
+              <summary>Does it use Beeper’s existing bridge protocol?</summary>
+              <p>
+                Yes. It uses Beeper’s Matrix-based bridge protocol, including
+                its WebSocket transport for self-hosted bridges. Beeper’s
+                <a href="https://github.com/beeper/bridge-manager">bbctl</a>
+                tool handles one-time registration. The Muse side reads and
+                operates your signed-in webpage.
+                <a
+                  href="https://github.com/nishu-builder/beeper-muse/blob/main/docs/browser-runtime.md#protocol-compatibility"
+                  >Protocol details.</a
+                >
+              </p>
+            </details>
+            <details>
               <summary>Is this an official integration?</summary>
               <p>
-                No. Beeper Muse is not affiliated with Beeper or Muse. It uses
-                Beeper’s bridge protocol and observes the selected Muse webpage.
+                No. Beeper Muse is not affiliated with Beeper or Muse.
                 <a
                   href="https://github.com/nishu-builder/beeper-muse/blob/main/docs/architecture.md"
                   >Read how it works.</a

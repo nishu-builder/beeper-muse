@@ -135,3 +135,11 @@ exclusion. The production dependency audit reported no vulnerabilities.
 Documentation file targets were checked; installed message behavior was not
 retested because this cleanup changes no runtime logic. GitHub runs the same
 checks on Linux and macOS before merge.
+
+## Protocol wording — September 15
+
+README and website now identify Beeper's existing Matrix-based bridge protocol.
+The runtime guide separates standard Matrix messages/application services from
+Beeper/mautrix WebSocket and provisioning extensions, and identifies bbctl as
+the one-time registration tool. Muse still uses the DOM adapter; this wording
+does not assert official API access, complete bridgev2 support or new parity.
