@@ -21,3 +21,8 @@ Keep setup instructions in `docs/chrome-setup.md`; the site links there instead
 of duplicating commands. Keep feature claims aligned with `docs/parity.md` and
 distinguish source builds from older public releases. Website changes do not
 require an extension version bump or Chrome Web Store submission.
+
+The hero links to the public Chrome Web Store item and the source-build guide.
+Store review can lag behind source updates; the site does not claim a current
+store version. “The bridge is fully local” refers to the Chrome runtime; Muse
+and Beeper still process messages through their services.

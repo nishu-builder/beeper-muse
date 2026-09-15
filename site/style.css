@@ -141,11 +141,6 @@ h1 {
 .text-link {
   font: 13px/1.7 var(--mono);
 }
-.fineprint {
-  color: var(--muted);
-  font: 11px/1.6 var(--mono);
-  margin: 20px 0 0;
-}
 /* One computer source, with the same conversation on two Beeper devices. */
 .bridge-demo {
   position: relative;
@@ -354,12 +349,6 @@ figcaption {
   text-align: center;
   margin: 38px 0 60px;
   font: 12px/1.7 var(--mono);
-}
-figcaption span {
-  display: block;
-  margin-top: 7px;
-  color: var(--muted);
-  font-size: 9px;
 }
 .section {
   border-top: 1px solid var(--line);
@@ -694,5 +683,12 @@ details p {
   }
   figcaption {
     margin-bottom: 40px;
+  }
+}
+
+@media (max-width: 360px) {
+  .actions {
+    flex-direction: column;
+    gap: 16px;
   }
 }
