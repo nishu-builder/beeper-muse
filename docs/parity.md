@@ -10,15 +10,18 @@ The product remains Chrome-only. Maintainer test tools are optional.
 
 ## Current priorities
 
-1. The live 0.8.14 photo → text sequence passed: both uniquely marked replies
-   returned to Beeper with native SUCCESS. Fresh logs and automatic local updates
-   work. Keep broader update/restart cases and unattended recovery on the ledger.
-2. Verify Muse-to-Beeper image generation separately, then broaden photo coverage
-   beyond the single small PNG used in the successful incoming-photo test.
-3. Verify the new Babar avatar synchronization and diagnose missing typing indicators.
-4. Verify both-direction photos and native delivery status end to end.
-5. Work through the rendering/type inventory below; inspect actual source support
-   before claiming the inventory is exhaustive.
+1. Visible-source generated-image delivery without rescan passed in 0.8.17 and
+   0.8.18. Finish delayed fallback replacement rendering and background-tab media
+   discovery; source-hidden images remain a known limitation.
+2. Verify older-history placement and quiet catch-up in installed clients. Native
+   order for a fresh prompt/caption/photo passed. Muse's inspected source exposes
+   no original timestamps, so the observed-time fallback remains explicit.
+3. Babar's animated-avatar frame is visible in Desktop. Real Muse-driven typing
+   appeared and cleared; native owner reaction addition/removal also passed.
+   Retain broader mobile, reaction replacement and acknowledgement checks.
+4. Broaden incoming photo coverage beyond the passed PNG → text sequence, and
+   continue the rendering/type inventory below. These remain separate acceptance
+   cases rather than reopening already verified individual tests.
 
 ## September 14 additional reports
 
@@ -559,3 +562,49 @@ after closing the viewer, shows the label cleared. This establishes source-drive
 Desktop appearance/clear, beyond the earlier controlled protocol test. Mobile
 visual behavior remains unverified. The connected Muse tab stayed visible for
 this image acceptance; rendering deferred in background tabs remains a limitation.
+
+### Native reaction add/remove and merge confirmation
+
+On the actual selected Muse source, a temporary heart on the latest synthetic
+caption produced a verified m.reaction event: the sender was the owner, its
+annotation targeted the exact caption event, and it was initially unredacted.
+After removing the reaction in Muse, that same native event had redacted_because
+and no remaining relation content. No test reaction remains. This establishes
+native add/remove mapping; client bubble appearance, replacement and assistant
+acknowledgements remain separate checks.
+
+The caption's rendered source contains no time element or timestamp/date
+attribute. Continue using the explicit observed-time fallback; never infer the
+original time from unrelated interface state. History order and quiet catch-up
+remain open for installed-client acceptance.
+
+PR 31 merged as 58265ee after all six Linux/macOS CI checks passed. Local
+validation passed 229 TypeScript tests, type checks, Go tests/build, formatting,
+and the public extension package. The installed 0.8.17 build passed the fresh
+no-rescan generated-image check; the driver automatically archived that result.
+
+## Image timeline identity (0.8.18, implementation pending live acceptance)
+
+The previous runtime created an extra "Image" text event for image-only sources,
+then appended a separate native photo event. A delayed preparation could therefore
+put the photo after later conversation messages. New image-only imports now use
+one source event; unavailable-image fallback recovery edits that same event into
+a native image. Reactions continue to target the same event. Existing legacy
+image event IDs remain unchanged. Caption changes preserve native image content.
+Message updates request no new notification and do not assert that the user read
+the chat. New messages retain their existing live/history notification policy.
+Regression tests cover delayed recovery, later text, original timestamp retention,
+reaction targeting, preview loss and caption edits. Installed-client acceptance
+is still required; unrelated late-loaded history insertion remains open.
+
+### Single-image native acceptance (0.8.18)
+
+A fresh generated-image request passed automatic native attachment and delivery
+checks without refresh, rescan or resend. The image-only source has exactly its
+primary encrypted Matrix event; the old separate image-event ID returns
+M_NOT_FOUND. Desktop reports one matching image attachment. Native sort keys
+place the prompt, caption and image in source order; the caption and image share
+the source-observation time, and the owner's original send time is retained.
+This verifies new-message identity and order, not delayed fallback replacement
+rendering or old-history insertion. All 232 TypeScript tests, type checks, Go
+checks, formatting and packaging passed.

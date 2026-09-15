@@ -95,6 +95,9 @@ History uses silent batches and read markers. Source timestamps are used when
 available; otherwise timestamps describe when the extension first observed the
 message. Older imports are appended, not inserted between existing Beeper events.
 Offscreen text placeholders may gain formatting and images when rendered later.
+New image-only imports use one native message; a delayed image replaces its
+unavailable-image fallback in place. Message updates are quiet and do not
+mark an otherwise unread chat as read.
 
 ## Update without losing state
 

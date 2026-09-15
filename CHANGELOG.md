@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.8.18
+
+- Give image-only source messages one native timeline position, replacing a delayed
+  image fallback in place instead of appending a second photo message.
+- Preserve native image content through temporary preview loss and caption changes.
+- Update existing messages quietly without marking unseen chat messages as read.
+
 ## 0.8.17
 
 - Compress oversized still PNG/JPEG images to bounded WebP previews instead of
