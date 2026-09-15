@@ -659,3 +659,23 @@ samples, delivery timing, coverage gaps and journal recovery. The installed
 0.8.18 diagnostic reported visible and the live preflight correctly refused to
 send. A real hidden-tab run is pending the requested manual tab switch; this
 guard improves verification and does not itself fix source rendering.
+
+### Independent Chrome tab diagnostics (0.8.19)
+
+After the requested tab switch, fresh page observations still reported visible
+and focused. The runtime now adds `sourceTabActive` from Chrome's authenticated
+message sender, separately from the DOM signals. Page-provided values cannot
+override it; missing Chrome state remains unknown. This distinguishes actual
+tab selection from a possible debugger visibility override without changing
+source visibility, focusing tabs or reading browser profiles.
+
+All 237 tests and full local checks passed. Actual background acceptance still
+requires consistent live evidence; this diagnostic change does not assert that
+the source's background rendering has been fixed.
+
+The installed 0.8.19 update reconnected automatically. Fresh diagnostics then
+showed `sourceTabActive=false` together with `sourceVisible=true` and
+`sourceFocused=true`: the user's tab switch had worked, but page visibility
+remained overridden. The background runner now requires both inactive Chrome
+tab state and hidden page state. Temporarily disabling computer use was requested
+to release inspection; no additional image prompt was sent during diagnosis.

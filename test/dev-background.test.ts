@@ -10,12 +10,19 @@ const now = 100000;
 const sample = (time: number, sourceVisible?: boolean) => ({
   time,
   code: 'source-readiness',
-  facts: { sourceVisible },
+  facts: { sourceVisible, sourceTabActive: false },
 });
 
 test('background preflight rejects visible, unknown, future and stale source evidence', () => {
   for (const events of [
     [],
+    [
+      {
+        ...sample(now, false),
+        facts: { sourceVisible: false, sourceTabActive: true },
+      },
+    ],
+    [{ ...sample(now, false), facts: { sourceVisible: false } }],
     [sample(now, true)],
     [sample(now)],
     [sample(now + 1, false)],

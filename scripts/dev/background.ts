@@ -25,10 +25,11 @@ export function beginBackground(
     !last ||
     last.time > now ||
     now - last.time > maxGap ||
-    last.facts?.sourceVisible !== false
+    last.facts?.sourceVisible !== false ||
+    last.facts?.sourceTabActive !== false
   )
     throw new DevError(
-      'Background test not sent: wait for a fresh log sample with Muse hidden. Switch to another Chrome tab and leave it there.',
+      'Background test not sent: wait for a fresh log sample with Muse hidden and its Chrome tab inactive. Switch to another Chrome tab and leave it there.',
     );
   return {
     firstSample: last.time,
@@ -63,7 +64,8 @@ export function observeBackground(
     if (
       sample.time > now ||
       sample.time - state.lastSample > maxGap ||
-      sample.facts?.sourceVisible !== false
+      sample.facts?.sourceVisible !== false ||
+      sample.facts?.sourceTabActive !== false
     )
       state.failed = true;
     state.lastSample = sample.time;

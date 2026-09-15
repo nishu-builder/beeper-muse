@@ -1,5 +1,9 @@
 import { RuntimeWork, isConnectionDiagnostic } from './runtime-work.js';
-import { DiagnosticLog, failureCode } from './diagnostic-log.js';
+import {
+  DiagnosticLog,
+  failureCode,
+  sourceReadinessFacts,
+} from './diagnostic-log.js';
 import { Updates, localUpdate } from './updates.js';
 import { ensureMuseTab, isMuseURL, resumeTicket } from './muse-tab.js';
 declare const __BEEPER_MUSE_BUILD_ID__: string;
@@ -420,7 +424,12 @@ async function handle(
     throw Error('This Muse tab is not connected.');
   }
   if (message.type === 'diagnostic') {
-    await log.record(message.code, message.facts);
+    await log.record(
+      message.code,
+      message.code === 'source-readiness'
+        ? sourceReadinessFacts(message.facts, sender.tab.active)
+        : message.facts,
+    );
     return { ok: true };
   }
   await start();
