@@ -8,6 +8,10 @@
 Your Muse conversation, alongside your other chats in Beeper. Connected directly
 from Chrome on one of your devices; **the bridge is fully local**.
 
+Uses Beeper's existing Matrix-based bridge protocol, with registration through
+[Beeper's bbctl tool](https://github.com/beeper/bridge-manager).
+[Protocol details](docs/browser-runtime.md#protocol-compatibility).
+
 [Website](https://nishu-builder.github.io/beeper-muse/) · [Chrome Web Store](https://chromewebstore.google.com/detail/beeper-muse/bchjpmhhlhpcokhlmbpbiibehfjdgnme) · [Setup](docs/chrome-setup.md) · [Source releases](https://github.com/nishu-builder/beeper-muse/releases/latest) · [Documentation](docs/README.md)
 
 ## Get started
