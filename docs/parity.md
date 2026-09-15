@@ -742,3 +742,13 @@ loading limitation remains open. Restoring natural focus via the supported CDP
 capability was independently confirmed by fresh hidden/inactive diagnostics, and
 read-only CDP DOM inspection preserved that hidden state. Future investigations
 can use this without repeated user restarts.
+
+## September 15 website
+
+The GitHub Pages landing site is tracked separately from integration parity.
+It links to the setup guide and this ledger, and calls out the Chrome tab
+requirement, one-time terminal registration, preview photo support, and delayed
+images in hidden Muse tabs. Website publication does not close any open
+integration acceptance item. Browser checks passed at 1280px, 808px, 390px,
+and 320px, including no horizontal overflow, loaded assets, keyboard skip link,
+and FAQ expansion. The Pages workflow deploys only the public site directory.
