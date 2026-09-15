@@ -1,7 +1,7 @@
 # Website
 
 The public landing page is https://nishu-builder.github.io/beeper-muse/.
-Its source is `site/`: static HTML, CSS, and the extension icon. There is no
+Its source is `site/`: static HTML, CSS, the extension icon, and an original SVG sample image. There is no
 JavaScript, build step, analytics, external font service, or registration form.
 Private registration files are imported in the extension, never on this site.
 
@@ -21,3 +21,8 @@ Keep setup instructions in `docs/chrome-setup.md`; the site links there instead
 of duplicating commands. Keep feature claims aligned with `docs/parity.md` and
 distinguish source builds from older public releases. Website changes do not
 require an extension version bump or Chrome Web Store submission.
+
+The hero links to the public Chrome Web Store item and the source-build guide.
+Store review can lag behind source updates; the site does not claim a current
+store version. “The bridge is fully local” refers to the Chrome runtime; Muse
+and Beeper still process messages through their services.

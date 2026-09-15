@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="300" viewBox="0 0 480 300">
+<title>Mountains and a lake at sunset</title>
+<defs><linearGradient id="sky" x2="0" y2="1"><stop stop-color="#f0dbb3"/><stop offset="1" stop-color="#f9eac9"/></linearGradient><linearGradient id="water" x2="0" y2="1"><stop stop-color="#a8bcb4"/><stop offset="1" stop-color="#d1d5b6"/></linearGradient></defs>
+<path fill="url(#sky)" d="M0 0h480v300H0z"/><circle cx="345" cy="67" r="29" fill="#db8760"/>
+<path d="m0 148 85-94 67 71 69-90 104 112 75-65 80 85v133H0Z" fill="#849b98"/>
+<path d="m62 81 23-27 31 33-22-8-11 6-8-7M194 70l27-35 35 38-27-12-10 9-9-6" fill="#f8f1da"/>
+<path d="m0 178 77-51 61 39 65-33 90 42 67-41 120 45v121H0Z" fill="#4f756d"/>
+<path d="M0 188q130-28 239-4t241-7v123H0Z" fill="url(#water)"/>
+<path d="m57 191 57 39 72-38m88 2 56 37 68-41" fill="none" stroke="#90aaa1" stroke-width="9" opacity=".6"/>
+<path d="M0 225q79 2 124 75H0Zm480-23q-76 26-118 98h118Z" fill="#334f49"/>
+<path d="M0 266q48-3 89 34H0Zm480-17q-41 6-69 51h69Z" fill="#759073"/>
+<g stroke="#f3ebc9" stroke-width="2" stroke-linecap="round"><path d="M192 211h47m49-4h27m-142 38h56m29 20h39m-7-36h29"/></g>
+</svg>
