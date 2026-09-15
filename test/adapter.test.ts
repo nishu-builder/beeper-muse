@@ -1194,3 +1194,34 @@ test('oversized animations and over-limit downloads retain fallback without deco
     f.dom.window.close();
   }
 });
+
+test('an unmounted image presentation stays pending, while unrelated skeletons stay widgets', () => {
+  const f = fixture();
+  try {
+    f.document.querySelector('[role="log"]')!.innerHTML = `
+      <div data-message-item data-message-id="image" data-message-role="assistant" data-message-has-presentation="true">
+        <div data-testid="hatch-chat-attachment-presentation-image"><div>
+          <div data-slot="skeleton" data-visualcompletion="loading-state" class="hatch-chat-groupable-bubble"></div>
+        </div></div>
+      </div>
+      <div data-message-item data-message-id="tool" data-message-role="assistant" data-message-has-presentation="true">
+        <div class="hatch-chat-groupable-bubble" data-visualcompletion="loading-state"></div>
+      </div>`;
+    const snapshot = f.adapter.snapshot(f.document);
+    assert.equal(snapshot.messages[0].imageState, 'loading');
+    assert.equal(snapshot.messages[0].images.length, 0);
+    assert.equal(snapshot.messages[1].imageState, undefined);
+    const card = f.document.querySelector(
+      '[data-testid="hatch-chat-attachment-presentation-image"]',
+    )!;
+    card.innerHTML =
+      '<button class="hatch-chat-groupable-bubble"><img src="blob:https://muse.ai/ready"></button>';
+    assert.equal(
+      f.adapter.snapshot(f.document).messages[0].imageState,
+      undefined,
+    );
+    assert.equal(f.adapter.snapshot(f.document).messages[0].images.length, 1);
+  } finally {
+    f.dom.window.close();
+  }
+});

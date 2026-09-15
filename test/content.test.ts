@@ -571,3 +571,25 @@ test('reply completion leaves an unprepared image for background retry rather th
     false,
   );
 });
+
+test('worker pulses advance the queue without tab timers and never overlap or resume a stopped source', async () => {
+  const h = harness(true);
+  h.view({ busy: true });
+  h.signal('start');
+  await flush();
+  assert.equal(h.messages.filter((m) => m.type === 'claim').length, 0);
+  h.view({ busy: false });
+  h.signal('activity-pulse');
+  await flush();
+  assert.equal(h.messages.filter((m) => m.type === 'claim').length, 1);
+  h.signal('activity-pulse');
+  await flush();
+  assert.equal(h.messages.filter((m) => m.type === 'claim').length, 1);
+  h.signal('stop');
+  h.claim();
+  await flush();
+  h.signal('activity-pulse');
+  await flush();
+  assert.equal(h.messages.filter((m) => m.type === 'claim').length, 1);
+  assert.equal(h.submits, 0);
+});

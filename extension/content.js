@@ -297,6 +297,9 @@
     if (message.type === 'activity-pulse') {
       respond({ ok: true });
       void pulseActivity();
+      // Hidden tabs can throttle their interval for a minute at a time. The
+      // worker already wakes this selected tab; also advance its guarded sync.
+      void poll();
       return;
     }
     if (message.type === 'check-upload') {

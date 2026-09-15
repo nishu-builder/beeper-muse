@@ -1140,3 +1140,50 @@ test('new captions keep image content and update quietly without moving the phot
     'quiet edits do not claim the user read the chat',
   );
 });
+
+test('an image skeleton gets a native loading placeholder, then a quiet image replacement', async (t) => {
+  const h = await harness();
+  t.after(h.close);
+  const pending = {
+    id: 'pending-image',
+    role: 'assistant' as const,
+    text: '',
+    imageState: 'loading' as const,
+    observedAtMs: 123456,
+  };
+  await h.bridge.importMessages([pending]);
+  const original = h.batches[0]!.events[0];
+  assert.match(original.content.content.body, /still loading in Muse/);
+  await h.bridge.importMessages([pending]);
+  assert.equal(h.batches.length, 1);
+  await h.bridge.importMessages([
+    { id: 'later', role: 'assistant', text: 'Later message' },
+  ]);
+  await h.bridge.importMessages([
+    {
+      ...pending,
+      imageState: undefined,
+      images: [
+        { url: 'blob:https://muse.ai/ready', data: 'AQID', mime: 'image/png' },
+      ],
+    },
+  ]);
+  const recovered = h.batches[2]!.events;
+  assert.equal(recovered.length, 1);
+  assert.equal(recovered[0].content.content.msgtype, 'm.image');
+  assert.equal(
+    recovered[0].content.content['m.relates_to'].event_id,
+    original.event_id,
+  );
+  assert.equal(h.batches[2]!.send_notification, false);
+  assert.equal(
+    (await h.state.get<any>('source:pending-image')).timestamp,
+    123456,
+  );
+  await h.bridge.importMessages([pending]);
+  assert.equal(
+    h.batches.length,
+    3,
+    'a later skeleton cannot downgrade a delivered photo',
+  );
+});

@@ -56,8 +56,8 @@
         (m) =>
           m.id &&
           ['user', 'assistant'].includes(m.role) &&
-          (!m.widget || !!m.images?.length) &&
-          (m.text.trim() || !!m.images?.length),
+          (!m.widget || !!m.images?.length || m.imageState === 'loading') &&
+          (m.text.trim() || !!m.images?.length || m.imageState === 'loading'),
       )
       .map((m) => ({
         id: m.id,
@@ -65,6 +65,7 @@
         partial: m.partial,
         html: m.html ? Array.from(m.html).slice(0, 32000).join('') : undefined,
         images: m.images,
+        imageState: m.imageState,
         timestampMs: m.timestampMs,
         read: m.read,
         reactions: m.reactions,
@@ -84,6 +85,7 @@
         (message.images || []).map(({ url, alt }) => ({ url, alt })),
         message.read || false,
         message.reactions,
+        ...(message.imageState ? [message.imageState] : []),
       ]),
     );
     const digest = await crypto.subtle.digest('SHA-256', bytes);
@@ -118,9 +120,12 @@
     return out;
   }
   function mediaReady(message: Muse.Message) {
-    return (message.images || []).every(
-      (image) =>
-        !!image.data && /^image\/(png|jpeg|gif|webp)$/.test(image.mime || ''),
+    return (
+      message.imageState !== 'loading' &&
+      (message.images || []).every(
+        (image) =>
+          !!image.data && /^image\/(png|jpeg|gif|webp)$/.test(image.mime || ''),
+      )
     );
   }
   class Tracker implements Muse.SyncTracker {
@@ -183,7 +188,7 @@
         waiting: 0,
         missingTimes: items.filter((m) => m.timestampMs === undefined).length,
         skippedWidgets: view.messages.filter(
-          (m) => m.widget && !m.images?.length,
+          (m) => m.widget && !m.images?.length && m.imageState !== 'loading',
         ).length,
       };
       // The log can mount before its messages. An empty snapshot is not a

@@ -1,7 +1,7 @@
 # Muse / Beeper parity ledger
 
 This is the persistent work list for the integration. New requests add to this
-list; they do not replace unfinished work. Last updated: September 14, 2026.
+list; they do not replace unfinished work. Last updated: September 15, 2026.
 
 **Target:** preserve Muse's conversation content, identity and state in its Beeper
 chat as faithfully as the supported protocol allows. Keep source parsing behind
@@ -11,8 +11,8 @@ The product remains Chrome-only. Maintainer test tools are optional.
 ## Current priorities
 
 1. Visible-source generated-image delivery without rescan passed in 0.8.17 and
-   0.8.18. Finish delayed fallback replacement rendering and background-tab media
-   discovery; source-hidden images remain a known limitation.
+   0.8.18. Encrypted delayed fallback replacement is now verified in Desktop. Continue
+   background-tab media discovery; source-hidden images remain a known limitation.
 2. Quiet catch-up and reconnect deduplication passed in installed Desktop (see
    acceptance below). Older-history placement remains open. Muse's inspected
    source exposes no original timestamps, so observed-time fallback stays explicit.
@@ -679,3 +679,66 @@ showed `sourceTabActive=false` together with `sourceVisible=true` and
 remained overridden. The background runner now requires both inactive Chrome
 tab state and hidden page state. Temporarily disabling computer use was requested
 to release inspection; no additional image prompt was sent during diagnosis.
+
+### September 15: real hidden-tab reproduction (0.8.19)
+
+After Chrome restarted with computer use disabled, fresh diagnostics agreed:
+page hidden, Chrome tab inactive, page unfocused. One journaled generated-image
+request was submitted under the background guard. Native delivery was confirmed
+and the text reply completed, but repeated hidden samples over several minutes
+showed an image presentation with two child elements and no image element. No
+image attachment had arrived in Beeper. Queue, claimed, blocked and pending-key
+counts returned to zero. The same test remains available for observation without
+resending its prompt. This reproduces the source-rendering gap without browser
+inspection's visibility override; it does not establish a permanent media error.
+Computer use was requested again to inspect the same source card and diagnose
+its deferred rendering.
+
+### Deferred image diagnosis and mitigation (0.8.20)
+
+Reattaching browser inspection made the same image presentation expose its image.
+The existing journal then confirmed native attachment delivery without refresh,
+catch-up or resend. The background verdict correctly remained failed. The live
+DOM had a source-owned image presentation containing a loading skeleton, with no
+image URL to capture while hidden. Public frontend script inspection showed its
+media resolution depends on Muse's file/connection layer; we did not call private
+application APIs, read app state, or extract credentials.
+
+The adapter now carries that observed loading state through the typed contract.
+After bounded settling/retry, the bridge emits an explicit loading placeholder
+before later messages. The first available image replaces that same primary
+event quietly, preserving the first observation time. A subsequent skeleton
+cannot downgrade an already delivered photo. This is a mitigation for missing
+content and ordering, not a fix for Muse's hidden-page loading itself. No tab
+focus override, new permission, or companion process is added to the product.
+
+Focused tests passed for skeleton detection, unrelated-widget exclusion, delayed
+recovery, subsequent text, stable timestamps and quiet native replacement.
+Installed acceptance of the new pending-image path remains to be checked.
+
+The first installed pending-image check also exposed delayed content polling in
+hidden Chrome tabs. The worker's existing four-second activity pulse now invokes
+the same guarded sync poll as the page timer. Tests cover progress without page
+intervals, no overlapping claim, and no send after stopping the source. The
+product still leaves Muse's own visibility and media loading policy unchanged.
+All 241 tests and the full Go/type/format checks pass.
+
+### Installed deferred-image recovery acceptance (0.8.20)
+
+One fresh test reproduced the hidden, inactive, unfocused source with an image
+skeleton and no image element. Beeper received the explicit loading placeholder.
+After opening that same Muse tab, the image replaced the placeholder under the
+same Desktop message ID, timestamp and sort key. A native Desktop screenshot
+shows the recovered picture marked Edited after its prompt and caption. No
+rescan or repeated prompt was used. Queue, claimed, blocked and pending-key
+counts are zero. This exercises the installed encrypted recovery path, beyond
+the earlier controlled unencrypted replacement test.
+
+The receive-image background verdict remains failed: an observation gap exceeded
+the conservative coverage limit, and the image ultimately required a visible
+source. We did not relax that guard or claim uninterrupted background delivery.
+The final installed build includes worker-driven polling; the fully hidden image
+loading limitation remains open. Restoring natural focus via the supported CDP
+capability was independently confirmed by fresh hidden/inactive diagnostics, and
+read-only CDP DOM inspection preserved that hidden state. Future investigations
+can use this without repeated user restarts.

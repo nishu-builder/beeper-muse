@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.20
+
+- Preserve a deferred Muse image's timeline position with an explicit loading
+  placeholder. Once Muse exposes the image, replace that same message quietly.
+  Later text can continue; no image prompt is replayed.
+- Use the existing worker heartbeat to advance syncing when Chrome throttles
+  a hidden tab's polling timer. Concurrent polls and stopped sources remain guarded.
+- Hidden Muse tabs can still defer image loading. This release makes that delay
+  visible instead of silently dropping the image; it does not force tab focus.
+
 ## 0.8.19
 
 - Record Chrome’s actual selected-tab state separately from page visibility and

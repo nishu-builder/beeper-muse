@@ -13,6 +13,7 @@ type Message = {
   role: string;
   text: string;
   widget?: boolean;
+  imageState?: 'loading';
   images?: { url: string; data?: string; mime?: string }[];
 };
 type View = { messages: Message[]; busy: boolean };
@@ -415,4 +416,45 @@ test('an inaccessible image exposes a fallback and cannot hold later text indefi
     ['image', 'later', 'image'],
   );
   assert.ok(h.sent[2]?.images?.[0]?.data);
+});
+
+test('a deferred image reserves its place before later text and recovers without rescan', async () => {
+  const h = harness(async (m) => ({
+    ...m,
+    images: m.images?.map((i) => ({ ...i, data: 'AQID', mime: 'image/png' })),
+  }));
+  const v = view(
+    { ...message('image', ''), widget: true, imageState: 'loading' },
+    message('later'),
+  );
+  await h.tracker.sync(v, 'all', () => true);
+  for (let i = 0; i < 3; i++) {
+    h.tick(30000);
+    await h.tracker.sync(v, 'all', () => true);
+  }
+  assert.deepEqual(
+    h.sent.map((m) => m.id),
+    ['image', 'later'],
+  );
+  assert.equal(h.sent[0]?.imageState, 'loading');
+  h.tick(30000);
+  await h.tracker.sync(v, 'all', () => true);
+  assert.equal(h.sent.length, 2, 'does not repeat the pending notice');
+  v.messages[0] = {
+    ...message('image', ''),
+    widget: true,
+    images: [{ url: 'blob:https://muse.ai/ready' }],
+  };
+  await h.tracker.sync(v, 'all', () => true);
+  h.tick();
+  await h.tracker.sync(v, 'all', () => true);
+  assert.deepEqual(
+    h.sent.map((m) => m.id),
+    ['image', 'later', 'image'],
+  );
+  assert.equal(
+    (h.sent[2] as any).observedAtMs,
+    (h.sent[0] as any).observedAtMs,
+  );
+  assert.equal(h.sent[2]?.imageState, undefined);
 });
