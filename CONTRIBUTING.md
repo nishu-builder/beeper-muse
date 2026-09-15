@@ -64,3 +64,7 @@ sending; `npm run dev:cycle` checks, updates and tests the installed extension.
 The typed driver uses Beeper Desktop's API and records each send before making
 it. `dev:observe` resumes an unfinished observation without resending. This is
 optional maintainer tooling, not part of the shipped extension.
+
+## Website
+
+For landing-page edits and GitHub Pages deployment, see [website maintenance](docs/website.md).

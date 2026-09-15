@@ -3,7 +3,7 @@
 Use your Muse conversation from a dedicated chat in Beeper. Runs entirely in
 Chrome, with no companion app or background terminal.
 
-[Get started](docs/chrome-setup.md) · [Download](https://github.com/nishu-builder/beeper-muse/releases/latest)
+[Website](https://nishu-builder.github.io/beeper-muse/) · [Get started](docs/chrome-setup.md) · [Download](https://github.com/nishu-builder/beeper-muse/releases/latest)
 · [Architecture](docs/architecture.md) · [Troubleshooting](docs/operations.md)
 · [Privacy](PRIVACY.md) · [Parity and known issues](docs/parity.md)
 
