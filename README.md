@@ -1,5 +1,10 @@
 # Beeper Muse
 
+[![CI](https://github.com/nishu-builder/beeper-muse/actions/workflows/ci.yml/badge.svg?branch=main&event=push)](https://github.com/nishu-builder/beeper-muse/actions/workflows/ci.yml?query=branch%3Amain)
+[![Chrome Web Store](https://img.shields.io/badge/Chrome_Web_Store-install-4285F4?logo=googlechrome&logoColor=white)](https://chromewebstore.google.com/detail/beeper-muse/bchjpmhhlhpcokhlmbpbiibehfjdgnme)
+[![GitHub release](https://img.shields.io/github/v/release/nishu-builder/beeper-muse?label=release)](https://github.com/nishu-builder/beeper-muse/releases/latest)
+[![License: MIT](https://img.shields.io/github/license/nishu-builder/beeper-muse)](LICENSE)
+
 Use your Muse conversation from a dedicated chat in Beeper. Runs entirely in
 Chrome, with no companion app or background terminal.
 
@@ -20,7 +25,7 @@ One-time registration uses [bbctl](https://github.com/beeper/bridge-manager),
 Node.js 24+, and a terminal on macOS or Linux. No Go compiler or local server
 is needed for the Chrome extension.
 
-1. Install the extension from the latest GitHub release, or build it from source.
+1. Install from the [Chrome Web Store](https://chromewebstore.google.com/detail/beeper-muse/bchjpmhhlhpcokhlmbpbiibehfjdgnme), download a [GitHub release](https://github.com/nishu-builder/beeper-muse/releases/latest), or [build from source](docs/chrome-setup.md#build-from-source).
 2. Create a Beeper registration and import its private JSON file in the popup.
 3. Open Muse, wait for **Beeper: Connected**, and click **Connect this Muse tab**.
 4. Send a message in the **Muse** chat in Beeper.
