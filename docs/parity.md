@@ -752,3 +752,7 @@ images in hidden Muse tabs. Website publication does not close any open
 integration acceptance item. Browser checks passed at 1280px, 808px, 390px,
 and 320px, including no horizontal overflow, loaded assets, keyboard skip link,
 and FAQ expansion. The Pages workflow deploys only the public site directory.
+
+Website refinement: removed the closing slogans and decorative FAQ underline.
+The illustration now shows the same sample image in a computer Muse tab and
+Beeper on desktop and phone. Integration acceptance remains unchanged.

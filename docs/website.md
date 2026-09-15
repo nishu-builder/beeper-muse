@@ -1,7 +1,7 @@
 # Website
 
 The public landing page is https://nishu-builder.github.io/beeper-muse/.
-Its source is `site/`: static HTML, CSS, and the extension icon. There is no
+Its source is `site/`: static HTML, CSS, the extension icon, and an original SVG sample image. There is no
 JavaScript, build step, analytics, external font service, or registration form.
 Private registration files are imported in the extension, never on this site.
 
