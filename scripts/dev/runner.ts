@@ -12,6 +12,7 @@ import {
   object,
 } from './desktop.ts';
 import { colorPNG } from './fixture.ts';
+import { validBackground, type BackgroundEvidence } from './background.ts';
 export type Scenario = 'text' | 'image' | 'receive-image';
 export interface Run {
   format: 1;
@@ -25,6 +26,7 @@ export interface Run {
   color: 'RED' | 'BLUE';
   phase: 'prepared' | 'sending' | 'observing';
   pendingID?: string;
+  background?: BackgroundEvidence;
 }
 export function newRun(target: Target, scenario: Scenario): Run {
   const id = randomUUID(),
@@ -52,6 +54,8 @@ export function readRun(value: unknown, target: Target): Run {
   const r = object(value),
     t = object(r.target);
   if (
+    (r.background !== undefined &&
+      (!validBackground(r.background) || r.scenario !== 'receive-image')) ||
     r.format !== 1 ||
     typeof r.id !== 'string' ||
     !/^[a-f0-9-]{36}$/.test(r.id) ||
