@@ -75,6 +75,7 @@ const fields = [
   'assistantBusy',
   'sourceVisible',
   'sourceFocused',
+  'sourceTabActive',
   'tailImageBusy',
   'tailImageChildNodes',
   'tailImageNodes',
@@ -124,6 +125,14 @@ export function cleanFacts(value: unknown) {
       result[key] = v;
   }
   return Object.keys(result).length ? result : undefined;
+}
+// The page cannot provide this field: Chrome supplies the authenticated sender
+// tab independently of document visibility/focus, which a debugger can emulate.
+export function sourceReadinessFacts(value: unknown, active: unknown) {
+  const facts = { ...cleanFacts(value) };
+  delete facts.sourceTabActive;
+  if (typeof active === 'boolean') facts.sourceTabActive = active;
+  return facts;
 }
 export function cleanEntries(value: unknown): LogEntry[] {
   if (!Array.isArray(value)) return [];

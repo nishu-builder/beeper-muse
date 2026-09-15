@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   DiagnosticLog,
   cleanEntries,
+  sourceReadinessFacts,
   logFile,
   type LogEntry,
 } from '../browser-runtime/runtime/diagnostic-log.ts';
@@ -256,4 +257,29 @@ test('source diagnostics retain bounded counts without message data', () => {
     syncPolling: true,
   });
   assert.ok(!JSON.stringify(result).includes('PRIVATE'));
+});
+
+test('Chrome tab state overrides page claims without altering emulated visibility evidence', () => {
+  assert.deepEqual(
+    sourceReadinessFacts(
+      {
+        sourceTabActive: true,
+        sourceVisible: true,
+        sourceFocused: true,
+        url: 'PRIVATE',
+      },
+      false,
+    ),
+    { sourceTabActive: false, sourceVisible: true, sourceFocused: true },
+  );
+  assert.deepEqual(sourceReadinessFacts({ sourceTabActive: false }, true), {
+    sourceTabActive: true,
+  });
+  assert.deepEqual(
+    sourceReadinessFacts({ sourceTabActive: false }, undefined),
+    {},
+  );
+  assert.deepEqual(sourceReadinessFacts(null, false), {
+    sourceTabActive: false,
+  });
 });

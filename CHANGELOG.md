@@ -1,5 +1,10 @@
 # Changelog
 
+## 0.8.19
+
+- Record Chrome’s actual selected-tab state separately from page visibility and
+  focus, so browser inspection cannot silently disguise a background test.
+
 ## 0.8.18
 
 - Give image-only source messages one native timeline position, replacing a delayed
