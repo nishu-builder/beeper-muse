@@ -143,3 +143,6 @@ The runtime guide separates standard Matrix messages/application services from
 Beeper/mautrix WebSocket and provisioning extensions, and identifies bbctl as
 the one-time registration tool. Muse still uses the DOM adapter; this wording
 does not assert official API access, complete bridgev2 support or new parity.
+
+Website copy: removed the redundant “No server to run.” sentence; retained
+“The bridge is fully local.” Integration acceptance is unchanged.
