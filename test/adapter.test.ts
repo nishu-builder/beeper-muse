@@ -76,6 +76,78 @@ test('avatar discovery selects the named assistant outside navigation/history an
     f.dom.window.close();
   }
 });
+test('animated avatar captures one bounded frame, rejects ambiguity, and retries unreadable frames', async () => {
+  const f = fixture();
+  try {
+    f.document.title = 'Chat – Babar';
+    f.document.body.insertAdjacentHTML(
+      'afterbegin',
+      '<div data-hatch-avatar-interaction="true" aria-label="Babar"><video src="blob:https://muse.ai/avatar" data-hatch-avatar-layer="ready" data-hatch-avatar-slot="current"></video><video src="blob:https://muse.ai/old" data-hatch-avatar-layer="ready" data-hatch-avatar-slot="previous"></video></div>',
+    );
+    const video = f.document.querySelector('video')!;
+    Object.defineProperties(video, {
+      readyState: { value: 1, configurable: true },
+      videoWidth: { value: 1024 },
+      videoHeight: { value: 512 },
+    });
+    let captures = 0,
+      fail = true;
+    f.dom.window.HTMLCanvasElement.prototype.getContext = function () {
+      return {
+        drawImage: (
+          source: unknown,
+          x: number,
+          y: number,
+          w: number,
+          h: number,
+        ) => {
+          assert.equal(source, video);
+          assert.deepEqual([x, y, w, h], [0, 0, 256, 128]);
+          captures++;
+          if (fail) throw new Error('SecurityError');
+        },
+      } as any;
+    } as any;
+    f.dom.window.HTMLCanvasElement.prototype.toDataURL = () =>
+      'data:image/png;base64,' + colorPNG('RED').toString('base64');
+    const adapter = f.adapter.create(f.document);
+    assert.equal(
+      await adapter.profile(),
+      undefined,
+      'wait for a decoded frame',
+    );
+    assert.equal(captures, 0);
+    Object.defineProperty(video, 'readyState', { value: 2 });
+    assert.equal(
+      await adapter.profile(),
+      undefined,
+      'a tainted frame is not published',
+    );
+    fail = false;
+    const profile = await adapter.profile();
+    assert.equal(profile.avatar.mime, 'image/png');
+    assert.equal(profile.avatar.data, colorPNG('RED').toString('base64'));
+    assert.equal(
+      await adapter.profile(),
+      profile,
+      'animation does not continually change the avatar',
+    );
+    assert.equal(captures, 2);
+    f.document.body.insertAdjacentHTML(
+      'beforeend',
+      '<img alt="Babar" src="/ambiguous.png">',
+    );
+    assert.equal(
+      await adapter.profile(),
+      undefined,
+      'do not guess between visible avatar candidates',
+    );
+    f.document.title = 'Chat – Someone else';
+    assert.equal(await adapter.profile(), undefined);
+  } finally {
+    f.dom.window.close();
+  }
+});
 test('avatar capture enforces its smaller byte budget without affecting chat image preparation', async () => {
   const f = fixture();
   try {
@@ -948,4 +1020,28 @@ test('image preparation reports fixed failure codes without URLs or content', as
     'image-prepared',
   ]);
   f.dom.window.close();
+});
+
+test('generated media retains its own accessible description as image alt text', () => {
+  const f = fixture();
+  f.document.querySelector('[data-message-id]')!.innerHTML =
+    '<button class="hatch-chat-groupable-bubble" aria-label="Open generated image Test square" title="Test square"><img alt="" src="blob:https://muse.ai/generated"></button>';
+  const message = f.adapter.snapshot(f.document).messages[0];
+  assert.equal(message.images[0].alt, 'Test square');
+  assert.equal(message.text, '');
+  f.dom.window.close();
+});
+
+test('file-card decoration is not imported as a conversation photo', () => {
+  const f = fixture();
+  try {
+    f.document.querySelector('[role="log"]')!.innerHTML =
+      '<div data-message-item data-message-id="file" data-message-role="assistant" data-message-has-presentation="true"><span class="hatch-chat-groupable-bubble" data-pel-impression="sandbox_file_card_impression"><img src="/code.png" alt=""><span>Report</span><span>JSON</span></span></div>';
+    const message = f.adapter.create(f.document).snapshot().messages[0];
+    assert.equal(message.images.length, 0);
+    assert.ok(message.text.includes('Report'));
+    assert.equal(message.widget, true);
+  } finally {
+    f.dom.window.close();
+  }
 });

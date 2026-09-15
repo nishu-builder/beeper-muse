@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.8.16
+
+- Match animated Muse avatars with a bounded, cached still frame from the named assistant.
+- Exclude file-card icons from conversation photos.
+- Retry incomplete image preparation with bounded backoff instead of marking it
+  synced. After three failed attempts, show an unavailable-image fallback so later
+  text can continue. Reply completion leaves unfinished media for background synchronization.
+- Preserve generated-image descriptions as alt text. The development image test
+  identifies the marked image itself, including when Muse emits a separate caption.
+
 ## 0.8.15
 
 - Log image preparation success, download failures, unsupported formats and size

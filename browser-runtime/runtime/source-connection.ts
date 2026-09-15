@@ -26,7 +26,7 @@ export async function readSourceConnection(
     selected === id &&
     isMuseURL(tab.url) &&
     !tab.discarded &&
-    probe?.protocol === 19 &&
+    probe?.protocol === 20 &&
     probe.active === true &&
     ['ready', 'busy', 'draft'].includes(probe.health || '')
   );

@@ -100,10 +100,10 @@ npm run dev:test -- receive-image
 npm run dev:cycle -- --receive-image
 ```
 
-This asks Muse to generate an image and may use its generation allowance. The
-current verifier conservatively requires an image attachment on the marked
-reply. An image emitted as a separate message remains unverified; an unrelated
-image cannot pass the test. All scenarios still require a native delivery status.
+This asks Muse to generate an image and may use its generation allowance. The test requests its unique marker in the image description and accompanying
+reply. The verifier requires an image attachment on a message containing that
+marker; a separate plain caption cannot pass by itself, and unrelated adjacent
+images cannot satisfy the check. All scenarios still require a native delivery status.
 
 ## Reading failures and resuming
 

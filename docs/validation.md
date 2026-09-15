@@ -453,3 +453,17 @@ reverse-image test: the delay/reload dependency is unexplained, and Desktop's
 numeric message IDs do not expose the deterministic Matrix/source IDs used by
 the attempted correlation check. Retain the active generation journal and
 investigate automatic image retry/association before claiming full parity.
+
+## September 14: animated avatar and image retry (0.8.16)
+
+Babar's animated video supplied a bounded still frame through the installed
+Chrome-only runtime. Native room/profile avatar state and Beeper Desktop's chat
+list/header confirmed the elephant picture. Synthetic coverage includes frame
+readiness, security failures, caching and ambiguous avatar rejection.
+
+Image retry tests cover recovery without changed source content and a bounded
+fallback that lets later text continue. Live generated-image acceptance remains
+open: a marked caption arrived with native SUCCESS, while the corresponding
+image event was absent. Source diagnostics now expose bounded counts and import
+failures to investigate that gap. Do not treat passing unit tests or the avatar
+result as proof of automatic generated-image delivery, typing, or quiet history.

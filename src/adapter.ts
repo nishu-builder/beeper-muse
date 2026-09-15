@@ -45,8 +45,22 @@
     const clone = element.cloneNode(true) as Element;
     const sourceImages = [...element.querySelectorAll<HTMLImageElement>('img')];
     clone.querySelectorAll('img').forEach((image, index) => {
+      if (
+        sourceImages[index]?.closest(
+          '[data-pel-impression="sandbox_file_card_impression"]',
+        )
+      ) {
+        image.remove();
+        return;
+      }
       const selected = sourceImages[index]?.currentSrc;
       if (selected) image.setAttribute('src', selected);
+      if (!image.getAttribute('alt')) {
+        const description = sourceImages[index]
+          ?.closest('button[aria-label^="Open generated image"]')
+          ?.getAttribute('title');
+        if (description) image.setAttribute('alt', description.slice(0, 1000));
+      }
     });
     clone.querySelectorAll('button').forEach((button) => {
       if (
@@ -162,8 +176,19 @@
         if (!image) return;
         const url = image.currentSrc || image.src;
         if (!safeImageURL(url)) return;
-        if (cached?.url === url && Date.now() - cached.at < 300000)
+        const animated = image.tagName === 'VIDEO';
+        if (
+          cached?.url === url &&
+          (animated || Date.now() - cached.at < 300000)
+        )
           return cached.profile;
+        if (animated) {
+          const avatar = avatarFrame(document, image as HTMLVideoElement);
+          if (!avatar) return;
+          const profile = { avatar };
+          cached = { url, at: Date.now(), profile };
+          return profile;
+        }
         const prepared = await prepare(
           { id: 'avatar', role: 'assistant', text: '', images: [{ url }] },
           512 * 1024,
@@ -287,7 +312,9 @@
       (a.actor + a.key).localeCompare(b.actor + b.key),
     );
   }
-  function assistantAvatar(document: Document): HTMLImageElement | undefined {
+  function assistantAvatar(
+    document: Document,
+  ): HTMLImageElement | HTMLVideoElement | undefined {
     const name = /^Chat\s+[–—-]\s+(.+)$/.exec(document.title)?.[1]?.trim();
     if (!name || name.length > 100) return;
     const labels = new Set(
@@ -305,7 +332,55 @@
         ) &&
         labels.has(image.alt.trim().toLowerCase()),
     );
-    return images.length === 1 ? images[0] : undefined;
+    const videos = [
+      ...document.querySelectorAll<HTMLVideoElement>(
+        '[data-hatch-avatar-interaction="true"] video[data-hatch-avatar-layer="ready"][data-hatch-avatar-slot="current"]',
+      ),
+    ].filter((video) => {
+      const wrapper = video.closest('[data-hatch-avatar-interaction="true"]');
+      return (
+        visible(video) &&
+        !video.closest(
+          '[role="log"],[data-message-item],nav,[role="navigation"]',
+        ) &&
+        wrapper?.getAttribute('aria-label')?.trim() === name
+      );
+    });
+    const candidates = [...images, ...videos];
+    return candidates.length === 1 ? candidates[0] : undefined;
+  }
+  function avatarFrame(
+    document: Document,
+    video: HTMLVideoElement,
+  ): Muse.Image | undefined {
+    // Copy an already decoded frame. Never seek, pause or alter Muse's animation.
+    if (video.readyState < 2 || !video.videoWidth || !video.videoHeight) return;
+    const scale = Math.min(
+      1,
+      256 / Math.max(video.videoWidth, video.videoHeight),
+    );
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(video.videoWidth * scale));
+    canvas.height = Math.max(1, Math.round(video.videoHeight * scale));
+    try {
+      const context = canvas.getContext('2d');
+      if (!context) return;
+      context.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const url = canvas.toDataURL('image/png');
+      const data = url.split(',')[1];
+      if (
+        !url.startsWith('data:image/png;base64,') ||
+        !data ||
+        data.length > Math.ceil((512 * 1024) / 3) * 4
+      )
+        return;
+      return { url, data, mime: 'image/png' };
+    } catch {
+      // A tainted canvas or an unavailable frame is not permission to bypass CORS.
+      return;
+    } finally {
+      canvas.width = canvas.height = 0;
+    }
   }
   function activityReadiness(document: Document): Muse.ActivityReadiness {
     const stopButtons = [

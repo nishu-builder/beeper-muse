@@ -131,6 +131,7 @@ declare namespace Muse {
     ): Promise<Set<string>>;
   }
   interface SyncAPI {
+    mediaReady(message: Message): boolean;
     prepareBatch(
       messages: Message[],
       prepare: (message: Message) => Promise<Message>,

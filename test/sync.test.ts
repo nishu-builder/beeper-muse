@@ -8,14 +8,20 @@ const source = await readFile(
   new URL('../extension/sync.js', import.meta.url),
   'utf8',
 );
-type Message = { id: string; role: string; text: string; widget?: boolean };
+type Message = {
+  id: string;
+  role: string;
+  text: string;
+  widget?: boolean;
+  images?: { url: string; data?: string; mime?: string }[];
+};
 type View = { messages: Message[]; busy: boolean };
 type Source = { id: string; hash: string };
 interface Tracker {
   sync(view: View, mode: string, active: () => boolean): Promise<void>;
   remember(sources: Source[]): void;
 }
-function harness() {
+function harness(prepare?: (message: Message) => Promise<Message>) {
   const context = { crypto: webcrypto, TextEncoder } as {
     crypto: typeof webcrypto;
     TextEncoder: typeof TextEncoder;
@@ -23,6 +29,7 @@ function harness() {
       Tracker: new (
         send: (message: { messages: Message[] }) => Promise<void>,
         now: () => number,
+        prepare?: (message: Message) => Promise<Message>,
       ) => Tracker;
       fingerprint: (message: Message) => Promise<Source>;
     };
@@ -37,6 +44,7 @@ function harness() {
       sent.push(...messages);
     },
     () => now,
+    prepare,
   );
   return {
     tracker,
@@ -312,4 +320,99 @@ test('an unsettled edit does not block a later first delivery', async () => {
     h.sent.map((m) => m.id),
     ['earlier', 'later', 'earlier'],
   );
+});
+
+test('failed image preparation retries unchanged sources without rescan and preserves following order', async () => {
+  let attempts = 0;
+  const h = harness(async (m) => {
+    if (!m.images?.length) return m;
+    attempts++;
+    return attempts < 2
+      ? m
+      : {
+          ...m,
+          images: m.images.map((i) => ({
+            ...i,
+            data: 'aGVsbG8=',
+            mime: 'image/png',
+          })),
+        };
+  });
+  const view: View = {
+    busy: false,
+    messages: [
+      {
+        ...message('image', ''),
+        images: [{ url: 'blob:https://muse.ai/test' }],
+      },
+      message('later'),
+    ],
+  };
+  await h.tracker.sync(view, 'all', () => true);
+  h.tick();
+  await h.tracker.sync(view, 'all', () => true);
+  assert.equal(attempts, 1);
+  assert.equal(h.sent.length, 0);
+  h.tick(1000);
+  await h.tracker.sync(view, 'all', () => true);
+  assert.equal(attempts, 1, 'backoff prevents repeated fetches on every poll');
+  h.tick(1000);
+  await h.tracker.sync(view, 'all', () => true);
+  assert.equal(attempts, 2);
+  assert.deepEqual(
+    h.sent.map((m) => m.id),
+    ['image', 'later'],
+  );
+  h.tick();
+  await h.tracker.sync(view, 'all', () => true);
+  assert.equal(attempts, 2, 'completed image is not fetched again');
+  assert.equal(h.sent.length, 2);
+});
+
+test('an inaccessible image exposes a fallback and cannot hold later text indefinitely', async () => {
+  let recover = false;
+  const h = harness(async (m) =>
+    !m.images?.length || !recover
+      ? m
+      : {
+          ...m,
+          images: m.images.map((i) => ({
+            ...i,
+            data: 'aGVsbG8=',
+            mime: 'image/png',
+          })),
+        },
+  );
+  const v = view(
+    {
+      ...message('image', ''),
+      images: [{ url: 'blob:https://muse.ai/unavailable' }],
+    },
+    message('later'),
+  );
+  await h.tracker.sync(v, 'all', () => true);
+  for (let i = 0; i < 3; i++) {
+    h.tick(30000);
+    await h.tracker.sync(v, 'all', () => true);
+  }
+  assert.deepEqual(
+    h.sent.map((m) => m.id),
+    ['image', 'later'],
+  );
+  assert.equal(
+    h.sent[0]?.images?.[0]?.data,
+    undefined,
+    'runtime displays an unavailable image, not success',
+  );
+  h.tick(1000);
+  await h.tracker.sync(v, 'all', () => true);
+  assert.equal(h.sent.length, 2, 'backoff does not repeat the fallback');
+  recover = true;
+  h.tick(30000);
+  await h.tracker.sync(v, 'all', () => true);
+  assert.deepEqual(
+    h.sent.map((m) => m.id),
+    ['image', 'later', 'image'],
+  );
+  assert.ok(h.sent[2]?.images?.[0]?.data);
 });

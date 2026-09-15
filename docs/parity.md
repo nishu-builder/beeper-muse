@@ -434,3 +434,57 @@ reverse-image test: the delay/reload dependency is unexplained, and Desktop's
 numeric message IDs do not expose the deterministic Matrix/source IDs used by
 the attempted correlation check. Retain the active generation journal and
 investigate automatic image retry/association before claiming full parity.
+
+## Reliable image delivery work (0.8.16)
+
+Code inspection established two loss paths: the tracker remembered a source hash
+following an import even when image preparation retained only a URL, and reply
+completion likewise remembered incomplete media. Because source hashes exclude
+prepared bytes, those sources could remain skipped until a rescan.
+
+The tracker now retries unchanged incomplete images with 2–30 second backoff.
+After three failed attempts it publishes the existing unavailable-image fallback
+before later text, while continuing media retries. This bounds the wait so a
+permanently inaccessible attachment cannot freeze the transcript. Reply completion acknowledges only prepared
+assistant media; pending images remain for background sync without repeating the
+prompt. Regressions cover unchanged-source recovery, backoff, exactly one import,
+subsequent order and reply completion excluding unfinished images. This addresses
+proven code paths, without claiming they explain every prior live omission.
+
+The observed generated-image control's own title now supplies missing alt text.
+The receive-image test requests its unique marker in that description and still
+requires an actual image attachment on the marked message; unrelated adjacent
+images cannot pass. Live no-rescan verification is the next acceptance gate.
+
+### Live test and avatar follow-up (0.8.16)
+
+The no-rescan request completed with native SUCCESS and no held work, but Muse
+returned a JSON artifact card instead of a generated picture. The strict checker
+did not pass. This is not evidence of successful image transport. The original
+connected source was not reloaded or rescanned during observation. Its code-file
+icon was incorrectly eligible as photo media; that observed decoration is now
+excluded, with a regression fixture. The rendering inventory remains open for
+other card types.
+
+Animated-avatar support now selects the unique current, ready video in the named
+assistant's avatar wrapper. It copies a decoded frame at at most 256 pixels,
+without seeking or changing playback, and caches it for that source URL. Missing
+frames and canvas security errors retry later; ambiguous identities are refused.
+Tests cover size bounds, readiness, failure recovery, caching and ambiguity.
+Installed avatar display still needs verification after the next local update.
+
+The installed avatar update emitted avatar-updated. Read-only Matrix requests
+confirmed both room and bot avatar state, and a native Beeper Desktop window
+capture visibly showed Babar's elephant in the chat list and the Muse chat header.
+The current video frame therefore reaches the client; cross-restart persistence
+and mobile display remain broader acceptance cases.
+
+A second, uniquely marked generation request produced a real inline image in
+Muse. Its marked caption and native SUCCESS reached Desktop, but the exact image
+Matrix event returned M_NOT_FOUND before any source refresh. The retry fix alone
+does not resolve this source-discovery gap. No generation request was replayed.
+Added bounded source-message/image/partial counts, tracker progress and import
+failure events to the chosen diagnostic file; message data remains excluded.
+The source update retained the completed test journal for observation. Initial
+counts show the source tracker finishes its 20 eligible entries, so investigate
+which current media observations are omitted rather than assuming transport loss.
