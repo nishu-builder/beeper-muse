@@ -1,4 +1,4 @@
-// Generated JavaScript lives in extension/sync.js. Edit this TypeScript source.
+// Generated JavaScript lives in dist/content/sync.js. Edit this TypeScript source.
 (() => {
   'use strict';
   const normalize = (value: string) => value.replace(/\s+/g, ' ').trim();

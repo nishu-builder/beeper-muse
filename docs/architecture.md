@@ -24,7 +24,7 @@ flowchart LR
 | --------------------------- | --------------------------------------------------------------------- | --------------------------------------------------------------------------- |
 | Muse adapter                | Read the selected conversation and use its composer                   | `src/adapter.ts`                                                            |
 | Source contract and tracker | Typed messages, attribution, settling, catch-up and deduplication     | `src/muse.d.ts`, `src/sync.ts`, `src/activity.ts`                           |
-| Content script              | Run the adapter for the selected top-level tab                        | `extension/content.js`                                                      |
+| Content script              | Run the adapter for the selected top-level tab                        | `browser-runtime/runtime/content.js`                                        |
 | Service worker              | Validate senders, run one bridge, coordinate lifecycle and UI         | `browser-runtime/runtime/background.ts`                                     |
 | Matrix translator           | Native senders, formatting, images, revisions and delivery            | `browser-runtime/runtime/bridge.ts`                                         |
 | Crypto and storage          | Device keys, encrypted sessions, durable records                      | `browser-runtime/runtime/crypto.ts`, `state.ts`, `browser-runtime/inbox.ts` |

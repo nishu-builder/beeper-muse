@@ -58,6 +58,26 @@ test('release ZIP is reproducible, readable by unzip, and excludes private files
     await readFile(new URL('../package.json', import.meta.url), 'utf8'),
   );
   assert.equal(manifest.version, pkg.version);
+  const manifestAssets = [
+    manifest.background.service_worker,
+    manifest.action.default_popup,
+    ...Object.values(manifest.icons),
+    ...Object.values(manifest.action.default_icon),
+    ...manifest.content_scripts.flatMap(
+      (script: { js?: string[]; css?: string[] }) => [
+        ...(script.js ?? []),
+        ...(script.css ?? []),
+      ],
+    ),
+  ];
+  for (const asset of manifestAssets) {
+    assert.equal(typeof asset, 'string');
+    assert.ok(
+      names.includes(asset),
+      'Manifest references missing asset ' + asset,
+    );
+  }
+
   assert.ok(
     manifest.permissions.includes('declarativeNetRequestWithHostAccess'),
   );

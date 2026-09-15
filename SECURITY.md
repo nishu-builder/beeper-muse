@@ -57,7 +57,7 @@ profile access is outside the extension's isolation boundary.
 
 The public packager uses an explicit file allowlist, rejects symlinked release
 files, and includes the WASM module and license notices. `.local/`, setup
-credentials, development probes and the legacy companion are excluded. Never
+credentials and development tooling are excluded. Never
 upload a private development extension directory.
 
 Dependencies are pinned in lockfiles. CI checks formatting, types, tests,

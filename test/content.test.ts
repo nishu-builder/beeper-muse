@@ -4,16 +4,16 @@ import { readFile } from 'node:fs/promises';
 import { runInNewContext } from 'node:vm';
 import { webcrypto } from 'node:crypto';
 const syncSource = await readFile(
-  new URL('../extension/sync.js', import.meta.url),
+  new URL('../dist/content/sync.js', import.meta.url),
   'utf8',
 );
 
 const activitySource = await readFile(
-  new URL('../extension/activity.js', import.meta.url),
+  new URL('../dist/content/activity.js', import.meta.url),
   'utf8',
 );
 const source = await readFile(
-  new URL('../extension/content.js', import.meta.url),
+  new URL('../browser-runtime/runtime/content.js', import.meta.url),
   'utf8',
 );
 const flush = () => new Promise<void>((resolve) => setImmediate(resolve));

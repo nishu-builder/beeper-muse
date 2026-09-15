@@ -4,27 +4,35 @@ Start with [architecture](docs/architecture.md) and [runtime protocol](docs/brow
 Read the [parity ledger](docs/parity.md) before choosing work. Keep reported bugs,
 implemented changes and live verification separate, and update it when findings
 or priorities change. An interrupted investigation stays open across handoffs.
-The current product is the Chrome-only extension. Legacy Go code is retained
-for existing installations and protocol reference, not bundled into releases.
 
 ## Development
 
-Use Node.js 24+, Go 1.26+, and a C compiler for the full repository checks.
-Only Node/npm are needed to build the Chrome extension.
+Use Node.js 24+, npm, and the standard unzip utility for package tests.
+The same toolchain builds and checks the entire project on Linux and macOS.
 
 ```sh
 npm ci --ignore-scripts
 npm run build
 npm run check
-go test -race -tags goolm ./...
 npm run package
 ```
 
 `npm run build` writes the public extension to `dist/chrome-extension`.
-`npm run build:legacy` builds the older companion and client. `npm run format`
-formats TypeScript, JavaScript, documentation and Go. Tests use synthetic DOM,
+`npm run format` formats TypeScript, JavaScript, CSS, HTML and documentation. Tests use synthetic DOM,
 mocked Chrome APIs and isolated temporary databases; they do not require accounts.
 See [validation](docs/validation.md) for live checks still needed.
+
+## Source layout
+
+- `src/`: typed Muse contract, DOM adapter and sync/activity tracking.
+- `browser-runtime/runtime/`: service worker, popup, connection tab, content
+  script and icons; shared transport/storage modules are one directory above.
+- `scripts/`: builds, registration, updates, releases and optional live test tools.
+- `test/`: synthetic behavior and packaging regressions.
+- `site/`: GitHub Pages source; `docs/`: guides, active issues and dated history.
+
+Generated content scripts live in `dist/content/`; the complete extension is
+`dist/chrome-extension/`. Source directories are not loadable extensions.
 
 ## Boundaries to preserve
 

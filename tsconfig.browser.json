@@ -10,8 +10,8 @@
     "noUnusedParameters": true,
     "types": ["chrome"],
     "rootDir": "browser-runtime",
-    "outDir": "dist/browser-probe",
-    "skipLibCheck": true
+    "skipLibCheck": true,
+    "noEmit": true
   },
   "include": ["browser-runtime/**/*.ts"]
 }

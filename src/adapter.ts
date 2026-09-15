@@ -1,4 +1,4 @@
-// Generated JavaScript lives in extension/adapter.js. Edit this TypeScript source.
+// Generated JavaScript lives in dist/content/adapter.js. Edit this TypeScript source.
 (() => {
   'use strict';
   const visible = (element: Element) =>

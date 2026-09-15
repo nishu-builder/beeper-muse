@@ -5,7 +5,7 @@ import { runInNewContext } from 'node:vm';
 import { webcrypto } from 'node:crypto';
 
 const source = await readFile(
-  new URL('../extension/sync.js', import.meta.url),
+  new URL('../dist/content/sync.js', import.meta.url),
   'utf8',
 );
 type Message = {

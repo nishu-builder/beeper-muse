@@ -9,9 +9,8 @@ what the Muse adapter has observed.
 
 | Symptom                                           | Action                                                                                                                                               |
 | ------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| “Start the local bridge” or a pairing-code field  | You loaded the legacy extension. Follow [Chrome setup](chrome-setup.md); disable the old copy.                                                       |
 | Beeper connecting or needs attention              | Open **Connection settings** and inspect the startup stage/error. Keep the connection tab open. Use **Reconnect Beeper** after addressing the error. |
-| Another instance is connected                     | Pause/disable the other extension or development probe using this registration, then reconnect deliberately.                                         |
+| Another instance is connected                     | Pause/disable the other extension using this registration, then reconnect deliberately.                                                              |
 | Beeper connected, Muse tab not connected          | Open the signed-in Muse main chat, and click **Connect this Muse tab**.                                                                              |
 | Pending prompt does not appear in Muse            | Keep the selected main chat open, clear any draft, and wait for existing Muse work to finish.                                                        |
 | Muse answered but Beeper did not                  | Inspect the queue and interrupted-job controls. Do not resend blindly; the prompt may already have reached Muse.                                     |
@@ -49,7 +48,7 @@ not establish Desktop success; see [validation](validation.md).
 
 If Chrome stops after claiming a prompt, Muse may already have accepted it.
 The extension blocks that job rather than submitting it again. Check Muse and
-Beeper, then use **I handled this in Muse** to clear the interrupted job when
+Beeper, then use **Dismiss this job** to clear the interrupted job when
 appropriate. That control clears the saved prompt; it does not roll back Muse
 or reconstruct a missing response.
 
@@ -81,9 +80,6 @@ management tools to revoke the registration separately, checking their deletion
 behavior before proceeding. Delete private setup files/backups only when no
 longer needed; filesystem deletion does not guarantee secure erasure.
 
-Legacy companion files/processes have separate removal needs; see
-[legacy companion](legacy-companion.md).
-
 ## Report a problem
 
 Include the extension version, Chrome/OS/Beeper versions, whether Desktop and
@@ -95,9 +91,10 @@ Use [private vulnerability reporting](../SECURITY.md) for security issues.
 ## A photo did not arrive
 
 Open the extension popup and check interrupted jobs. Unsupported files or failed
-media downloads block the queue rather than silently sending a text placeholder.
+media downloads appear as failed jobs. Failures before upload starts do not hold
+later text; uncertain submissions wait for inspection to avoid duplicate sends.
 PNG, JPEG, GIF and WebP are accepted up to 5 MB from Beeper; Muse uploads remain
-in preview pending live website verification. Check for a staged attachment or
+in preview, with a synthetic PNG round trip verified. Check for a staged attachment or
 existing draft in Muse before dismissing the job and sending it again. Do not
 clear extension storage or recreate the registration to retry a photo.
 

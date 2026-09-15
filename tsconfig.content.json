@@ -9,7 +9,7 @@
     "noUnusedParameters": true,
     "types": [],
     "rootDir": "src",
-    "outDir": "extension",
+    "outDir": "dist/content",
     "skipLibCheck": true
   },
   "include": ["src/**/*.ts"]

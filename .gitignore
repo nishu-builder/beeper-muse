@@ -3,18 +3,13 @@ dist/
 coverage/
 .env
 .env.*
-!.env.example
 .local/
 *.log
 .DS_Store
-extension/local-config.json
 bin/
 *.db
 *.db-shm
 *.db-wal
 
-# Generated from strict TypeScript in src/.
-/extension/adapter.js
-/extension/sync.js
-/extension/bridge.js
-/extension/activity.js
+# Keep output and private pairing files from older checkouts out of Git.
+/extension/
