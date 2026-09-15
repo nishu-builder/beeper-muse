@@ -998,3 +998,145 @@ test('formatting beyond structural limits keeps a visible plain message', async 
     h.close();
   }
 });
+
+test('image-only sources use one stable event through fallback, recovery and reactions', async (t) => {
+  const h = await harness();
+  t.after(h.close);
+  const source = {
+    id: 'image-position',
+    role: 'assistant' as const,
+    text: '',
+    timestampMs: 123456,
+    historical: true,
+    images: [{ url: 'https://example.org/image.png' }],
+  };
+  await h.bridge.importMessages([source]);
+  const original = h.batches[0]!.events[0];
+  await h.bridge.importMessages([
+    { id: 'later', role: 'assistant', text: 'Later reply' },
+  ]);
+  const ready = {
+    ...source,
+    images: [
+      {
+        ...source.images[0]!,
+        mime: 'image/png',
+        data: 'AQID',
+        alt: 'The picture',
+      },
+    ],
+  };
+  await h.bridge.importMessages([ready]);
+  const recovery = h.batches[2]!.events;
+  assert.equal(recovery.length, 1);
+  assert.equal(recovery[0].content.content.msgtype, 'm.image');
+  assert.equal(
+    recovery[0].content.content['m.relates_to'].event_id,
+    original.event_id,
+  );
+  assert.equal(
+    recovery[0].content.content['m.relates_to'].rel_type,
+    'm.replace',
+  );
+  assert.equal(h.batches[2]!.send_notification, false);
+  assert.equal(
+    (await h.state.get<any>('source:image-position')).timestamp,
+    123456,
+  );
+  await h.bridge.importMessages([source]);
+  assert.equal(
+    h.batches.length,
+    3,
+    'lost preview bytes do not replace the native image with text',
+  );
+  await h.bridge.importMessages([
+    { ...ready, reactions: [{ actor: 'user', key: 'synthetic' }] },
+  ]);
+  const reaction = h.batches
+    .at(-1)!
+    .events.find((e: any) => e.type === 'm.reaction');
+  assert.equal(reaction.content['m.relates_to'].event_id, original.event_id);
+});
+
+test('a ready image-only source creates one image and description edits keep its position', async (t) => {
+  const h = await harness();
+  t.after(h.close);
+  const source = {
+    id: 'one-image',
+    role: 'assistant' as const,
+    text: '',
+    images: [
+      {
+        url: 'https://example.org/image.png',
+        mime: 'image/png',
+        data: 'AQID',
+        alt: 'Original description',
+      },
+    ],
+  };
+  await h.bridge.importMessages([source]);
+  assert.equal(h.batches[0]!.events.length, 1);
+  const original = h.batches[0]!.events[0];
+  assert.equal(original.content.content.msgtype, 'm.image');
+  await h.bridge.importMessages([
+    {
+      ...source,
+      images: [{ ...source.images[0]!, alt: 'Corrected description' }],
+    },
+  ]);
+  assert.equal(h.batches[1]!.events.length, 1);
+  assert.equal(
+    h.batches[1]!.events[0].content.content['m.relates_to'].event_id,
+    original.event_id,
+  );
+  assert.equal(
+    h.batches[1]!.events[0].content.content['m.new_content'].body,
+    'Corrected description',
+  );
+});
+
+test('new captions keep image content and update quietly without moving the photo', async (t) => {
+  const h = await harness();
+  t.after(h.close);
+  const source = {
+    id: 'caption-upgrade',
+    role: 'assistant' as const,
+    text: '',
+    images: [
+      {
+        url: 'https://example.org/image.png',
+        mime: 'image/png',
+        data: 'AQID',
+        alt: 'photo.png',
+      },
+    ],
+  };
+  await h.bridge.importMessages([source]);
+  assert.equal(h.batches[0]!.send_notification, true);
+  await h.bridge.importMessages([
+    {
+      ...source,
+      text: 'A new caption',
+      html: '<p>A <strong>new</strong> caption</p>',
+    },
+  ]);
+  assert.equal(h.batches[1]!.events.length, 1);
+  const content = h.batches[1]!.events[0].content.content;
+  assert.equal(content.msgtype, 'm.image');
+  assert.equal(content['m.new_content'].body, 'A new caption');
+  assert.equal(content['m.new_content'].filename, 'photo.png');
+  assert.match(
+    content['m.new_content'].formatted_body,
+    /<strong>new<\/strong>/,
+  );
+  assert.equal(
+    content['m.relates_to'].event_id,
+    h.batches[0]!.events[0].event_id,
+  );
+  assert.equal(h.batches[1]!.send_notification, false);
+  assert.equal(
+    h.batches[1]!.mark_read_by,
+    undefined,
+    'quiet edits do not claim the user read the chat',
+  );
+});

@@ -37,6 +37,7 @@ interface SourceRecord {
   fingerprint: string;
   contentFingerprint?: string;
   originalImage?: boolean;
+  primaryImage?: boolean;
   role: Muse.Role;
   timestamp: number;
   reactions: Record<string, string>;
@@ -52,6 +53,7 @@ interface Delivery {
     transactionID: string;
   }>;
   historical: boolean;
+  notify?: boolean;
   read: boolean;
   record: SourceRecord;
 }
@@ -704,6 +706,23 @@ export class BrowserBridge {
         content.formatted_body = formatted;
       }
     }
+    // An image-only source owns one timeline position. If preparation is late,
+    // replace its existing fallback instead of appending a second message.
+    // Keep already imported legacy image IDs stable during migration.
+    const primaryImage =
+      saved?.primaryImage === true ||
+      (!saved?.originalImage &&
+        !saved?.images?.['0'] &&
+        message.images?.length === 1 &&
+        !message.text.trim());
+    const firstImage = message.images?.[0];
+    const firstBytes = firstImage?.data?.replace(/^data:[^,]+,/, '');
+    const primaryReady =
+      primaryImage &&
+      firstBytes &&
+      /^image\/(png|jpeg|webp|gif)$/.test(firstImage?.mime || '') &&
+      firstBytes.length <= 8 * 1024 * 1024 &&
+      /^[A-Za-z0-9+/=]+$/.test(firstBytes);
     const plain = { ...content };
     if (saved) {
       content['m.new_content'] = plain;
@@ -712,6 +731,8 @@ export class BrowserBridge {
     const events: Event[] = [];
     if (
       !saved?.originalImage &&
+      !primaryReady &&
+      !(primaryImage && saved?.images?.['0']) &&
       (!saved || saved.contentFingerprint !== contentFingerprint)
     ) {
       const encrypted = await this.crypto.encrypt(
@@ -745,21 +766,52 @@ export class BrowserBridge {
         !/^[A-Za-z0-9+/=]+$/.test(encoded)
       )
         continue;
-      const imageFingerprint = await eventID(this.room, encoded);
-      const previousImage = imageRecords[String(index)];
+      const imageFingerprint = await eventID(
+        this.room,
+        JSON.stringify([
+          encoded,
+          image.mime,
+          image.alt,
+          primaryImage && index === 0
+            ? [message.text, message.html]
+            : undefined,
+        ]),
+      );
+      const previousImage =
+        imageRecords[String(index)] ||
+        (primaryImage && index === 0 && saved
+          ? { eventID: baseID, fingerprint: '' }
+          : undefined);
       if (previousImage?.fingerprint === imageFingerprint) continue;
       const imageID =
         previousImage?.eventID ||
-        (await eventID(this.room, 'image:' + message.id + ':' + index));
+        (primaryImage && index === 0
+          ? baseID
+          : await eventID(this.room, 'image:' + message.id + ':' + index));
       const bytes = Uint8Array.from(atob(encoded), (c) => c.charCodeAt(0));
       const file = await this.crypto.image(bytes);
       const imageMessage: Record<string, unknown> = {
         msgtype: 'm.image',
-        body: image.alt || 'Muse image',
+        body:
+          primaryImage && index === 0 && message.text.trim()
+            ? message.text
+            : image.alt || 'Muse image',
+        ...(primaryImage && index === 0 && message.text.trim()
+          ? { filename: image.alt || 'Muse image' }
+          : {}),
         file,
         info: { mimetype: image.mime, size: bytes.length },
         'fi.mau.double_puppet_source': SOURCE,
       };
+      if (
+        primaryImage &&
+        index === 0 &&
+        message.text.trim() &&
+        content.formatted_body
+      ) {
+        imageMessage.format = content.format;
+        imageMessage.formatted_body = content.formatted_body;
+      }
       if (previousImage) {
         imageMessage['m.new_content'] = { ...imageMessage };
         imageMessage['m.relates_to'] = {
@@ -844,6 +896,7 @@ export class BrowserBridge {
       events,
       redactions,
       historical: message.historical === true,
+      notify: !saved && message.historical !== true && message.read !== true,
       read: message.read === true || message.historical === true,
       record: {
         revision,
@@ -852,6 +905,7 @@ export class BrowserBridge {
         fingerprint,
         contentFingerprint,
         originalImage: saved?.originalImage,
+        primaryImage: primaryImage === true,
         role: message.role,
         timestamp,
         reactions,
@@ -891,7 +945,8 @@ export class BrowserBridge {
       {
         forward: true,
         forward_if_no_messages: true,
-        send_notification: !delivery.historical && !delivery.read,
+        send_notification:
+          delivery.notify ?? (!delivery.historical && !delivery.read),
         ...(delivery.read ? { mark_read_by: this.api.config.owner } : {}),
         events: delivery.events,
       },
