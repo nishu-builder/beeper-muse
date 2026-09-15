@@ -1045,3 +1045,152 @@ test('file-card decoration is not imported as a conversation photo', () => {
     f.dom.window.close();
   }
 });
+
+test('media diagnostics distinguish generated controls, image mounts and file decoration without contents', () => {
+  const f = fixture();
+  try {
+    f.document.querySelector('[role="log"]')!.innerHTML = [
+      '<div data-message-item data-message-id="older"><img><canvas></canvas></div>',
+      '<div data-message-item data-message-id="generated"><button aria-label="Open generated image PRIVATE"><img src="blob:https://muse.ai/PRIVATE"></button></div>',
+      '<div data-message-item data-message-id="file"><span data-pel-impression="sandbox_file_card_impression"><img></span></div>',
+      '<div data-message-item data-message-id="deferred"><span data-message-accessibility-surrogate="true">PRIVATE</span></div>',
+    ].join('');
+    const result = f.adapter.create(f.document).mediaReadiness();
+    assert.deepEqual(JSON.parse(JSON.stringify(result)), {
+      sourceVisible: false,
+      sourceFocused: false,
+      tailImageBusy: 0,
+      tailImageChildNodes: 0,
+      tailImageNodes: 2,
+      tailImagePresentations: 0,
+      tailIframes: 0,
+      tailWidgetsOnscreen: 0,
+      tailWidgetsSized: 0,
+      tailCanvases: 0,
+      tailVideos: 0,
+      tailFileCards: 1,
+      tailGeneratedControls: 1,
+      tailGeneratedImages: 1,
+      tailDeferred: 1,
+    });
+    assert.ok(!JSON.stringify(result).includes('PRIVATE'));
+  } finally {
+    f.dom.window.close();
+  }
+});
+
+test('oversized still images are compressed within the remaining message budget', async () => {
+  const f = fixture();
+  const events: string[] = [],
+    dimensions: number[][] = [];
+  let closed = 0,
+    conversions = 0;
+  Object.assign(f.dom.window, {
+    createImageBitmap: async () => ({
+      width: 3200,
+      height: 1600,
+      close: () => closed++,
+    }),
+    OffscreenCanvas: class {
+      constructor(
+        public width: number,
+        public height: number,
+      ) {
+        dimensions.push([width, height]);
+      }
+      getContext() {
+        return { drawImage() {} };
+      }
+      async convertToBlob() {
+        conversions++;
+        // The first resolution exceeds the per-image budget. The second fits.
+        return new Blob([new Uint8Array(conversions % 2 ? 2200000 : 1500000)], {
+          type: 'image/webp',
+        });
+      }
+    },
+  });
+  f.dom.window.fetch = async () =>
+    new Response(new Uint8Array(3000000), {
+      headers: { 'content-type': 'image/jpeg' },
+    }) as any;
+  try {
+    const result = await f.adapter
+      .create(f.document, (code: string) => events.push(code))
+      .prepare({
+        id: 'photo',
+        role: 'assistant',
+        text: '',
+        images: [
+          { url: 'https://muse.ai/one', alt: 'Original caption' },
+          { url: 'https://muse.ai/two' },
+        ],
+      });
+    assert.equal(closed, 2);
+    assert.deepEqual(dimensions, [
+      [2048, 1024],
+      [1536, 768],
+      [2048, 1024],
+      [1536, 768],
+    ]);
+    assert.equal(result.images[0].mime, 'image/webp');
+    assert.equal(result.images[0].alt, 'Original caption');
+    assert.equal(Buffer.from(result.images[0].data, 'base64').length, 1500000);
+    assert.deepEqual(events, [
+      'image-compressed',
+      'image-prepared',
+      'image-compressed',
+      'image-prepared',
+    ]);
+  } finally {
+    f.dom.window.close();
+  }
+});
+
+test('oversized animations and over-limit downloads retain fallback without decoding', async () => {
+  for (const mime of ['image/gif', 'image/webp', 'image/png']) {
+    const f = fixture();
+    let decoded = false;
+    Object.assign(f.dom.window, {
+      createImageBitmap: async () => {
+        decoded = true;
+        throw Error('Unexpected decode');
+      },
+    });
+    const bytes = new Uint8Array(3000000);
+    if (mime === 'image/png') bytes.set([97, 99, 84, 76], 12); // APNG acTL before IDAT
+    f.dom.window.fetch = async () =>
+      new Response(bytes, { headers: { 'content-type': mime } }) as any;
+    try {
+      const result = await f.adapter.create(f.document).prepare({
+        id: 'photo',
+        role: 'assistant',
+        text: '',
+        images: [{ url: 'https://muse.ai/image' }],
+      });
+      assert.equal(decoded, false);
+      assert.equal(result.images[0].data, undefined);
+    } finally {
+      f.dom.window.close();
+    }
+  }
+  const f = fixture();
+  const events: string[] = [];
+  f.dom.window.fetch = async () =>
+    new Response(new Uint8Array(20 * 1024 * 1024 + 1), {
+      headers: { 'content-type': 'image/jpeg' },
+    }) as any;
+  try {
+    await f.adapter
+      .create(f.document, (code: string) => events.push(code))
+      .prepare({
+        id: 'large',
+        role: 'assistant',
+        text: '',
+        images: [{ url: 'https://muse.ai/image' }],
+      });
+    assert.deepEqual(events, ['image-too-large']);
+  } finally {
+    f.dom.window.close();
+  }
+});

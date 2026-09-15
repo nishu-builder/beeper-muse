@@ -488,3 +488,74 @@ failure events to the chosen diagnostic file; message data remains excluded.
 The source update retained the completed test journal for observation. Initial
 counts show the source tracker finishes its 20 eligible entries, so investigate
 which current media observations are omitted rather than assuming transport loss.
+
+## Post-merge evidence (0.8.16 / PR 30)
+
+PR 30 merged after all six Linux/macOS CI checks passed (225 TypeScript tests,
+Go tests/build, type checks and formatting). The installed build remains connected
+with no held work. A new text round trip passed both exact reply and native SUCCESS.
+
+The source-driven text request emitted typing-accepted followed by typing-cleared
+about one second later. The diagnostic-file-triggered captures occurred after the
+reply was already visible; they do not establish visible source-driven typing.
+A separate controlled native typing request to the same room/bot visibly showed
+both the typing label and dots in Desktop; the subsequent clear removed them.
+Thus native client rendering is verified. Capture a longer actual Muse task before
+closing source-to-client timing and mobile acceptance.
+
+Source-readiness before a later text request reported 43 entries, four extracted
+images, 22 partial observations, and zero images/zero partials/one widget among
+the last three entries. The tracker completed all 20 eligible entries. This
+narrows the missing generated-image issue to discovery in the selected source;
+its inspection tab shows a real generated-image button for that same turn.
+
+A temporary reaction was added and removed on the synthetic reply through the
+controlled inspection tab. That source UI change was confirmed. It did not become
+visible in Desktop during observation, and the homeserver's relation-list route
+returned M_UNRECOGNIZED, so the add/change/remove native acceptance is not passed.
+The controlled tab is not the extension's selected source; distinguish cross-tab
+Muse update propagation from reaction parsing before changing the mapping. The
+temporary reaction was removed in the inspection tab; no user message was edited.
+
+## Source visibility and oversized generated images (0.8.17)
+
+Supported browser control can claim the existing selected Muse tab; earlier
+reports that only a separate inspection tab was accessible were incomplete.
+Claiming that tab made it visible. The previously empty generated-image widget
+then mounted a 1600-by-1600 image. Without resending the prompt, diagnostics
+subsequently reported image-too-large: the 2 MB preparation limit is a second,
+concrete obstruction after source rendering. Foregrounding alone did not prove
+delivery. Background rendering remains an acceptance case, not a completed fix.
+
+The new preparation path preserves small originals and compresses oversized
+still PNG/JPEG sources to WebP within the existing per-image/message limits.
+Downloads remain bounded at 20 MB; conversion caps output dimensions and attempts,
+closes decoded bitmaps, and avoids flattening animations. Fixture tests cover
+bounded compression, remaining message budget, cleanup and oversized animations.
+Live delivery on the installed update is pending.
+
+A temporary reaction added on the actual selected source changed the native
+Desktop chat preview to "You loved" the exact synthetic reply. It was removed
+through that same Muse source. This is stronger add evidence than the earlier
+inspection-tab experiment; visible bubble and removal acceptance remain open.
+
+### Live no-rescan image acceptance (0.8.17)
+
+After the automatic update, the previously missing generated image's exact
+Matrix event exists and is encrypted from the Muse bot. A fresh uniquely marked
+image-generation request then passed without a refresh, rescan or resend:
+roundTrip=true, nativeDelivery=true, duplicate=false, nativeFailure=false. The
+source exposed an actual 1920-by-1280 image, image-compressed/image-prepared were
+logged, and Desktop's native image attachment retained the marker in fileName.
+The development checker now reads the pinned timeline for image-only messages
+omitted by search and matches the attachment's own description. Separate nearby
+text cannot satisfy the image test. Regression coverage rejects unrelated files,
+images and foreign-chat responses. The completed test was archived with no held work.
+
+The same actual Muse request emitted typing-accepted and typing-cleared about
+12 seconds apart. A native Desktop capture during that interval visibly shows
+"typing" beneath Muse's header (behind an open image viewer); the later capture,
+after closing the viewer, shows the label cleared. This establishes source-driven
+Desktop appearance/clear, beyond the earlier controlled protocol test. Mobile
+visual behavior remains unverified. The connected Muse tab stayed visible for
+this image acceptance; rendering deferred in background tabs remains a limitation.

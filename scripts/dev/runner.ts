@@ -170,12 +170,20 @@ export function assess(run: Run, messages: Message[]) {
     (m) =>
       m.senderID === run.target.botID &&
       m.isSender !== true &&
-      m.text?.includes(run.marker),
+      (m.text?.includes(run.marker) ||
+        (run.scenario === 'receive-image' &&
+          m.attachments?.some(
+            (a) => a.type === 'img' && a.fileName?.includes(run.marker),
+          ))),
   );
   const reply = replies.find((m) =>
     run.scenario === 'receive-image'
-      ? plain(m.text || '').includes(run.expected) &&
-        !!m.attachments?.some((a) => a.type === 'img')
+      ? !!m.attachments?.some(
+          (a) =>
+            a.type === 'img' &&
+            (plain(m.text || '').includes(run.expected) ||
+              a.fileName?.includes(run.expected)),
+        )
       : plain(m.text || '') === run.expected,
   );
   const duplicate = new Set(own.map((m) => m.id)).size > 1;

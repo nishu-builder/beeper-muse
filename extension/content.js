@@ -306,7 +306,7 @@
     }
     if (message.type === 'probe') {
       respond({
-        protocol: 20,
+        protocol: 21,
         health: health(),
         active: !stopped && closeGuard,
         progress: tracker.progress,
@@ -325,14 +325,14 @@
       generation++;
       void reportActivity(null);
       guardClosing(false);
-      respond({ protocol: 20 });
+      respond({ protocol: 21 });
     }
     if (message.type === 'start') {
       stopped = false;
       tracker = new BeeperMuseSync.Tracker(send, undefined, muse.prepare);
       const state = health();
       guardClosing(state !== 'unavailable');
-      respond({ protocol: 20, health: state });
+      respond({ protocol: 21, health: state });
       checkUpload();
       void poll();
     }
@@ -349,6 +349,7 @@
           diagnostic('activity-readiness', muse.activityReadiness());
           const view = await muse.snapshot();
           diagnostic('source-readiness', {
+            ...muse.mediaReadiness?.(),
             sourceMessages: Math.min(100, view.messages.length),
             sourceTailImages: Math.min(
               100,

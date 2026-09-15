@@ -4,6 +4,7 @@
  */
 declare namespace Muse {
   type PreparationEvent =
+    | 'image-compressed'
     | 'image-prepared'
     | 'image-fetch-failed'
     | 'image-format-unsupported'
@@ -77,12 +78,30 @@ declare namespace Muse {
     reactions: boolean;
     readReceipts: boolean;
   }
+  interface MediaReadiness {
+    sourceVisible: boolean;
+    sourceFocused: boolean;
+    tailImageBusy: number;
+    tailImageChildNodes: number;
+    tailImageNodes: number;
+    tailImagePresentations: number;
+    tailIframes: number;
+    tailWidgetsOnscreen: number;
+    tailWidgetsSized: number;
+    tailCanvases: number;
+    tailVideos: number;
+    tailFileCards: number;
+    tailGeneratedControls: number;
+    tailGeneratedImages: number;
+    tailDeferred: number;
+  }
   interface Adapter {
     readonly capabilities: Capabilities;
     snapshot(): Snapshot | Promise<Snapshot>;
     /** Lightweight observation that does not require a usable composer or transcript. */
     activity?(): Activity | Promise<Activity>;
     activityReadiness?(): ActivityReadiness;
+    mediaReadiness?(): MediaReadiness;
     profile?(): Promise<Profile | undefined>;
     submit(
       prompt: string,

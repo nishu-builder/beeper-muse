@@ -358,3 +358,46 @@ test('writer heartbeat alone, inconsistent collection and in-progress updates ca
     );
   }
 });
+
+test('generated image filenames provide correlation when Desktop omits body text', async () => {
+  const run = newRun(target, 'receive-image');
+  const media: Message = {
+    id: 'photo',
+    chatID: target.chatID,
+    senderID: target.botID,
+    isSender: false,
+    timestamp: new Date(run.startedAt).toISOString(),
+    attachments: [{ type: 'img', fileName: run.marker }],
+  };
+  const client = new Desktop('synthetic', async (input) =>
+    Response.json({
+      items: String(input).includes('/messages/search') ? [] : [media],
+    }),
+  );
+  const messages = await client.messages(target, run.startedAt, true);
+  assert.equal(messages.length, 1);
+  assert.equal(assess(run, messages).roundTrip, true);
+  assert.equal(
+    assess(run, [
+      { ...media, attachments: [{ type: 'img', fileName: 'unrelated' }] },
+    ]).roundTrip,
+    false,
+  );
+  assert.equal(
+    assess(run, [
+      { ...media, attachments: [{ type: 'file', fileName: run.marker }] },
+    ]).roundTrip,
+    false,
+  );
+  const foreign = new Desktop('synthetic', async (input) =>
+    Response.json({
+      items: String(input).includes('/messages/search')
+        ? []
+        : [{ ...media, chatID: 'foreign' }],
+    }),
+  );
+  await assert.rejects(
+    foreign.messages(target, run.startedAt, true),
+    /different chat/,
+  );
+});
