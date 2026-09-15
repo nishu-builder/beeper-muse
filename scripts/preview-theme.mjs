@@ -9,9 +9,13 @@ for (const name of ['theme.css', 'popup.css', 'connection.css'])
     new URL('browser-runtime/runtime/' + name, root),
     new URL(name, out),
   );
-await cp(new URL('extension/icons/', root), new URL('icons/', out), {
-  recursive: true,
-});
+await cp(
+  new URL('browser-runtime/runtime/icons/', root),
+  new URL('icons/', out),
+  {
+    recursive: true,
+  },
+);
 await cp(new URL('site/', root), new URL('site/', out), { recursive: true });
 const version = JSON.parse(await read('package.json')).version;
 const stripScripts = (html) =>

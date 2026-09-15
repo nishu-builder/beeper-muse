@@ -13,7 +13,7 @@ there is no companion process to leave running afterward.
   copies with the same registration conflict.
 
 On macOS, bbctl is available with `brew install beeper/tap/bbctl`.
-A Beeper Desktop API token and a Go compiler are not needed for this setup.
+A Beeper Desktop API token is only needed for the optional maintainer test tools.
 
 ## 1. Create a private registration
 
@@ -48,16 +48,15 @@ Extract the ZIP to a permanent folder. Open `chrome://extensions`, enable
 **Developer mode**, choose **Load unpacked**, and select the extracted folder
 containing `manifest.json`. Keep that folder in place.
 
-If installing through Chrome Web Store, confirm the version is 0.7.0 or newer.
-Older companion releases use a different setup, and store review can delay the
-new version. Store installations update through Chrome. For local builds, use
-the automatic reload setup below.
+You can also install from the [Chrome Web Store](https://chromewebstore.google.com/detail/beeper-muse/bchjpmhhlhpcokhlmbpbiibehfjdgnme).
+Store review can delay releases; compare the installed version with the release
+notes. Store installations update through Chrome. For local builds, use the
+automatic reload setup below.
 
 ### Build from source
 
 From the repository, run `npm run build`, then load `dist/chrome-extension`
-using the same **Load unpacked** steps. The source `extension/` directory is
-part of the older companion build; do not load it for Chrome-only operation.
+using the same **Load unpacked** steps. Load the built output, not a source directory.
 
 ## 3. Import and connect
 
@@ -140,14 +139,6 @@ the extension identity and storage. There is no crypto-state export/import tool.
 Plan a fresh registration/chat for that switch, disable the old copy, and retain
 old messages. Do not promise that importing credentials transfers the old keys.
 
-## Moving from the Go companion
-
-Finish or inspect pending jobs, stop the old companion, and disable its extension.
-Create a new Chrome registration using this guide. The new runtime does not
-import the Go SQLite encryption database, queued work, or old room mappings.
-Keep private backups until you have verified the new chat. The old setup is
-recorded in [legacy companion](legacy-companion.md).
-
 For pausing, interrupted jobs, removal, and credential revocation, see
 [operations](operations.md). Current testing limits are in [validation](validation.md).
 
@@ -165,8 +156,9 @@ to accept the new permission or reload an unpacked extension once; automatic
 updates cannot accept permission prompts for you. Your registration and saved
 messages do not need to be reset.
 
-The final upload into Muse still needs live verification. A connected status
-only confirms the Beeper connection, not a successful image upload.
+A synthetic PNG upload and subsequent text message have passed through the
+installed extension with native delivery confirmation. Other formats and sizes
+need broader testing; a connected status alone does not confirm an upload.
 
 ### Images waiting for Muse
 

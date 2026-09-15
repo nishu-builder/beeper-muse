@@ -17,14 +17,13 @@ Setup instructions: https://nishu-builder.github.io/beeper-muse/
 - Detailed setup: <https://github.com/nishu-builder/beeper-muse/blob/main/docs/chrome-setup.md>
 - Support: <https://github.com/nishu-builder/beeper-muse/issues>
 - Privacy: <https://github.com/nishu-builder/beeper-muse/blob/main/PRIVACY.md>
-- Icon: `extension/icons/icon128.png`
+- Icon: `browser-runtime/runtime/icons/icon128.png`
 - Overview illustration: `docs/store/overview.png` (1280 × 800)
 - Extension UI illustration: `docs/store/extension.png` (1280 × 800)
 - Small promotional tile: `docs/store/tile.png` (440 × 280)
 
-Remove the old companion pairing screenshot. The new illustration describes the
-Chrome-only architecture with synthetic text; it is not a screenshot or live
-verification record. Use the supplied icon, with no private account images.
+The illustrations describe the Chrome architecture with example content; they
+are not screenshots or live verification records. Use the supplied icon, with no private account images.
 
 ## Single purpose
 

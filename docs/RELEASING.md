@@ -1,20 +1,19 @@
 # Releasing
 
 Current releases ship the Chrome-only extension. The public artifact is built
-from `dist/chrome-extension`, not the legacy `extension` source directory or a
-private `.local` installation.
+from `dist/chrome-extension`. Never package a private `.local` installation.
 
 ## Prepare a release
 
 1. Update the version in `package.json`, the root entries of `package-lock.json`,
-   and `browser-runtime/runtime/manifest.json`. The legacy Go/client versions
-   remain independent. Update `CHANGELOG.md` and affected documentation.
+   and `browser-runtime/runtime/manifest.json`. Update `CHANGELOG.md` and affected
+   documentation.
 2. Run `npm ci --ignore-scripts`, `npm run check`,
-   `go test -race -tags goolm ./...`, `npm audit --omit=dev --audit-level=high`,
+   `npm audit --omit=dev --audit-level=high`,
    and `npm run package`. Review [validation](validation.md) honestly.
 3. Inspect the archive: it must contain the connection tab, runtime JavaScript,
    `crypto.wasm`, icons and license notices. It must exclude credentials,
-   private configuration, development probes and companion code.
+   private configuration and development tooling.
 4. Merge through a ready-for-review PR with passing CI. Tag the merged main commit
    with the matching version (for example `v0.7.0`) and push that tag.
 
@@ -32,8 +31,8 @@ assets silently; issue a new version for changed bytes.
 
 Item: `bchjpmhhlhpcokhlmbpbiibehfjdgnme`. Use [listing notes](store-listing.md)
 for the short description, current permissions, privacy disclosures and reviewer
-instructions. Keep the privacy/setup links public. Remove stale companion
-screenshots or descriptions when uploading the Chrome-only package.
+instructions. Keep screenshots, descriptions and public privacy/setup links
+consistent with the version being submitted.
 
 Upload `dist/beeper-muse-extension.zip` through the developer dashboard, complete
 listing/disclosure changes, then submit for review. An upload or submission is

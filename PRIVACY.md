@@ -86,10 +86,6 @@ local storage and pending work but does not revoke the remote Beeper registratio
 or remove messages already held by Beeper or Muse. Private setup files and
 backups must be removed separately. See [removal and recovery](docs/operations.md).
 
-Earlier companion versions stored credentials/messages in local files and SQLite
-and communicated over loopback. Those components are not in the current public
-ZIP; consult [legacy companion](docs/legacy-companion.md) if still using them.
-
 Policy changes are committed here. Ask privacy questions in a
 [GitHub issue](https://github.com/nishu-builder/beeper-muse/issues) without private
 data; use [private vulnerability reporting](https://github.com/nishu-builder/beeper-muse/security/advisories/new)

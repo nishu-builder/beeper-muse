@@ -2,7 +2,7 @@
 
 This document describes the current Chrome implementation.
 For the component overview, see [architecture](architecture.md). For installation,
-see [setup](chrome-setup.md). The older Go companion is separate legacy code.
+see [setup](chrome-setup.md).
 
 ## Registration and room identity
 
@@ -21,7 +21,7 @@ socket connects and is refreshed while connected.
 
 Do not clear storage to retry startup. Room-alias recovery is not reliable on
 all Beeper server paths; losing local state can create another room. There is
-no supported migration from the Go crypto database or between extension IDs.
+no supported migration of encryption state between extension IDs.
 
 ## Why the socket has its own tab
 
@@ -89,7 +89,7 @@ crypto-store passphrase alongside local state; encryption at rest is not a defen
 against someone controlling the Chrome profile. `unlimitedStorage` avoids ordinary
 quota eviction but does not protect against disk failure or uninstalling.
 
-## Diagnostics and development probe
+## Diagnostics
 
 The popup shows separate Beeper/Muse states, startup stages, queue counts,
 connection errors and interrupted jobs. Diagnostics exclude credentials, raw
@@ -97,13 +97,6 @@ frames and conversations. Handshake observations are restricted to the exact
 socket/tab and report only verification flags, HTTP status and bounded errors.
 A startup stage taking over 60 seconds is reported; the watchdog does not create
 a second crypto writer while an operation is still pending.
-
-`browser-runtime/probe/` is a development-only handshake experiment, not the
-shipping extension. `npm run build:browser-probe` builds it without credentials.
-The private setup helper requires the legacy development bbctl configuration and
-creates a separate registration; it is not a public installation step. Never
-load it against the active runtime registration or package `.local/chrome-probe`.
-The successful probe established transport compatibility, not full message sync.
 
 See [validation](validation.md) for acceptance coverage and [releasing](RELEASING.md)
 for public artifacts.

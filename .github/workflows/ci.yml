@@ -1,6 +1,7 @@
 name: CI
 on:
   push:
+    branches: [main]
   pull_request:
 permissions:
   contents: read
@@ -9,13 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - os: ubuntu-latest
-            go: '1.26.x'
-          - os: ubuntu-latest
-            go: '1.27.x'
-          - os: macos-latest
-            go: '1.27.x'
+        os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 15
     steps:
@@ -24,11 +19,6 @@ jobs:
         with:
           node-version: 24
           cache: npm
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: ${{ matrix.go }}
-          cache: true
       - run: npm ci --ignore-scripts
       - run: npm run check
-      - run: go test -race -tags goolm ./...
       - run: npm audit --omit=dev --audit-level=high

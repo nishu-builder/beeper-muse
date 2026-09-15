@@ -27,16 +27,12 @@ async function fingerprint(directory) {
     }
   }
 }
-for (const directory of [
-  'src/',
-  'browser-runtime/runtime/',
-  'extension/icons/',
-])
+for (const directory of ['src/', 'browser-runtime/runtime/'])
   await fingerprint(directory);
 for (const path of [
-  'extension/content.js',
   'package-lock.json',
   'scripts/build-browser-runtime.mjs',
+  'tsconfig.content.json',
 ]) {
   hash.update(path + '\0');
   hash.update(await readFile(new URL(path, root)));
@@ -64,16 +60,21 @@ for (const name of [
   'theme.css',
   'connection.html',
   'connection.css',
+  'content.js',
 ])
   await copyFile(
     new URL('browser-runtime/runtime/' + name, root),
     new URL(name, output),
   );
-for (const name of ['adapter.js', 'sync.js', 'activity.js', 'content.js'])
-  await copyFile(new URL('extension/' + name, root), new URL(name, output));
-await cp(new URL('extension/icons/', root), new URL('icons/', output), {
-  recursive: true,
-});
+for (const name of ['adapter.js', 'sync.js', 'activity.js'])
+  await copyFile(new URL('dist/content/' + name, root), new URL(name, output));
+await cp(
+  new URL('browser-runtime/runtime/icons/', root),
+  new URL('icons/', output),
+  {
+    recursive: true,
+  },
+);
 await copyFile(
   new URL(
     'node_modules/@matrix-org/matrix-sdk-crypto-wasm/pkg/matrix_sdk_crypto_wasm_bg.wasm',

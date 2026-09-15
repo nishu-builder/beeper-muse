@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+- Remove the retired Go companion, its old extension UI and setup commands, and
+  the standalone handshake experiment. Node 24 now builds and checks the project.
+- Keep Chrome runtime assets together and generated content scripts under dist.
+  Simplify Linux/macOS CI and release jobs by dropping the Go toolchain.
+- Refresh setup/support documentation, correct stale photo/typing/avatar claims,
+  and separate current validation and parity priorities from historical logs.
+
 ## 0.8.21
 
 - Match the website in the popup and connection tab: cream backgrounds,

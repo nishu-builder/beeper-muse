@@ -4,11 +4,11 @@ import { readFile } from 'node:fs/promises';
 import { JSDOM } from 'jsdom';
 import { colorPNG } from '../scripts/dev/fixture.ts';
 const sync = await readFile(
-  new URL('../extension/sync.js', import.meta.url),
+  new URL('../dist/content/sync.js', import.meta.url),
   'utf8',
 );
 const adapter = await readFile(
-  new URL('../extension/adapter.js', import.meta.url),
+  new URL('../dist/content/adapter.js', import.meta.url),
   'utf8',
 );
 function fixture() {
