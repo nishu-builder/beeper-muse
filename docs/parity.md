@@ -644,3 +644,18 @@ image and the blue replacement image in the conversation, with Babar's elephant
 avatar in the header. The replacement is marked Edited and remains after the
 generated-image exchange. This adds actual client rendering evidence to the
 attachment API checks above; it does not change the background-tab limitation.
+
+### Background acceptance guard
+
+The development runner now accepts `receive-image --background`. It refuses a
+send without a fresh hidden-source sample and persists visibility observations
+with the existing send journal. Native image delivery cannot pass this scenario
+until a subsequent hidden sample arrives. Visible/unknown samples or diagnostic
+gaps invalidate background acceptance permanently for that run. Repeated
+observations do not count as new evidence, and `dev:observe` never resends.
+
+Seventeen focused development tests passed, including stale/future/unknown
+samples, delivery timing, coverage gaps and journal recovery. The installed
+0.8.18 diagnostic reported visible and the live preflight correctly refused to
+send. A real hidden-tab run is pending the requested manual tab switch; this
+guard improves verification and does not itself fix source rendering.

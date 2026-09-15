@@ -79,6 +79,23 @@ npm run dev:test -- image
 npm run dev:observe
 ```
 
+To verify generated-image delivery while Muse is hidden, use:
+
+```sh
+npm run dev:test -- receive-image --background
+```
+
+Switch Chrome to another tab first and wait for the diagnostic source sample
+(up to 30 seconds). The runner refuses to send unless the latest sample reports
+Muse hidden. It keeps the visibility evidence in the same send journal and waits
+for a hidden sample after delivery before passing. `dev:observe` resumes both
+checks without another send. A visible/unknown sample or a gap longer than
+40 seconds invalidates background acceptance even if the image arrives. This
+checks sampled visibility; it does not prove continuous invisibility between
+samples. Browser inspection can affect tab state, so do not inspect Muse during
+this check. A failed test record can be closed with `dev:close`; that does not
+dismiss or replay any bridge job.
+
 Each send has a unique marker and a durable record written **before** any
 mutation. Losing a response or restarting the driver never triggers an automatic
 resend. `dev:observe` resumes reading the same run; it sends nothing. An individual

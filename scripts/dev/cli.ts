@@ -3,6 +3,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { setTimeout as wait } from 'node:timers/promises';
 import { Desktop, DevError, object, type Target } from './desktop.ts';
+import { beginBackground, observeBackground } from './background.ts';
 import {
   diagnostics,
   ready,
@@ -163,9 +164,17 @@ try {
         const scenario = process.argv[3] || 'text';
         if (!['text', 'image', 'receive-image'].includes(scenario))
           throw new DevError('Choose text, image or receive-image.');
-        ready(await readLog(), version, build);
+        const flags = process.argv.slice(4);
+        if (
+          flags.some((flag) => flag !== '--background') ||
+          (flags.length && scenario !== 'receive-image')
+        )
+          throw new DevError('Only receive-image supports --background.');
+        const initialLog = ready(await readLog(), version, build);
         await desktop.messages(target, Date.now() - 60000);
         run = newRun(target, scenario as Scenario);
+        if (flags.includes('--background'))
+          run.background = beginBackground(initialLog.events);
         await save(active, run);
         await sendOnce(desktop, run, (r) => save(active, r));
         console.log('One synthetic test sent. Observing without resending.');
@@ -178,16 +187,39 @@ try {
           run.startedAt - 1000,
           run.scenario === 'receive-image',
         );
-        const result = assess(run, messages);
+        const delivery = assess(run, messages);
         let log: ReturnType<typeof diagnostics> | undefined;
         try {
           log = diagnostics(await readLog());
         } catch {
           /* Report unavailable separately. */
         }
+        const background = run.background
+          ? observeBackground(
+              run.background,
+              log?.events || [],
+              delivery.outcome === 'passed',
+            )
+          : undefined;
+        if (run.background) await save(active, run);
+        const result = {
+          ...delivery,
+          ...(background
+            ? {
+                background,
+                outcome:
+                  delivery.outcome === 'failed' || background === 'failed'
+                    ? 'failed'
+                    : background === 'passed'
+                      ? 'passed'
+                      : 'waiting',
+              }
+            : {}),
+        };
         const report = {
           id: run.id,
           scenario: run.scenario,
+          backgroundEvidence: run.background,
           at: Date.now(),
           version,
           ...result,
