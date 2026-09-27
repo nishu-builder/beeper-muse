@@ -35,7 +35,7 @@
     "esbuild": "0.28.2",
     "fake-indexeddb": "6.2.5",
     "jsdom": "30.0.1",
-    "prettier": "3.9.6",
+    "prettier": "3.9.9",
     "tsx": "4.23.13",
     "typescript": "7.0.2"
   },
