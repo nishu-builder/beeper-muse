@@ -31,7 +31,7 @@
   "devDependencies": {
     "@types/chrome": "0.2.9",
     "@types/jsdom": "30.0.0",
-    "@types/node": "24.13.4",
+    "@types/node": "24.13.6",
     "esbuild": "0.28.2",
     "fake-indexeddb": "6.2.5",
     "jsdom": "30.0.1",
